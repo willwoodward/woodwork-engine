@@ -1,5 +1,5 @@
 from components.component import component
-from components.knowledge_bases.chroma import chroma
+from components.knowledge_bases.vector_databases.chroma import chroma
 
 keywords = ["knowledge_base"]
 components: list[component] = []
@@ -7,7 +7,7 @@ components: list[component] = []
 line = []
 with open("main.wf", "r") as f:
     lines = list(map(lambda line: line.strip("\n"), f.readlines()))
-    
+
 for line in lines:
     if "knowledge_base" in line:
         # The name is everything before the equals sign with the whitespace removed either side
@@ -18,4 +18,5 @@ for line in lines:
         if type == "chroma":
             components.append(chroma(name))
 
-print(components[0].name, components[0].type)
+for c in components:
+    print(c.name)
