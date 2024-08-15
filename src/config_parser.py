@@ -36,8 +36,7 @@ with open("main.wf", "r") as f:
 for command in commands:
     if command["component"] == "knowledge_base":
         
-        if command["type"] == "chroma":
-            components.append(chroma(command["variable"]))
+        if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
     
 
 print(components[0])
