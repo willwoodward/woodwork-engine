@@ -1,4 +1,6 @@
 name1 = knowledge_base chroma {
     client: local
-    path: ./chroma
+    path: ../local_data/chroma
 }
+
+neo4j = knowledge_base neo4j {}

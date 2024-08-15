@@ -2,6 +2,7 @@ import re
 
 from components.component import component
 from components.knowledge_bases.vector_databases.chroma import chroma
+from components.knowledge_bases.graph_databases.neo4j import neo4j
 
 keywords = ["knowledge_base"]
 components: list[component] = []
@@ -37,6 +38,7 @@ for command in commands:
     if command["component"] == "knowledge_base":
         
         if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
+        if command["type"] == "neo4j":  components.append(neo4j(command["variable"], command["config"]))
     
 
 print(components[0])
