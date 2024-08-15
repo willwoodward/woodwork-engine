@@ -1,3 +1,4 @@
 name1 = knowledge_base chroma {
-
+    client: local
+    path: file.txt
 }
