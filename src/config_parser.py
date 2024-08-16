@@ -26,20 +26,28 @@ with open("main.ww", "r") as f:
         config_items = list(map(lambda x: x.replace("\n", "").strip(), re.findall(r"\n[^\n\}]+", entry)))
         config_items = [x for x in config_items if x != ""]
 
+        # Parses the settings for each command
         command["config"] = {}
         for item in config_items:
             key = item.split(":")[0].strip()
             value = item.split(":")[1].strip()
+            
+            # If the value is not a string, it references a variable
+            # We replace this variable with a reference to the object
+            if value[0] != "\"" and value[0] != "'":
+                # Search components for the variable
+                for c in components:
+                    if c.name == value:
+                        value = c
+                        break
+
             command["config"][key] = value
-
-        commands.append(command)
-
-
-
-for command in commands:
-    if command["component"] == "knowledge_base":
-        if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
-        if command["type"] == "neo4j":  components.append(neo4j(command["variable"], command["config"]))
     
-    if command["component"] == "llm":
-        if command["type"] == "hugging_face": components.append(hugging_face(command["variable"], command["config"]))
+        if command["component"] == "knowledge_base":
+            if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
+            if command["type"] == "neo4j":  components.append(neo4j(command["variable"], command["config"]))
+        
+        if command["component"] == "llm":
+            if command["type"] == "hugging_face": components.append(hugging_face(command["variable"], command["config"]))
+        
+        print(command)

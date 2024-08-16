@@ -5,5 +5,8 @@ class hugging_face(llm):
         print("Establishing connection with model...")
         
         super().__init__(name)
+        
+        if config["knowledge_base"]:
+            config["knowledge_base"].retriever()
 
         print("Model initialised.")

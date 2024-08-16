@@ -1,8 +1,8 @@
 name1 = knowledge_base chroma {
-    client: local
-    path: ../local_data/chroma
+    client: "local"
+    path: "../local_data/chroma"
 }
 
 model = llm hugging_face {
-
+    knowledge_base: name1
 }
