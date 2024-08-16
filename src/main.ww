@@ -3,4 +3,6 @@ name1 = knowledge_base chroma {
     path: ../local_data/chroma
 }
 
-neo4j = knowledge_base neo4j {}
+model = llm hugging_face {
+
+}
