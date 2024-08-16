@@ -43,6 +43,7 @@ with open("main.ww", "r") as f:
 
             command["config"][key] = value
     
+        # Create the objects specified by the command
         if command["component"] == "knowledge_base":
             if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
             if command["type"] == "neo4j":  components.append(neo4j(command["variable"], command["config"]))
@@ -52,5 +53,3 @@ with open("main.ww", "r") as f:
         
         if command["component"] == "input":
             if command["type"] == "command_line": components.append(command_line(command["variable"], command["config"]))
-        
-        print(command)
