@@ -8,7 +8,7 @@ keywords = ["knowledge_base"]
 components: list[component] = []
 
 commands = []
-with open("main.wf", "r") as f:
+with open("main.ww", "r") as f:
     lines = f.read()
     
     entry_pattern = r".+=.+\{[\s\S]*?\}"
