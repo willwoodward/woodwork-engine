@@ -6,3 +6,7 @@ name1 = knowledge_base chroma {
 model = llm hugging_face {
     knowledge_base: name1
 }
+
+in = input command_line {
+    to: model
+}

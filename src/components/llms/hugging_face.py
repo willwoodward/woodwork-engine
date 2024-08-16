@@ -10,3 +10,6 @@ class hugging_face(llm):
             config["knowledge_base"].retriever()
 
         print("Model initialised.")
+    
+    def input_handler(self, query):
+        print(f"Query: {query}")
