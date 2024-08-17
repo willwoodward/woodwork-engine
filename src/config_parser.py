@@ -6,7 +6,6 @@ from components.knowledge_bases.graph_databases.neo4j import neo4j
 from components.llms.hugging_face import hugging_face
 from components.inputs.command_line import command_line
 
-keywords = ["knowledge_base"]
 components: list[component] = []
 
 commands = []

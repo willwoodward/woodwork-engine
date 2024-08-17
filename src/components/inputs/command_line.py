@@ -14,7 +14,8 @@ class command_line(inputs):
         print("Command line input initialised, type \";\" to exit. Begin typing:")
         
         thread = Thread(target=self.__input_loop)
-        thread.start()        
+        thread.start()
+        thread.join()     
     
     def __input_loop(self):
         while True:
@@ -24,4 +25,4 @@ class command_line(inputs):
                 break
             
             # Send the input to the component
-            self.destination.input_handler(x)
+            print(self.destination.input_handler(x))
