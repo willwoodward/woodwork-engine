@@ -1,11 +1,11 @@
 import re
 import os
 
-from components.component import component
-from components.knowledge_bases.vector_databases.chroma import chroma
-from components.knowledge_bases.graph_databases.neo4j import neo4j
-from components.llms.hugging_face import hugging_face
-from components.inputs.command_line import command_line
+from .components.component import component
+from .components.knowledge_bases.vector_databases.chroma import chroma
+from .components.knowledge_bases.graph_databases.neo4j import neo4j
+from .components.llms.hugging_face import hugging_face
+from .components.inputs.command_line import command_line
 
 def main_function():
     components: list[component] = []

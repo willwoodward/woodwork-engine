@@ -1,3 +1,6 @@
 __pycache__
 local_data
 .env
+chroma
+build
+dist

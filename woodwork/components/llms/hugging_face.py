@@ -5,7 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 import os
 from dotenv import load_dotenv
 
-from components.llms.llm import llm
+from woodwork.components.llms.llm import llm
 
 class hugging_face(llm):
     def __init__(self, name, config):

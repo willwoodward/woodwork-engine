@@ -6,7 +6,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import CharacterTextSplitter
 from langchain.schema.document import Document
 
-from components.knowledge_bases.vector_databases.vector_database import vector_database
+from woodwork.components.knowledge_bases.vector_databases.vector_database import vector_database
 
 class chroma(vector_database):
     def __init__(self, name, config):

@@ -1,6 +1,6 @@
 from threading import Thread
 
-from components.inputs.inputs import inputs
+from woodwork.components.inputs.inputs import inputs
 
 class command_line(inputs):
     def __init__(self, name, config):

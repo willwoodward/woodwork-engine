@@ -1,2 +1,0 @@
-[console_scripts]
-woodwork = woodwork.__main__:main

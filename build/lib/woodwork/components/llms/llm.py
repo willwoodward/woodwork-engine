@@ -1,4 +1,4 @@
-from components.component import component
+from woodwork.components.component import component
 
 class llm(component):
     def __init__(self, name):
