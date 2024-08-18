@@ -1,4 +1,5 @@
 import re
+import os
 
 from components.component import component
 from components.knowledge_bases.vector_databases.chroma import chroma
@@ -8,8 +9,10 @@ from components.inputs.command_line import command_line
 
 components: list[component] = []
 
+current_directory = os.getcwd()
+
 commands = []
-with open("main.ww", "r") as f:
+with open(current_directory + "/main.ww", "r") as f:
     lines = f.read()
     
     entry_pattern = r".+=.+\{[\s\S]*?\}"
