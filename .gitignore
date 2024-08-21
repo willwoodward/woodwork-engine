@@ -5,3 +5,4 @@ chroma
 build
 dist
 .woodwork
+woodwork_engine.egg-info
