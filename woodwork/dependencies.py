@@ -28,6 +28,28 @@ def setup_virtual_env(options):
     with open(os.getcwd() + "/.woodwork/env/pyvenv.cfg", "w") as f:
         f.write(lines)
 
+def activate_virtual_environment():
+    "Activates the virtual environment if not already activated."
+    # Path to the virtual environment
+    venv_path = os.path.join(os.getcwd(), '.woodwork', 'env')
+
+    # Check if we're already in the virtual environment
+    if sys.prefix == venv_path:
+        print("Virtual environment is already active.")
+        return
+
+    # Execute the activation script
+    activate_script = os.path.join(venv_path, 'bin', 'activate')
+    cmd = f'source {activate_script}'
+    
+    # Run the command in the virtual environment
+    subprocess.run(f"/bin/bash -c \"source .woodwork/env/bin/activate\"", shell=True, check=True)
+
+    # Adjust sys.path to prioritize the virtual environment
+    site_packages = os.path.join(venv_path, 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}', 'site-packages')
+    sys.path.insert(0, site_packages)
+
+    print("Virtual environment activated.")
 
 def init(options={"isolated": False}):
     # Make sure the virtual environment is set up properly
