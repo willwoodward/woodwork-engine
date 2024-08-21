@@ -14,7 +14,6 @@ def main_function():
     current_directory = os.getcwd()
     load_dotenv()
 
-    commands = []
     with open(current_directory + "/main.ww", "r") as f:
         lines = f.read()
         
