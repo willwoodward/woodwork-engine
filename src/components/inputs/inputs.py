@@ -1,5 +1,0 @@
-from components.component import component
-
-class inputs(component):
-    def __init__(self, name):
-        super().__init__(name, "input")
