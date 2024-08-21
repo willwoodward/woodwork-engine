@@ -35,6 +35,9 @@ def setup_virtual_env(options):
 def activate_virtual_environment():
     # Path to the virtual environment
     venv_path = os.path.join(os.getcwd(), '.woodwork', 'env')
+    
+    if not os.path.exists(venv_path):
+        setup_virtual_env({"isolated": False})
 
     # Check if we're already in the virtual environment
     if sys.prefix == venv_path:
