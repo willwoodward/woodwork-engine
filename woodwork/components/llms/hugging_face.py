@@ -3,20 +3,17 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 import os
-from dotenv import load_dotenv
 
 from woodwork.components.llms.llm import llm
 
 class hugging_face(llm):
     def __init__(self, name, config):
         print(f"Establishing connection with model...")
-        
-        load_dotenv()
-        
+                
         self.__llm = HuggingFaceEndpoint(repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
                     temperature=0.1, 
                     model_kwargs={"max_length": 100},
-                    huggingfacehub_api_token=os.getenv(config["api_token"]))
+                    huggingfacehub_api_token=config["api_token"])
                 
         super().__init__(name)
         

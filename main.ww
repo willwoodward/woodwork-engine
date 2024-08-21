@@ -4,7 +4,7 @@ name1 = knowledge_base chroma {
 
 model = llm hugging_face {
     knowledge_base: name1
-    api_token: "HF_API_TOKEN"
+    api_token: $HF_API_TOKEN
 }
 
 in = input command_line {
