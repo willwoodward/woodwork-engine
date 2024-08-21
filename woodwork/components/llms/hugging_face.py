@@ -9,14 +9,14 @@ from woodwork.components.llms.llm import llm
 
 class hugging_face(llm):
     def __init__(self, name, config):
-        print("Establishing connection with model...")
+        print(f"Establishing connection with model...")
         
         load_dotenv()
         
         self.__llm = HuggingFaceEndpoint(repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
                     temperature=0.1, 
                     model_kwargs={"max_length": 100},
-                    huggingfacehub_api_token=os.getenv("HF_API_TOKEN"))
+                    huggingfacehub_api_token=os.getenv(config["api_token"]))
                 
         super().__init__(name)
         

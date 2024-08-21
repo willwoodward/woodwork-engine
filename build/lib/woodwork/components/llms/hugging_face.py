@@ -9,7 +9,7 @@ from woodwork.components.llms.llm import llm
 
 class hugging_face(llm):
     def __init__(self, name, config):
-        print("Establishing connection with model...")
+        print(f"Establishing connection with model..., cd = {os.getcwd()}")
         
         load_dotenv()
         

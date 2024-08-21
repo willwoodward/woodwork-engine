@@ -11,7 +11,7 @@ class command_line(inputs):
         if config["to"]:
             self.destination = config["to"]
 
-        print("Command line input initialised, type \";\" to exit. Begin typing:")
+        print("Command line input initialised, type \";\" to exit. Begin typing a message:")
         
         thread = Thread(target=self.__input_loop)
         thread.start()
