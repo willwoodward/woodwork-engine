@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 def init():
-    print("Initialising dependencies...")
+    print("Installing dependencies...")
     
     components = set()
     with open(os.getcwd() + "/main.ww", "r") as f:
@@ -34,17 +34,16 @@ def init():
         component_requirements = os.path.join(requirements_dir, component, f"{component}.txt")
         try:
             if os.path.isfile(component_requirements):
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", component_requirements], stdout=subprocess.DEVNULL)
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", component_requirements])
                 print(f"Installed dependencies for {component}.")
         except subprocess.CalledProcessError:
-            print(f"Failed to install dependencies for {component}.")
             sys.exit(1)
         
         # Install the component type dependencies
         type_requirements = os.path.join(requirements_dir, component, f"{type}.txt")
         try:
             if os.path.isfile(type_requirements):
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", type_requirements], stdout=subprocess.DEVNULL)
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", type_requirements])
                 print(f"Installed dependencies for {component}.")
         except subprocess.CalledProcessError:
             sys.exit(1)

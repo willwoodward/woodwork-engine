@@ -1,5 +1,6 @@
 import re
 import os
+from dotenv import load_dotenv
 
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
@@ -11,8 +12,8 @@ def main_function():
     components: list[component] = []
 
     current_directory = os.getcwd()
+    load_dotenv()
 
-    commands = []
     with open(current_directory + "/main.ww", "r") as f:
         lines = f.read()
         
@@ -37,12 +38,17 @@ def main_function():
                 
                 # If the value is not a string, it references a variable
                 # We replace this variable with a reference to the object
-                if value[0] != "\"" and value[0] != "'":
+                if value[0] != "\"" and value[0] != "'" and value[0] != '$':
                     # Search components for the variable
                     for c in components:
                         if c.name == value:
                             value = c
                             break
+                
+                # If the value starts with $, then it is a secret key in the .env file
+                # Replace this with the secret
+                elif value[0] == '$':
+                    value = os.getenv(value[1::])
 
                 command["config"][key] = value
         
