@@ -7,4 +7,8 @@ def main():
     if len(sys.argv) == 1:
         main_function()
     elif sys.argv[1] == "init":
-        init()
+        if len(sys.argv) == 2:
+            init()
+        else:
+            if sys.argv[2] == "--isolated":
+                init({"isolated": True})
