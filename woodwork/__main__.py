@@ -1,7 +1,10 @@
 from woodwork.config_parser import main_function
+from woodwork.dependencies import init
+
+import sys
 
 def main():
-    main_function()
-    
-if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 1:
+        main_function()
+    elif sys.argv[1] == "init":
+        init()
