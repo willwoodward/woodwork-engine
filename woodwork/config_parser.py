@@ -9,6 +9,7 @@ from woodwork.components.llms.hugging_face import hugging_face
 from woodwork.components.llms.openai import openai
 from woodwork.components.inputs.command_line import command_line
 from woodwork.components.apis.web import web
+from woodwork.components.decomposers.llm import llm
 
 def main_function():
     components: list[component] = []
@@ -56,6 +57,8 @@ def main_function():
                     value = value[1:-1:]
 
                 command["config"][key] = value
+            
+            print(command)
 
             # Create the objects specified by the command
             if command["component"] == "knowledge_base":
@@ -71,3 +74,6 @@ def main_function():
             
             if command["component"] == "api":
                 if command["type"] == "web": components.append(web(command["variable"], command["config"]))
+
+            if command["component"] == "decomposer":
+                if command["type"] == "1 =": components.append(llm(command["variable"], command["config"]))

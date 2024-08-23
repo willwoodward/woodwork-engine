@@ -14,4 +14,4 @@ class api(component):
 
     
     def describe(self):
-        print(self.__documentation)
+        return self.__documentation
