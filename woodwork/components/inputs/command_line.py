@@ -8,7 +8,7 @@ class command_line(inputs):
         
         super().__init__(name)
         
-        if config["to"]:
+        if "to" in config:
             self.destination = config["to"]
 
         print("Command line input initialised, type \";\" to exit. Begin typing a message:")
@@ -25,4 +25,7 @@ class command_line(inputs):
                 break
             
             # Send the input to the component
-            print(self.destination.input_handler(x))
+            try:
+                print(self.destination.input_handler(x))
+            except:
+                pass

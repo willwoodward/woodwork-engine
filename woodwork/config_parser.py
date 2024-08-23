@@ -6,6 +6,7 @@ from woodwork.components.component import component
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.components.llms.hugging_face import hugging_face
+from woodwork.components.llms.openai import openai
 from woodwork.components.inputs.command_line import command_line
 
 def main_function():
@@ -59,6 +60,7 @@ def main_function():
             
             if command["component"] == "llm":
                 if command["type"] == "hugging_face": components.append(hugging_face(command["variable"], command["config"]))
+                if command["type"] == "openai": components.append(openai(command["variable"], command["config"]))
             
             if command["component"] == "input":
                 if command["type"] == "command_line": components.append(command_line(command["variable"], command["config"]))

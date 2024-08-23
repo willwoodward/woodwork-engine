@@ -2,9 +2,10 @@ name1 = knowledge_base chroma {
     client: "local"
 }
 
-model = llm hugging_face {
+model2 = llm openai {
+    model: "gpt-4o-mini"
     knowledge_base: name1
-    api_token: $HF_API_TOKEN
+    api_key: $OPENAI_API_KEY
 }
 
 in = input command_line {
