@@ -55,7 +55,7 @@ def main_function():
                     value = value[1:-1:]
 
                 command["config"][key] = value
-                    
+            
             # Create the objects specified by the command
             if command["component"] == "knowledge_base":
                 if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
