@@ -8,6 +8,7 @@ from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.components.llms.hugging_face import hugging_face
 from woodwork.components.llms.openai import openai
 from woodwork.components.inputs.command_line import command_line
+from woodwork.components.apis.web import web
 
 def main_function():
     components: list[component] = []
@@ -55,7 +56,7 @@ def main_function():
                     value = value[1:-1:]
 
                 command["config"][key] = value
-            
+
             # Create the objects specified by the command
             if command["component"] == "knowledge_base":
                 if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
@@ -67,3 +68,6 @@ def main_function():
             
             if command["component"] == "input":
                 if command["type"] == "command_line": components.append(command_line(command["variable"], command["config"]))
+            
+            if command["component"] == "api":
+                if command["type"] == "web": components.append(web(command["variable"], command["config"]))
