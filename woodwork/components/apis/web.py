@@ -8,7 +8,7 @@ class web(api):
         print("Configuring API...")
         self.__url = config["url"]
         
-        super().__init__(name)
+        super().__init__(name, config)
         print("API configured.")
 
     def call(self, req):
