@@ -15,19 +15,17 @@ class chroma(vector_database):
         client = None
         if config["client"] == "local":
             if "path" not in config:
-                config["path"] = "../.woodwork/chroma"
+                config["path"] = ".woodwork/chroma"
             else:
                 client = chromadb.PersistentClient(path=config["path"])
                 
         embedding_function = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-
-        persistent_client = chromadb.PersistentClient()
         
         self.__db = Chroma(
-            client=persistent_client,
+            client=client,
             collection_name="embedding_store",
             embedding_function=embedding_function,
-            persist_directory="../.woodwork/chroma"
+            persist_directory=config["path"]
         )
 
         retriever = self.__db.as_retriever()
