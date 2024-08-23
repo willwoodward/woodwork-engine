@@ -10,10 +10,10 @@ from woodwork.components.llms.llm import llm
 class openai(llm):
     def __init__(self, name, config):
         print(f"Establishing connection with model...")
-                
+        
         self.__llm = ChatOpenAI(
-            model=config["model"],
-            temperature=0.1,
+            model="gpt-4o-mini",
+            temperature=0,
             max_tokens=None,
             timeout=None,
             max_retries=2,
@@ -27,7 +27,7 @@ class openai(llm):
 
         print("Model initialised.")
     
-    def input_handler(self, query):
+    def input_handler(self, query):        
         system_prompt = (
             "Use the given context to answer the question. "
             "If you don't know the answer, say you don't know. "
@@ -45,5 +45,16 @@ class openai(llm):
         
         question_answer_chain = create_stuff_documents_chain(self.__llm, prompt)
         chain = create_retrieval_chain(self.__retriever, question_answer_chain)
+        
+        # messages = [
+        #     (
+        #         "system",
+        #         "You are a helpful assistant that translates English to French. Translate the user sentence.",
+        #     ),
+        #     ("human", "What is the weather today?"),
+        # ]
+        # ai_msg = self.__llm.invoke(messages)
 
+        # print(chain.invoke({"input": query}))
         return chain.invoke({"input": query})['answer']
+        # return ai_msg

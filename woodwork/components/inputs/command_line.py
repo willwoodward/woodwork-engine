@@ -25,7 +25,4 @@ class command_line(inputs):
                 break
             
             # Send the input to the component
-            try:
-                print(self.destination.input_handler(x))
-            except:
-                pass
+            print(self.destination.input_handler(x))
