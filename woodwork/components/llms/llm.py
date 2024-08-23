@@ -14,7 +14,31 @@ class llm(component):
     
 
 
-    def input_handler(self, query):        
+    def input_handler(self, query):
+        # If there is no retriever object, there is no connected Knowledge Base
+        if not self.__retriever:
+            return self.question_answer(query)
+        else:
+            return self.context_answer(query)
+            
+    def question_answer(self, query):
+        system_prompt = (
+            "You are a helpful assistant, answer the provided question, "
+            "In 3 sentences or less. "
+        )
+        
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", "{input}"),
+            ]
+        )
+        
+        chain = prompt | self.__llm
+
+        return chain.invoke({"input": query}).content
+        
+    def context_answer(self, query):
         system_prompt = (
             "Use the given context to answer the question. "
             "If you don't know the answer, say you don't know. "

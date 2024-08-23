@@ -4,6 +4,7 @@ name1 = knowledge_base chroma {
 
 model2 = llm openai {
     model: "gpt-4o"
+    knowledge_base: name1
     api_key: $OPENAI_API_KEY
 }
 
