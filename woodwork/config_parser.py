@@ -50,9 +50,12 @@ def main_function():
                 # Replace this with the secret
                 elif value[0] == '$':
                     value = os.getenv(value[1::])
+                
+                elif (value[0] == "\"" and value[-1] == "\"") or (value[0] == "\'" and value[-1] == "\'"):
+                    value = value[1:-1:]
 
                 command["config"][key] = value
-        
+                    
             # Create the objects specified by the command
             if command["component"] == "knowledge_base":
                 if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))

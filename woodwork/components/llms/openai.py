@@ -45,16 +45,5 @@ class openai(llm):
         
         question_answer_chain = create_stuff_documents_chain(self.__llm, prompt)
         chain = create_retrieval_chain(self.__retriever, question_answer_chain)
-        
-        # messages = [
-        #     (
-        #         "system",
-        #         "You are a helpful assistant that translates English to French. Translate the user sentence.",
-        #     ),
-        #     ("human", "What is the weather today?"),
-        # ]
-        # ai_msg = self.__llm.invoke(messages)
 
-        # print(chain.invoke({"input": query}))
         return chain.invoke({"input": query})['answer']
-        # return ai_msg

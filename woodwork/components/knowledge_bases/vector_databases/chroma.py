@@ -14,7 +14,7 @@ class chroma(vector_database):
         
         client = None
         if config["client"] == "local":
-            if config["path"] == None:
+            if "path" not in config:
                 config["path"] = "../.woodwork/chroma"
             else:
                 client = chromadb.PersistentClient(path=config["path"])
