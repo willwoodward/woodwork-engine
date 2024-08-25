@@ -13,11 +13,11 @@ endpoint = api web {
     documentation: "endpoint.txt"
 }
 
-decomposer1 = decomposer llm {
+action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
     api: endpoint
 }
 
 in = input command_line {
-    to: decomposer1
+    to: action_model
 }

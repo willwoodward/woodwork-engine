@@ -4,6 +4,7 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+import json
 
 class llm(decomposer):
     def __init__(self, name, config):
@@ -32,9 +33,14 @@ class llm(decomposer):
         system_prompt = (
             "Given the following documentation for an API server:"
             "{context}"
-            "Answer the user's prompt, returning only the necessary endpoint URIs "
-            "With no formatting except for newlines, to carry out the steps to solving the user's prompt. "
+            "And the ability to prompt an LLM and receive an output, "
+            "Answer the user's prompt, returning only the necessary endpoint URIs or LLM prompts "
+            "to carry out the steps to solving the user's prompt. "
             "If you do not have necessary tools, say so."
+            "Structure your steps in the following schema: "
+            "{{{{\"tool\": API or LLM, \"action\": prompt or endpoint, \"inputs\": [{{{{variable: value}}}}], \"output\": value}}}}"
+            "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
+            "Format these JSON objects into an array of steps, returing only this array."
         ).format(context=self.__api.describe())
         
         prompt = ChatPromptTemplate.from_messages(
@@ -45,5 +51,6 @@ class llm(decomposer):
         )
         
         chain = prompt | self.__llm
+        result = chain.invoke({"input": query}).content
 
-        return chain.invoke({"input": query}).content
+        return result

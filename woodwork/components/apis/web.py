@@ -1,5 +1,4 @@
 import requests
-import json 
 
 from woodwork.components.apis.api import api
 
@@ -12,5 +11,5 @@ class web(api):
         print("API configured.")
 
     def call(self, req):
-        res = requests.get(f"{self.__url}/{req}")
-        return json.loads(res.text)
+        res = requests.get(f"http://127.0.0.1:5000/{req}")
+        return res.text

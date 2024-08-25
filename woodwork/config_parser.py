@@ -22,6 +22,7 @@ def main_function():
         
         entry_pattern = r".+=.+\{[\s\S]*?\}"
         entries = re.findall(entry_pattern, lines)
+        print(entries)
 
         for entry in entries:
             command = {}
@@ -76,4 +77,4 @@ def main_function():
                 if command["type"] == "web": components.append(web(command["variable"], command["config"]))
 
             if command["component"] == "decomposer":
-                if command["type"] == "1 =": components.append(llm(command["variable"], command["config"]))
+                if command["type"] == "llm": components.append(llm(command["variable"], command["config"]))
