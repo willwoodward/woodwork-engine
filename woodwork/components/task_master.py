@@ -31,7 +31,13 @@ class task_master(component):
                 result = api.call(instruction["action"], instruction["inputs"])
             
             if instruction["tool"] == "llm":
-                result = "llm"
+                # Substitute inputs
+                prompt = instruction["action"]
+                for key in instruction["inputs"]:
+                    prompt = prompt.replace(key, instruction["inputs"][key])
+                
+                llm = list(filter(lambda x: x.type == "llm", self.__tools))[0]
+                result = llm.question_answer(prompt)
 
             # Add the result to the variables
             variables[instruction["output"]] = result
