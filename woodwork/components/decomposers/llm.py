@@ -30,6 +30,20 @@ class llm(decomposer):
         
         super().__init__(name)
     
+    def __clean(self, x):
+        start_index = 0
+        end_index = 0
+
+        for i in range(len(x)-1):
+            if x[i] == "[":
+                start_index = i
+
+        for i in range(len(x)-1, 0, -1):
+            if x[i] == "]":
+                end_index = i
+
+        return json.loads(x[start_index:end_index+1:])
+    
     def input_handler(self, query):
         # Feed the input into an LLM query and return actions
         system_prompt = (
@@ -42,7 +56,8 @@ class llm(decomposer):
             "Structure your steps in the following schema: "
             "{{{{\"tool\": api or llm, \"action\": prompt or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}"
             "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
-            "Format these JSON objects into an array of steps, returing only this array."
+            "Format these JSON objects into an array of steps, returing only this array. "
+            "If you do not have the necessary information, ask for the required information. "
         ).format(context=self.__api.describe())
         
         prompt = ChatPromptTemplate.from_messages(
@@ -55,7 +70,8 @@ class llm(decomposer):
         chain = prompt | self.__llm
         result = chain.invoke({"input": query}).content
         
+        # Clean output as JSON
+        result = self.__clean(result)
+        
         # Send to task_master
-        self.__output.execute(result)
-
-        return result
+        return self.__output.execute(result)

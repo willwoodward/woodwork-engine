@@ -10,9 +10,7 @@ class task_master(component):
         self.__tools = tools
 
     def execute(self, instructions: str):
-        # Decode JSON input
         print(instructions)
-        instructions = json.loads(instructions)
         
         variables = {}
         
@@ -41,5 +39,6 @@ class task_master(component):
 
             # Add the result to the variables
             variables[instruction["output"]] = result
+            print(f"instruction = {instruction}")
             print(f"result = {result}")
 
