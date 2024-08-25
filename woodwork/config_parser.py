@@ -10,6 +10,9 @@ from woodwork.components.llms.openai import openai
 from woodwork.components.inputs.command_line import command_line
 from woodwork.components.apis.web import web
 from woodwork.components.decomposers.llm import llm
+from woodwork.components.task_master import task_master
+
+task_m = task_master("task_master")
 
 def main_function():
     components: list[component] = []
@@ -71,10 +74,12 @@ def main_function():
                 if command["type"] == "openai": components.append(openai(command["variable"], command["config"]))
             
             if command["component"] == "input":
+                task_m.add_tools(components)
                 if command["type"] == "command_line": components.append(command_line(command["variable"], command["config"]))
             
             if command["component"] == "api":
                 if command["type"] == "web": components.append(web(command["variable"], command["config"]))
 
             if command["component"] == "decomposer":
+                command["config"]["output"] = task_m
                 if command["type"] == "llm": components.append(llm(command["variable"], command["config"]))

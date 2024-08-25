@@ -1,4 +1,5 @@
 from woodwork.components.decomposers.decomposer import decomposer
+from woodwork.components.task_master import task_master
 
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -25,8 +26,9 @@ class llm(decomposer):
         
         self.__api = config["api"]
         
+        self.__output = config["output"]
+        
         super().__init__(name)
-        print("Decomposer initialised.")
     
     def input_handler(self, query):
         # Feed the input into an LLM query and return actions
@@ -38,7 +40,7 @@ class llm(decomposer):
             "to carry out the steps to solving the user's prompt. "
             "If you do not have necessary tools, say so."
             "Structure your steps in the following schema: "
-            "{{{{\"tool\": API or LLM, \"action\": prompt or endpoint, \"inputs\": [{{{{variable: value}}}}], \"output\": value}}}}"
+            "{{{{\"tool\": api or llm, \"action\": prompt or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}"
             "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
             "Format these JSON objects into an array of steps, returing only this array."
         ).format(context=self.__api.describe())
@@ -52,5 +54,8 @@ class llm(decomposer):
         
         chain = prompt | self.__llm
         result = chain.invoke({"input": query}).content
+        
+        # Send to task_master
+        self.__output.execute(result)
 
         return result

@@ -10,6 +10,6 @@ class web(api):
         super().__init__(name, config)
         print("API configured.")
 
-    def call(self, req):
-        res = requests.get(f"http://127.0.0.1:5000/{req}")
+    def call(self, req, inputs):
+        res = requests.get(f"http://127.0.0.1:5000/{req}", params=inputs)
         return res.text
