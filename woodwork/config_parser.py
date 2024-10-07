@@ -20,22 +20,34 @@ def dependency_resolver(commands, component):
     # How do we get each variable? Dict of commands, key = name, value = component dictionary
     # Traverse the depends_on as DFS
     
-    # Base case: no more dependencies in the depends_on array
     print(component)
+    # Base case: no dependencies in the depends_on array
     if component["depends_on"] == []:
         # Initialise component, return object reference
         if "object" not in component:
             component["object"] = create_object(component)
-        return
+        return component["object"]
 
     # Else, if the depends_on array has dependencies
     for dependency in component["depends_on"]:
         # Resolve that dependency, replace those variables in the config
         component_object = dependency_resolver(commands, commands[dependency])
+        
+        for key, value in component["config"].items():
+            # Handle arrays
+            if isinstance(value, list):
+                for i in range(len(value)):
+                    if value[i] == dependency:
+                        value[i] = component_object
+            
+            if value == dependency:
+                print(value, dependency)
+                component["config"][key] = component_object
     
     # Return component object
     component["depends_on"] = []
-    return 
+    component["object"] = create_object(component)
+    return component["object"]
 
 def create_object(command):
     if command["component"] == "knowledge_base":
