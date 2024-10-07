@@ -24,15 +24,14 @@ class llm(decomposer):
         if "knowledge_base" in config:
             retriever = config["knowledge_base"].retriever
         
-        self.__api = config["api"]
-        
+        self.__tools = config["tools"]
         self.__output = config["output"]
         
         super().__init__(name)
     
     def __clean(self, x):
-        start_index = 0
-        end_index = 0
+        start_index = -1
+        end_index = -1
 
         for i in range(len(x)-1):
             if x[i] == "[":
@@ -41,24 +40,40 @@ class llm(decomposer):
         for i in range(len(x)-1, 0, -1):
             if x[i] == "]":
                 end_index = i
+        
+        if start_index == -1:
+            return None
 
         return json.loads(x[start_index:end_index+1:])
     
     def input_handler(self, query):
-        # Feed the input into an LLM query and return actions
+        # # Feed the input into an LLM query and return actions
+        # system_prompt = (
+        #     "Given the following documentation for an API server:"
+        #     "{context}"
+        #     "And the ability to prompt an LLM and receive an output, "
+        #     "Answer the user's prompt, returning only the necessary endpoint URIs or LLM prompts "
+        #     "to carry out the steps to solving the user's prompt. "
+        #     "If you do not have necessary tools, say so."
+        #     "Structure your steps in the following schema: "
+        #     "{{{{\"tool\": api or llm, \"action\": prompt or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}"
+        #     "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
+        #     "Format these JSON objects into an array of steps, returing only this array. "
+        #     "If you do not have the necessary information, ask for the required information. "
+        # ).format(context=self.__api.describe())
+        
         system_prompt = (
-            "Given the following documentation for an API server:"
-            "{context}"
-            "And the ability to prompt an LLM and receive an output, "
+            "Given the following tools and their descriptions:\n"
+            "{tools} "
             "Answer the user's prompt, returning only the necessary endpoint URIs or LLM prompts "
             "to carry out the steps to solving the user's prompt. "
             "If you do not have necessary tools, say so."
             "Structure your steps in the following schema: "
-            "{{{{\"tool\": api or llm, \"action\": prompt or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}"
+            "[{{{{\"tool\": tool, \"action\": prompt or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}, ...]"
             "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
             "Format these JSON objects into an array of steps, returing only this array. "
             "If you do not have the necessary information, ask for the required information. "
-        ).format(context=self.__api.describe())
+        ).format(tools="insert tools here")
         
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -71,7 +86,9 @@ class llm(decomposer):
         result = chain.invoke({"input": query}).content
         
         # Clean output as JSON
+        print(result)
         result = self.__clean(result)
         
         # Send to task_master
-        return self.__output.execute(result)
+        return
+        # return self.__output.execute(result)

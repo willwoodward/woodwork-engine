@@ -1,11 +1,11 @@
-name1 = knowledge_base chroma {
-    client: "local"
-}
-
 model2 = llm openai {
     model: "gpt-4o"
     knowledge_base: name1
     api_key: $OPENAI_API_KEY
+}
+
+name1 = knowledge_base chroma {
+    client: "local"
 }
 
 endpoint = api web {
@@ -15,7 +15,7 @@ endpoint = api web {
 
 action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
-    api: endpoint
+    tools: [model2, endpoint]
 }
 
 in = input command_line {

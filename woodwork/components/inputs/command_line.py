@@ -15,7 +15,6 @@ class command_line(inputs):
         
         thread = Thread(target=self.__input_loop)
         thread.start()
-        thread.join()     
     
     def __input_loop(self):
         while True:
