@@ -59,7 +59,6 @@ def create_object(command):
         if command["type"] == "openai": return openai(command["variable"], command["config"])
 
     if command["component"] == "input":
-        # task_m.add_tools(components)
         if command["type"] == "command_line": return command_line(command["variable"], command["config"])
 
     if command["component"] == "api":
@@ -105,12 +104,6 @@ def main_function():
                 # If the value is not a string, it references a variable
                 # We replace this variable with a reference to the object
                 if value[0] != "\"" and value[0] != "'" and value[0] != '$' and value[0] != "[":
-                    # # Search components for the variable
-                    # for c in components:
-                    #     if c.name == value:
-                    #         value = c
-                    #         break
-                    
                     # Add variable to depends_on
                     command["depends_on"].append(value)
                 
@@ -124,10 +117,6 @@ def main_function():
                     value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
                     
                     for i in range(len(value)):
-                        # for c in components:
-                        #     if c.name == value[i]:
-                        #         value[i] = c
-                        #         break
                         command["depends_on"].append(value[i])
                     
                     print(f"values = {value}")
@@ -140,7 +129,11 @@ def main_function():
             print("[COMMAND]", command)
             commands[command["variable"]] = command
     
+    tools = []
     for name in commands.keys():
         dependency_resolver(commands, commands[name])
+        tools.append(commands[name]["object"])
+    
+    task_m.add_tools(tools)
     
     # print("[COMMANDS]", commands)
