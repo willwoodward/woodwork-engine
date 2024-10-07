@@ -59,7 +59,7 @@ def create_object(command):
         if command["type"] == "openai": return openai(command["variable"], command["config"])
 
     if command["component"] == "input":
-        task_m.add_tools(components)
+        # task_m.add_tools(components)
         if command["type"] == "command_line": return command_line(command["variable"], command["config"])
 
     if command["component"] == "api":
@@ -139,28 +139,8 @@ def main_function():
             
             print("[COMMAND]", command)
             commands[command["variable"]] = command
-
-            # # Create the objects specified by the command
-            # if command["component"] == "knowledge_base":
-            #     if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
-            #     if command["type"] == "neo4j":  components.append(neo4j(command["variable"], command["config"]))
-
-            # if command["component"] == "llm":
-            #     if command["type"] == "hugging_face": components.append(hugging_face(command["variable"], command["config"]))
-            #     if command["type"] == "openai": components.append(openai(command["variable"], command["config"]))
-
-            # if command["component"] == "input":
-            #     task_m.add_tools(components)
-            #     if command["type"] == "command_line": components.append(command_line(command["variable"], command["config"]))
-
-            # if command["component"] == "api":
-            #     if command["type"] == "web": components.append(web(command["variable"], command["config"]))
-
-            # if command["component"] == "decomposer":
-            #     command["config"]["output"] = task_m
-            #     if command["type"] == "llm": components.append(llm(command["variable"], command["config"]))
     
     for name in commands.keys():
         dependency_resolver(commands, commands[name])
     
-    print("[COMMANDS]", commands)
+    # print("[COMMANDS]", commands)
