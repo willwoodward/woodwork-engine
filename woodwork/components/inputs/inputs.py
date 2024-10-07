@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from woodwork.components.component import component
 
 class inputs(component):

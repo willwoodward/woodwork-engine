@@ -14,6 +14,27 @@ from woodwork.components.task_master import task_master
 
 task_m = task_master("task_master")
 
+def dependency_resolver(components, component):
+    # Parser parses into JSON for each component
+    # Each component should have a 'depends_on' array if it uses a variable as a value, init as []
+    # How do we get each variable? Dict of components, key = name, value = component dictionary
+    # Traverse the depends_on as DFS
+    
+    # Base case: no more dependencies in the depends_on array
+    if component.depends_on == []:
+        # Initialise component, return object reference
+        component.depends_on = None
+        return
+
+    # Else, if the depends_on array has dependencies
+    for dependency in depends_on:
+        # Resolve that dependency, replace those variables in the config
+        component_object = dependency_resolver(components, dependency)
+    
+    # Return component object
+    component.depends_on = None
+    return 
+
 def main_function():
     components: list[component] = []
 
@@ -45,7 +66,7 @@ def main_function():
                 
                 # If the value is not a string, it references a variable
                 # We replace this variable with a reference to the object
-                if value[0] != "\"" and value[0] != "'" and value[0] != '$':
+                if value[0] != "\"" and value[0] != "'" and value[0] != '$' and value[0] != "[":
                     # Search components for the variable
                     for c in components:
                         if c.name == value:
@@ -57,6 +78,18 @@ def main_function():
                 elif value[0] == '$':
                     value = os.getenv(value[1::])
                 
+                # If the value is an array, parse it as an array of references
+                elif value[0] == "[":
+                    value = list(map(lambda x: x.strip(), value[1::].split(",")))
+                    
+                    for i in range(len(value)):
+                        for c in components:
+                            if c.name == value[i]:
+                                value[i] = c
+                                break
+                    
+                    print(f"values = {value}")
+                                    
                 elif (value[0] == "\"" and value[-1] == "\"") or (value[0] == "\'" and value[-1] == "\'"):
                     value = value[1:-1:]
 
@@ -68,15 +101,15 @@ def main_function():
             if command["component"] == "knowledge_base":
                 if command["type"] == "chroma": components.append(chroma(command["variable"], command["config"]))
                 if command["type"] == "neo4j":  components.append(neo4j(command["variable"], command["config"]))
-            
+
             if command["component"] == "llm":
                 if command["type"] == "hugging_face": components.append(hugging_face(command["variable"], command["config"]))
                 if command["type"] == "openai": components.append(openai(command["variable"], command["config"]))
-            
+
             if command["component"] == "input":
                 task_m.add_tools(components)
                 if command["type"] == "command_line": components.append(command_line(command["variable"], command["config"]))
-            
+
             if command["component"] == "api":
                 if command["type"] == "web": components.append(web(command["variable"], command["config"]))
 

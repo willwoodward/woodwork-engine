@@ -33,3 +33,6 @@ class chroma(vector_database):
         super().__init__(name, retriever)
         
         print(f"Chroma Knowledge Base {name} created.")
+    
+    def query(self, query):
+        pass

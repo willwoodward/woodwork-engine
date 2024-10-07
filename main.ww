@@ -15,7 +15,7 @@ endpoint = api web {
 
 action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
-    api: endpoint
+    tools: [model2, endpoint]
 }
 
 in = input command_line {
