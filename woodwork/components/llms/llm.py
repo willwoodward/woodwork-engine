@@ -58,3 +58,6 @@ class llm(component):
         chain = create_retrieval_chain(self.__retriever, question_answer_chain)
 
         return chain.invoke({"input": query})['answer']
+
+    def describe(self):
+        return "Ask the LLM a prompt in the form of the string and it will return an answer to that prompt."

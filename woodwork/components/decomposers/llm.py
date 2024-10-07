@@ -62,6 +62,10 @@ class llm(decomposer):
         #     "If you do not have the necessary information, ask for the required information. "
         # ).format(context=self.__api.describe())
         
+        tool_documentation = ""
+        for obj in self.__tools:
+            tool_documentation += f"{obj.type}:\n{obj.describe()}\n\n"
+        
         system_prompt = (
             "Given the following tools and their descriptions:\n"
             "{tools} "
@@ -73,7 +77,9 @@ class llm(decomposer):
             "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
             "Format these JSON objects into an array of steps, returing only this array. "
             "If you do not have the necessary information, ask for the required information. "
-        ).format(tools="insert tools here")
+        ).format(tools=tool_documentation)
+        
+        print("[TOOLS]", self.__tools[1].describe())
         
         prompt = ChatPromptTemplate.from_messages(
             [
