@@ -82,6 +82,7 @@ def init(options={"isolated": False}):
             components.add((component, type))
     
     components = list(components)
+    requirements_set = set()
     
     # Install dependencies
     # Dependencies stored in requirements/{component}/{type}
@@ -92,8 +93,13 @@ def init(options={"isolated": False}):
         component_requirements = os.path.join(requirements_dir, component, f"{component}.txt")
         try:
             if os.path.isfile(component_requirements):
-                subprocess.check_call([f". {activate_script} && pip install -r {component_requirements}"], shell=True)
-                print(f"Installed dependencies for {component}.")
+
+                with open(component_requirements, 'r') as f:
+                    for line in f:
+                        # Remove any comments or empty lines
+                        cleaned_line = line.strip()
+                        if cleaned_line:
+                            requirements_set.add(cleaned_line)
         except subprocess.CalledProcessError:
             sys.exit(1)
         
@@ -101,9 +107,31 @@ def init(options={"isolated": False}):
         type_requirements = os.path.join(requirements_dir, component, f"{type}.txt")
         try:
             if os.path.isfile(type_requirements):
-                subprocess.check_call([f". {activate_script} && pip install -r {type_requirements}"], shell=True)
-                print(f"Installed dependencies for {component}.")
+
+                with open(type_requirements, 'r') as f:
+                    for line in f:
+                        # Remove any comments or empty lines
+                        cleaned_line = line.strip()
+                        if cleaned_line and not cleaned_line.startswith("#"):
+                            requirements_set.add(cleaned_line)
         except subprocess.CalledProcessError:
             sys.exit(1)
+    
+    # Write combined unique requirements to a temporary file
+    temp_requirements_file = '.woodwork/requirements.txt'
+    with open(temp_requirements_file, 'w') as f:
+        for requirement in sorted(requirements_set):
+            f.write(f"{requirement}\n")
+
+    try:
+        subprocess.check_call([f". {activate_script} && pip install -r {temp_requirements_file}"], shell=True)
+        print(f"Installed all combined dependencies.")
+    except subprocess.CalledProcessError:
+        sys.exit(1)
+    finally:
+        # Clean up temporary requirements file
+        if os.path.exists(temp_requirements_file):
+            os.remove(temp_requirements_file)
+
 
     print("Initialization complete.")
