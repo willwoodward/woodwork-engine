@@ -57,9 +57,15 @@ def activate_virtual_environment():
 
     print("Virtual environment activated.")
 
+def parse_requirements(requirements_set, file_path):
+    if os.path.isfile(file_path):
 
-
-
+        with open(file_path, 'r') as f:
+            for line in f:
+                # Remove any comments or empty lines
+                cleaned_line = line.strip()
+                if cleaned_line and not cleaned_line.startswith("#"):
+                    requirements_set.add(cleaned_line)
 
 def init(options={"isolated": False}):
     # Make sure the virtual environment is set up properly
@@ -92,28 +98,14 @@ def init(options={"isolated": False}):
         
         component_requirements = os.path.join(requirements_dir, component, f"{component}.txt")
         try:
-            if os.path.isfile(component_requirements):
-
-                with open(component_requirements, 'r') as f:
-                    for line in f:
-                        # Remove any comments or empty lines
-                        cleaned_line = line.strip()
-                        if cleaned_line:
-                            requirements_set.add(cleaned_line)
+            parse_requirements(requirements_set, component_requirements)
         except subprocess.CalledProcessError:
             sys.exit(1)
         
         # Install the component type dependencies
         type_requirements = os.path.join(requirements_dir, component, f"{type}.txt")
         try:
-            if os.path.isfile(type_requirements):
-
-                with open(type_requirements, 'r') as f:
-                    for line in f:
-                        # Remove any comments or empty lines
-                        cleaned_line = line.strip()
-                        if cleaned_line and not cleaned_line.startswith("#"):
-                            requirements_set.add(cleaned_line)
+            parse_requirements(requirements_set, type_requirements)
         except subprocess.CalledProcessError:
             sys.exit(1)
     
