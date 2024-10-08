@@ -10,6 +10,7 @@ import json
 class llm(decomposer):
     def __init__(self, name, config):
         print("Initialising decomposer...")
+        super().__init__(name, config)
         
         self.__llm = ChatOpenAI(
             model="gpt-4o-mini",
@@ -23,11 +24,6 @@ class llm(decomposer):
         self.__retriever = None
         if "knowledge_base" in config:
             retriever = config["knowledge_base"].retriever
-        
-        self.__tools = config["tools"]
-        self.__output = config["output"]
-        
-        super().__init__(name)
     
     def __clean(self, x):
         start_index = -1
@@ -48,7 +44,7 @@ class llm(decomposer):
     
     def input_handler(self, query):
         tool_documentation = ""
-        for obj in self.__tools:
+        for obj in self._tools:
             tool_documentation += f"{obj.type}:\n{obj.describe()}\n\n"
         
         system_prompt = (
@@ -78,4 +74,4 @@ class llm(decomposer):
         result = self.__clean(result)
         
         # Send to task_master
-        return self.__output.execute(result)
+        return self._output.execute(result)
