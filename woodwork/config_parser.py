@@ -1,6 +1,7 @@
 import re
 import os
 from dotenv import load_dotenv
+import sys
 
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
@@ -60,14 +61,7 @@ def create_object(command):
         if command["type"] == "openai": return openai(command["variable"], command["config"])
 
     if command["component"] == "input":
-        if command["type"] == "command_line":
-            global command_lines
-            if command_lines == 0:
-                command_lines = 1
-                return command_line(command["variable"], command["config"])
-            else:
-                print("[ERROR] only one command line input can be initialised.")
-                return
+        if command["type"] == "command_line": return command_line(command["variable"], command["config"])
 
     if command["component"] == "api":
         if command["type"] == "web": return web(command["variable"], command["config"])
@@ -76,10 +70,21 @@ def create_object(command):
         command["config"]["output"] = task_m
         if command["type"] == "llm": return llm(command["variable"], command["config"])
 
+def command_checker(commands):
+    terminals_remaining = 1
+    
+    for _, command in commands.items():
+        if command["component"] == "input" and command["type"] == "command_line":
+            if terminals_remaining == 1:
+                terminals_remaining = 0
+            else:
+                print("[ERROR] only one command line input can be initialised.")
+                exit()
+
 def main_function():
     components: list[component] = []
     
-    commands: dict[name, command] = {}
+    commands = {}
 
     current_directory = os.getcwd()
     load_dotenv(dotenv_path=os.path.join(current_directory, '.env'))
@@ -137,6 +142,8 @@ def main_function():
             print("[COMMAND]", command)
             commands[command["variable"]] = command
     
+    command_checker(commands)
+
     tools = []
     for name in commands.keys():
         dependency_resolver(commands, commands[name])
