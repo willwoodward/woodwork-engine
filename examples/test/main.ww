@@ -8,6 +8,14 @@ name1 = knowledge_base chroma {
     client: "local"
 }
 
+in2 = input command_line {
+    to: action_model
+}
+
+in = input command_line {
+    to: action_model
+}
+
 endpoint = api web {
     url: "http://localhost:3000"
     documentation: "endpoint.txt"
@@ -16,8 +24,4 @@ endpoint = api web {
 action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
     tools: [model2, endpoint]
-}
-
-in = input command_line {
-    to: action_model
 }

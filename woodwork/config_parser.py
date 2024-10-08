@@ -49,6 +49,7 @@ def dependency_resolver(commands, component):
     component["object"] = create_object(component)
     return component["object"]
 
+command_lines = 0
 def create_object(command):
     if command["component"] == "knowledge_base":
         if command["type"] == "chroma": return chroma(command["variable"], command["config"])
@@ -59,7 +60,14 @@ def create_object(command):
         if command["type"] == "openai": return openai(command["variable"], command["config"])
 
     if command["component"] == "input":
-        if command["type"] == "command_line": return command_line(command["variable"], command["config"])
+        if command["type"] == "command_line":
+            global command_lines
+            if command_lines == 0:
+                command_lines = 1
+                return command_line(command["variable"], command["config"])
+            else:
+                print("[ERROR] only one command line input can be initialised.")
+                return
 
     if command["component"] == "api":
         if command["type"] == "web": return web(command["variable"], command["config"])
