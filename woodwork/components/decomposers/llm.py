@@ -9,8 +9,8 @@ import json
 
 class llm(decomposer):
     def __init__(self, name, config):
-        print("Initialising decomposer...")
         super().__init__(name, config)
+        print("Initialising decomposer...")
         
         self.__llm = ChatOpenAI(
             model="gpt-4o-mini",
@@ -20,7 +20,7 @@ class llm(decomposer):
             max_retries=2,
             api_key=config["api_key"]
         )
-        
+
         self.__retriever = None
         if "knowledge_base" in config:
             retriever = config["knowledge_base"].retriever

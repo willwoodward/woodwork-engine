@@ -5,6 +5,7 @@ from woodwork.components.component import component
 class decomposer(component, ABC):
     def __init__(self, name, config):
         super().__init__(name, "decomposer")
+        print("Creating the decomposer...")
 
         self._tools = config["tools"]
         self._output = config["output"]
