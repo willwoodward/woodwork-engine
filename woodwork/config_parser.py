@@ -74,7 +74,7 @@ def main_function():
     commands: dict[name, command] = {}
 
     current_directory = os.getcwd()
-    load_dotenv()
+    load_dotenv(dotenv_path=os.path.join(current_directory, '.env'))
 
     with open(current_directory + "/main.ww", "r") as f:
         lines = f.read()

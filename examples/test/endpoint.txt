@@ -1,0 +1,8 @@
+This API server functions as an email server, to allow users to manage existing emails and send new emails.
+
+The server contains the following functions:
+- send_email(email_address, content) sends an email to the email address with the specified content
+- read_email(id) returns the content of the email from the specified email id
+- find_last_email_from(email_address) returns the email id
+
+The endpoints of each function is the function name, followed by the parameters as a query string.
