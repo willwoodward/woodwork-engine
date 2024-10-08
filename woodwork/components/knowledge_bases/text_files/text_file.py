@@ -1,6 +1,6 @@
 import os
 
-from woodwork.components.knowledge_base import knowledge_base
+from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
 
 class text_file(knowledge_base):
     def __init__(self, name, config):

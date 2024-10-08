@@ -3,11 +3,12 @@ from abc import ABC, abstractmethod
 from woodwork.components.component import component
 
 class inputs(component):
-    def __init__(self, name, config):
+    def __init__(self, name, config, keys):
         super().__init__(name, "input")
+        
+        if not self._config_checker(name, ["to"], config): exit()
 
-        if "to" in config:
-            self._output = config["to"]
+        self._output = config["to"]
 
     @abstractmethod
     def __input_handler(self):

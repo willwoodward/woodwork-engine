@@ -9,8 +9,10 @@ from langchain.schema.document import Document
 from woodwork.components.knowledge_bases.vector_databases.vector_database import vector_database
 
 class chroma(vector_database):
-    def __init__(self, name, config):
+    def __init__(self, name, config):        
         print("Initialising Chroma Knowledge Base...")
+        
+        self._config_checker(name, ["client"], config)
         
         client = None
         if config["client"] == "local":
@@ -29,8 +31,8 @@ class chroma(vector_database):
         )
 
         retriever = self.__db.as_retriever()
-        
-        super().__init__(name, retriever)
+
+        super().__init__(name, config)
         
         print(f"Chroma Knowledge Base {name} created.")
     

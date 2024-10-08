@@ -12,6 +12,8 @@ class llm(decomposer):
         super().__init__(name, config)
         print("Initialising decomposer...")
         
+        if not self._config_checker(name, ["api_key"], config): exit()
+        
         self.__llm = ChatOpenAI(
             model="gpt-4o-mini",
             temperature=0,

@@ -8,7 +8,7 @@ class llm(component):
     def __init__(self, name, llm, retriever):
         # Each LLM will have a: LLM object, input_handler, retriever?
         super().__init__(name, "llm")
-        
+                
         self.__llm = llm
         self.__retriever = retriever
     
