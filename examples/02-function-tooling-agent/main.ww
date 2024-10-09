@@ -1,0 +1,12 @@
+endpoint = api functions {
+    path: "functions.py"
+}
+
+action_model = decomposer llm {
+    api_key: $OPENAI_API_KEY
+    tools: [endpoint]
+}
+
+in = input command_line {
+    to: action_model
+}

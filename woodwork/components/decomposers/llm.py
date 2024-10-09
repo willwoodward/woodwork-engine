@@ -49,6 +49,7 @@ class llm(decomposer):
         for obj in self._tools:
             tool_documentation += f"{obj.type}:\n{obj.describe()}\n\n"
         
+        print(f"[DOCUMENTATION]:\n {tool_documentation}")
         system_prompt = (
             "Given the following tools and their descriptions:\n"
             "{tools} "
@@ -56,9 +57,10 @@ class llm(decomposer):
             "to carry out the steps to solving the user's prompt. "
             "If you do not have necessary tools, say so."
             "Structure your steps in the following schema: "
-            "[{{{{\"tool\": tool, \"action\": prompt or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}, ...]"
+            "[{{{{\"tool\": tool, \"action\": prompt or function or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}, ...]"
             "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
             "Format these JSON objects into an array of steps, returing only this array. "
+            "Specify only the function or endpoint name when they are used. "
             "If you do not have the necessary information, ask for the required information. "
         ).format(tools=tool_documentation)
         
@@ -71,6 +73,8 @@ class llm(decomposer):
         
         chain = prompt | self.__llm
         result = chain.invoke({"input": query}).content
+        
+        print(f"[RESULT] {result}")
         
         # Clean output as JSON
         result = self.__clean(result)
