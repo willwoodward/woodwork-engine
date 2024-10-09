@@ -1,17 +1,11 @@
-import os
+from abc import ABC, abstractmethod
 
 from woodwork.components.component import component
 
-class api(component):
+class api(component, ABC):
     def __init__(self, name, config):
-        # Ingest the API documentation
-        if "documentation" in config:
-            with open (os.getcwd() + "/" + config["documentation"]) as f:
-                self.__documentation = f.read()
-        
         super().__init__(name, "api")
-        
-
     
+    @abstractmethod
     def describe(self):
-        return self.__documentation
+        pass
