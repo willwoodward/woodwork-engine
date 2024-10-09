@@ -11,7 +11,7 @@ class short_term(memory):
         return self._data
     
     def add(self, text: str):
-        self._data = self._data + f"\n{text}"
+        self._data = self._data + f"{text}\n"
     
     def clear(self):
         self._data = ""

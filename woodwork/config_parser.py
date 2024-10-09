@@ -7,6 +7,7 @@ from woodwork.components.component import component
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.components.knowledge_bases.text_files.text_file import text_file
+from woodwork.components.memory.short_term import short_term
 from woodwork.components.llms.hugging_face import hugging_face
 from woodwork.components.llms.openai import openai
 from woodwork.components.inputs.command_line import command_line
@@ -57,6 +58,9 @@ def create_object(command):
         if command["type"] == "chroma": return chroma(command["variable"], command["config"])
         if command["type"] == "neo4j":  return neo4j(command["variable"], command["config"])
         if command["type"] == "text_file": return text_file(command["variable"], command["config"])
+    
+    if command["component"] == "memory":
+        if command["type"] == "short_term": return short_term(command["variable"], command["config"])
 
     if command["component"] == "llm":
         if command["type"] == "hugging_face": return hugging_face(command["variable"], command["config"])
