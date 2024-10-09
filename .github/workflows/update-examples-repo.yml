@@ -14,8 +14,9 @@ jobs:
 
       - name: Copy the examples folder
         run: |
-          mkdir -p examples-repo
-          cp -r examples/* examples-repo/
+          mkdir -p examples-repo/examples
+          rsync -av --exclude='README.md' examples/ examples-repo/examples/
+          cp examples/README.md examples-repo/
 
       - name: Setup Git
         run: |
