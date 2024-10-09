@@ -41,4 +41,3 @@ class task_master(component):
             variables[instruction["output"]] = result
             print(f"instruction = {instruction}")
             print(f"result = {result}")
-

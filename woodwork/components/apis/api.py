@@ -7,5 +7,9 @@ class api(component, ABC):
         super().__init__(name, "api")
     
     @abstractmethod
+    def call(self, req, inputs):
+        pass
+    
+    @abstractmethod
     def describe(self):
         pass

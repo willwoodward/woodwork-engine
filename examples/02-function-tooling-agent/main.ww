@@ -1,12 +1,12 @@
-function_api = api functions {
-    path: "./functions.py"
+endpoint = api functions {
+    path: "functions.py"
 }
 
 action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
-    tools: [function_api]
+    tools: [endpoint]
 }
 
 in = input command_line {
-    to: language_model
+    to: action_model
 }

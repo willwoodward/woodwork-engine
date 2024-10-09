@@ -12,6 +12,7 @@ from woodwork.components.llms.hugging_face import hugging_face
 from woodwork.components.llms.openai import openai
 from woodwork.components.inputs.command_line import command_line
 from woodwork.components.apis.web import web
+from woodwork.components.apis.functions import functions
 from woodwork.components.decomposers.llm import llm
 from woodwork.components.task_master import task_master
 
@@ -73,6 +74,7 @@ def create_object(command):
 
     if component == "api":
         if type == "web": return web(command["variable"], command["config"])
+        if type == "functions": return functions(command["variable"], command["config"])
 
     if component == "decomposer":
         command["config"]["output"] = task_m
