@@ -5,12 +5,16 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
 class llm(component):
-    def __init__(self, name, llm, retriever):
+    def __init__(self, name, llm, retriever, config):
         # Each LLM will have a: LLM object, input_handler, retriever?
         super().__init__(name, "llm")
-                
+                        
         self.__llm = llm
         self.__retriever = retriever
+        
+        self._memory = None
+        if "memory" in config:
+            self._memory = config["memory"]
     
 
 
@@ -22,10 +26,19 @@ class llm(component):
             return self.context_answer(query)
             
     def question_answer(self, query):
-        system_prompt = (
-            "You are a helpful assistant, answer the provided question, "
-            "In 3 sentences or less. "
-        )
+        # Defining the system prompt
+        if self._memory:
+            system_prompt = (
+                "You are a helpful assistant, answer the provided question, "
+                "In 3 sentences or less. "
+                "Here are the previous messages as context: "
+                "{context}"
+            ).format(context=self._memory.data)
+        else:
+            system_prompt = (
+                "You are a helpful assistant, answer the provided question, "
+                "In 3 sentences or less. "
+            )
         
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -35,8 +48,14 @@ class llm(component):
         )
         
         chain = prompt | self.__llm
+        response = chain.invoke({"input": query}).content
+        
+        # Adding to memory
+        if self._memory:
+            self._memory.add(f"[USER] {query}")
+            self._memory.add(f"[AI] {response}")
 
-        return chain.invoke({"input": query}).content
+        return response
         
     def context_answer(self, query):
         system_prompt = (

@@ -1,5 +1,5 @@
 model2 = llm openai {
-    model: "gpt-4o"
+    model: "gpt-4o-mini"
     knowledge_base: name1
     api_key: $OPENAI_API_KEY
 }

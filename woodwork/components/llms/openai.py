@@ -19,6 +19,6 @@ class openai(llm):
         if "knowledge_base" in config:
             retriever = config["knowledge_base"].retriever
         
-        super().__init__(name, llm, retriever)
+        super().__init__(name, llm, retriever, config)
 
         print("Model initialised.")

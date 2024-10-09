@@ -1,0 +1,11 @@
+mem = memory short_term {}
+
+language_model = llm openai {
+    model: "gpt-4o-mini"
+    memory: mem
+    api_key: $OPENAI_API_KEY
+}
+
+in = input command_line {
+    to: language_model
+}
