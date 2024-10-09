@@ -4,7 +4,7 @@ from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
 
 class text_file(knowledge_base):
     def __init__(self, name, config):
-        super().__init__(name)
+        super().__init__(name, config)
 
         # Check if the file exists before creating it
         if not os.path.exists(config["path"]):

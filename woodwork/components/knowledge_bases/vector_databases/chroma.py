@@ -30,7 +30,7 @@ class chroma(vector_database):
             persist_directory=config["path"]
         )
 
-        retriever = self.__db.as_retriever()
+        self.retriever = self.__db.as_retriever()
 
         super().__init__(name, config)
         
