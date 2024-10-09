@@ -52,29 +52,31 @@ def dependency_resolver(commands, component):
     component["object"] = create_object(component)
     return component["object"]
 
-command_lines = 0
 def create_object(command):
-    if command["component"] == "knowledge_base":
-        if command["type"] == "chroma": return chroma(command["variable"], command["config"])
-        if command["type"] == "neo4j":  return neo4j(command["variable"], command["config"])
-        if command["type"] == "text_file": return text_file(command["variable"], command["config"])
+    component = command["component"]
+    type = command["type"]
     
-    if command["component"] == "memory":
-        if command["type"] == "short_term": return short_term(command["variable"], command["config"])
+    if component == "knowledge_base":
+        if type == "chroma": return chroma(command["variable"], command["config"])
+        if type == "neo4j":  return neo4j(command["variable"], command["config"])
+        if type == "text_file": return text_file(command["variable"], command["config"])
+    
+    if component == "memory":
+        if type == "short_term": return short_term(command["variable"], command["config"])
 
-    if command["component"] == "llm":
-        if command["type"] == "hugging_face": return hugging_face(command["variable"], command["config"])
-        if command["type"] == "openai": return openai(command["variable"], command["config"])
+    if component == "llm":
+        if type == "hugging_face": return hugging_face(command["variable"], command["config"])
+        if type == "openai": return openai(command["variable"], command["config"])
 
-    if command["component"] == "input":
-        if command["type"] == "command_line": return command_line(command["variable"], command["config"])
+    if component == "input":
+        if type == "command_line": return command_line(command["variable"], command["config"])
 
-    if command["component"] == "api":
-        if command["type"] == "web": return web(command["variable"], command["config"])
+    if component == "api":
+        if type == "web": return web(command["variable"], command["config"])
 
-    if command["component"] == "decomposer":
+    if component == "decomposer":
         command["config"]["output"] = task_m
-        if command["type"] == "llm": return llm(command["variable"], command["config"])
+        if type == "llm": return llm(command["variable"], command["config"])
 
 def command_checker(commands):
     terminals_remaining = 1
