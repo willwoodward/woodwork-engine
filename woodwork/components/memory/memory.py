@@ -14,3 +14,7 @@ class memory(component, ABC):
     @abstractmethod
     def add(self, text: str):
         pass
+    
+    @abstractmethod
+    def clear(self):
+        pass
