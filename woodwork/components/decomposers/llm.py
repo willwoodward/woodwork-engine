@@ -79,5 +79,8 @@ class llm(decomposer):
         # Clean output as JSON
         result = self.__clean(result)
         
+        # Cache instructions
+        self._cache_actions(query, result)
+        
         # Send to task_master
         return self._output.execute(result)
