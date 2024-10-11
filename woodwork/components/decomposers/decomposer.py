@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from openai import OpenAI
+import json
 
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
@@ -62,6 +63,8 @@ class decomposer(component, ABC):
                 MATCH path=(p)-[NEXT*]-(a:Action)
                 RETURN a AS result""")
         
-        actions = list(map(lambda x: x["result"]["value"], actions))
+        actions = list(map(lambda x: json.loads(x["result"]["value"].replace("'", '"')), actions))
+        
+        print(f"[ACTIONS] {actions}")
         
         return {"prompt": best_prompt, "actions": actions, "score": score}

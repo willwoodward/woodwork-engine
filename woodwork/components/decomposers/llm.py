@@ -45,6 +45,12 @@ class llm(decomposer):
         return json.loads(x[start_index:end_index+1:])
     
     def input_handler(self, query):
+        # Search cache for similar results
+        closest_query = self._cache_search_actions(query)
+        if closest_query["score"] > 0.95:
+            print("Cache hit!")
+            return self._output.execute(closest_query["actions"])
+        
         tool_documentation = ""
         for obj in self._tools:
             tool_documentation += f"{obj.type}:\n{obj.describe()}\n\n"
