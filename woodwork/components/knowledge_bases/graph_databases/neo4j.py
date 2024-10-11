@@ -8,7 +8,7 @@ class neo4j(graph_database):
         
         super().__init__(name, config)
         
-        self._config_checker(name, ["uri", "user", "password"], config)
+        if not self._config_checker(name, ["uri", "user", "password"], config): exit()
         self._driver = GraphDatabase.driver(config["uri"], auth=(config["user"], config["password"]))
         
         print(f"Neo4j Knowledge Base {name} created.")
@@ -17,6 +17,9 @@ class neo4j(graph_database):
         self._driver.close()
 
     def run(self, query, parameters=None):
-        with self.driver.session() as session:
+        with self._driver.session() as session:
             result = session.run(query, parameters)
             return result.data()
+    
+    def query(self, query):
+        return
