@@ -17,8 +17,8 @@ class decomposer(component, ABC):
         if "cache" in config:
             if config["cache"] == "true":
                 # Initialise neo4j cache
-                if not self._config_checker(name, ["uri", "user", "password"], config): exit()
-                self._cache = neo4j("decomposer_cache", {"uri": config["uri"], "user": config["user"], "password": config["password"] })
+                if not self._config_checker(name, ["uri", "user", "password", "api_key"], config): exit()
+                self._cache = neo4j("decomposer_cache", {"uri": config["uri"], "user": config["user"], "password": config["password"], "api_key": config["api_key"] })
     
     @abstractmethod
     def input_handler(self, query):
@@ -40,6 +40,9 @@ class decomposer(component, ABC):
         
         # Execute query
         self._cache.run(query)
+        
+        # Add the vector embedding for the prompt
+        self._cache.embed("Prompt", "value")
         
         return
     
