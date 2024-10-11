@@ -46,10 +46,11 @@ class llm(decomposer):
     
     def input_handler(self, query):
         # Search cache for similar results
-        closest_query = self._cache_search_actions(query)
-        if closest_query["score"] > 0.95:
-            print("Cache hit!")
-            return self._output.execute(closest_query["actions"])
+        if self._cache_mode:
+            closest_query = self._cache_search_actions(query)
+            if closest_query["score"] > 0.95:
+                print("Cache hit!")
+                return self._output.execute(closest_query["actions"])
         
         tool_documentation = ""
         for obj in self._tools:
@@ -86,7 +87,7 @@ class llm(decomposer):
         result = self.__clean(result)
         
         # Cache instructions
-        self._cache_actions(query, result)
+        if self._cache_mode: self._cache_actions(query, result)
         
         # Send to task_master
         return self._output.execute(result)

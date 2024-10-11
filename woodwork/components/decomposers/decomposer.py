@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from openai import OpenAI
 import json
 
 from woodwork.components.component import component
@@ -19,9 +18,12 @@ class decomposer(component, ABC):
         if "cache" in config:
             if config["cache"] == "true":
                 # Initialise neo4j cache
+                self._cache_mode = True
                 if not self._config_checker(name, ["uri", "user", "password", "api_key"], config): exit()
                 self._cache = neo4j("decomposer_cache", {"uri": config["uri"], "user": config["user"], "password": config["password"], "api_key": config["api_key"] })
-    
+        else:
+            self._cache_mode = False
+
     @abstractmethod
     def input_handler(self, query):
         """Given a query, return the JSON array denoting the actions to take, passed to the task master."""
@@ -52,6 +54,9 @@ class decomposer(component, ABC):
     
     def _cache_search_actions(self, prompt: str):
         similar_prompts = self._cache.similarity_search(prompt, "Prompt", "value")
+        
+        if len(similar_prompts) == 0: return {"prompt": "", "actions": [], "score": 0}
+        
         print(f"[SIMILAR PROMPTS] {similar_prompts}")
         
         best_prompt = similar_prompts[0]["value"]
@@ -64,7 +69,5 @@ class decomposer(component, ABC):
                 RETURN a AS result""")
         
         actions = list(map(lambda x: json.loads(x["result"]["value"].replace("'", '"')), actions))
-        
-        print(f"[ACTIONS] {actions}")
-        
+                
         return {"prompt": best_prompt, "actions": actions, "score": score}
