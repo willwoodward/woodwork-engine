@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from openai import OpenAI
 
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
@@ -44,7 +45,13 @@ class decomposer(component, ABC):
         # Add the vector embedding for the prompt
         self._cache.embed("Prompt", "value")
         
+        # Find similar actions
+        self._cache_search_actions("generate a word and find its length")
+        
         return
     
     def _cache_search_actions(self, prompt: str):
+        similar_prompts = self._cache.similarity_search(prompt, "Prompt", "value")
+        print(similar_prompts)
+        
         return
