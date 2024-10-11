@@ -47,6 +47,6 @@ class neo4j(graph_database):
         query = f"""MATCH (a:{label})
         CALL db.index.vector.queryNodes('embeddings', 10, {embedding})
         YIELD node AS node, score
-        RETURN id(node) AS nodeID, node.{property} AS {property}, score"""
+        RETURN elementId(node) AS nodeID, node.{property} AS {property}, score"""
         
         return self.run(query)

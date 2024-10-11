@@ -29,6 +29,9 @@ class decomposer(component, ABC):
     def _cache_actions(self, prompt: str, instructions: list[any]):
         """Add the actions to the graph if they aren't already present, as a chain."""
         # Check to see if the action has been cached
+        if self._cache_search_actions(prompt)["score"] > 0.95:
+            print("Similar prompts have already been cached.")
+            return
         
         # Instructions must have at least one instruction
         if len(instructions) == 0: return
@@ -43,15 +46,22 @@ class decomposer(component, ABC):
         self._cache.run(query)
         
         # Add the vector embedding for the prompt
-        self._cache.embed("Prompt", "value")
-        
-        # Find similar actions
-        self._cache_search_actions("generate a word and find its length")
-        
+        self._cache.embed("Prompt", "value")        
         return
     
     def _cache_search_actions(self, prompt: str):
         similar_prompts = self._cache.similarity_search(prompt, "Prompt", "value")
-        print(similar_prompts)
+        print(f"[SIMILAR PROMPTS] {similar_prompts}")
         
-        return
+        best_prompt = similar_prompts[0]["value"]
+        score = similar_prompts[0]["score"]
+        
+        actions = self._cache.run(f"""MATCH (p:Prompt)
+                WHERE elementId(p) = \"{similar_prompts[0]["nodeID"]}\"
+                WITH p
+                MATCH path=(p)-[NEXT*]-(a:Action)
+                RETURN a AS result""")
+        
+        actions = list(map(lambda x: x["result"]["value"], actions))
+        
+        return {"prompt": best_prompt, "actions": actions, "score": score}
