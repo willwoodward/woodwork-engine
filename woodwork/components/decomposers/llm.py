@@ -70,7 +70,7 @@ class llm(decomposer):
             "Structure your steps in the following schema: "
             "[{{{{\"tool\": tool, \"action\": prompt or function or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}, ...]"
             "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
-            "Format these JSON objects into an array of steps, returing only this array. "
+            "Format this JSON into an array of steps, returing only this array. "
             "Specify only the function or endpoint name when they are used. "
             "If you do not have the necessary information, ask for the required information. "
         ).format(tools=tool_documentation)
@@ -89,6 +89,8 @@ class llm(decomposer):
         
         # Clean output as JSON
         result = self.__clean(result)
+        
+        print_debug(f"[RESULT] {result}")
         
         if isinstance(result, str):
             return result
