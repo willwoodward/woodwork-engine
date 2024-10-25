@@ -1,11 +1,12 @@
 from neo4j import GraphDatabase
 from openai import OpenAI
 
+from woodwork.helper_functions import print_debug
 from woodwork.components.knowledge_bases.graph_databases.graph_database import graph_database
 
 class neo4j(graph_database):
     def __init__(self, name, config):
-        print("Initialising Neo4j Knowledge Base...")
+        print_debug("Initialising Neo4j Knowledge Base...")
         
         super().__init__(name, config)
         
@@ -16,7 +17,7 @@ class neo4j(graph_database):
         self._api_key = config["api_key"]
         self._openai_client = OpenAI()
         
-        print(f"Neo4j Knowledge Base {name} created.")
+        print_debug(f"Neo4j Knowledge Base {name} created.")
     
     def _connected(self):
         try:

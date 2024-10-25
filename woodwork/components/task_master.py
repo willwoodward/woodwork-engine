@@ -1,6 +1,5 @@
+from woodwork.helper_functions import print_debug
 from woodwork.components.component import component
-
-import json
 
 class task_master(component):
     def __init__(self, name):
@@ -9,9 +8,7 @@ class task_master(component):
     def add_tools(self, tools):
         self.__tools = tools
 
-    def execute(self, instructions: str):
-        print(instructions)
-        
+    def execute(self, instructions: str):        
         variables = {}
         prev_instructon = ""
         
@@ -30,8 +27,8 @@ class task_master(component):
             # Add the result to the variables
             variables[instruction["output"]] = result
             prev_instructon = result
-            print(f"instruction = {instruction}")
-            print(f"result = {result}")
+            print_debug(f"instruction = {instruction}")
+            print_debug(f"result = {result}")
         
         return prev_instructon
 

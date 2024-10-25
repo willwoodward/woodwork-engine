@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 import json
 
+from woodwork.helper_functions import print_debug
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 
 class decomposer(component, ABC):
     def __init__(self, name, config):
         super().__init__(name, "decomposer")
-        print("Creating the decomposer...")
+        print_debug("Creating the decomposer...")
         
         if not self._config_checker(name, ["tools", "output"], config): exit()
 
@@ -33,7 +34,7 @@ class decomposer(component, ABC):
         """Add the actions to the graph if they aren't already present, as a chain."""
         # Check to see if the action has been cached
         if self._cache_search_actions(prompt)["score"] > 0.95:
-            print("Similar prompts have already been cached.")
+            print_debug("Similar prompts have already been cached.")
             return
         
         # Instructions must have at least one instruction
@@ -57,7 +58,7 @@ class decomposer(component, ABC):
         
         if len(similar_prompts) == 0: return {"prompt": "", "actions": [], "score": 0}
         
-        print(f"[SIMILAR PROMPTS] {similar_prompts}")
+        print_debug(f"[SIMILAR PROMPTS] {similar_prompts}")
         
         best_prompt = similar_prompts[0]["value"]
         score = similar_prompts[0]["score"]

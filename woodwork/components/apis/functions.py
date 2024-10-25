@@ -2,11 +2,12 @@ import ast
 import importlib
 import os
 
+from woodwork.helper_functions import print_debug
 from woodwork.components.apis.api import api
 
 class functions(api):
     def __init__(self, name, config):
-        print("Configuring API...")
+        print_debug("Configuring API...")
         super().__init__(name, config)
         
         self._config_checker(name, ["path"], config)
@@ -14,7 +15,7 @@ class functions(api):
         self._path = config["path"]
         self._generate_docs(self._path)
         
-        print("API configured.")
+        print_debug("API configured.")
 
     def _get_type_hint(self, annotation):
         """Helper function to convert AST annotation to a string."""
@@ -69,12 +70,12 @@ class functions(api):
             self._documentation += f"[FUNCTION] {func['name']}({params}) -> {func['return_type']}\n"
             self._documentation += f"[DOCUMENTATION] {func['docstring']}\n"
             
-            print(self.describe())
+            print_debug(self.describe())
 
     def _dynamic_import(self):
         module_path = os.path.join(os.getcwd(), f"{self._path}")
         
-        print(f"[MODULE_PATH] {module_path}")
+        print_debug(f"[MODULE_PATH] {module_path}")
         spec = importlib.util.spec_from_file_location(self._path, module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

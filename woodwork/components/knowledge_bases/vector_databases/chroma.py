@@ -10,7 +10,7 @@ from woodwork.components.knowledge_bases.vector_databases.vector_database import
 
 class chroma(vector_database):
     def __init__(self, name, config):        
-        print("Initialising Chroma Knowledge Base...")
+        print_debug("Initialising Chroma Knowledge Base...")
         
         self._config_checker(name, ["client"], config)
         
@@ -34,7 +34,7 @@ class chroma(vector_database):
 
         super().__init__(name, config)
         
-        print(f"Chroma Knowledge Base {name} created.")
+        print_debug(f"Chroma Knowledge Base {name} created.")
     
     def query(self, query):
         pass

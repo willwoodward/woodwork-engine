@@ -1,3 +1,4 @@
+from woodwork.helper_functions import print_debug
 from woodwork.components.decomposers.decomposer import decomposer
 from woodwork.components.task_master import task_master
 
@@ -10,7 +11,7 @@ import json
 class llm(decomposer):
     def __init__(self, name, config):
         super().__init__(name, config)
-        print("Initialising decomposer...")
+        print_debug("Initialising decomposer...")
         
         if not self._config_checker(name, ["api_key"], config): exit()
         
@@ -52,14 +53,14 @@ class llm(decomposer):
         if self._cache_mode:
             closest_query = self._cache_search_actions(query)
             if closest_query["score"] > 0.95:
-                print("Cache hit!")
+                print_debug("Cache hit!")
                 return self._output.execute(closest_query["actions"])
         
         tool_documentation = ""
         for obj in self._tools:
             tool_documentation += f"{obj.type}:\n{obj.describe()}\n\n"
         
-        print(f"[DOCUMENTATION]:\n {tool_documentation}")
+        print_debug(f"[DOCUMENTATION]:\n {tool_documentation}")
         system_prompt = (
             "Given the following tools and their descriptions:\n"
             "{tools} "
@@ -84,7 +85,7 @@ class llm(decomposer):
         chain = prompt | self.__llm
         result = chain.invoke({"input": query}).content
         
-        print(f"[RESULT] {result}")
+        print_debug(f"[RESULT] {result}")
         
         # Clean output as JSON
         result = self.__clean(result)

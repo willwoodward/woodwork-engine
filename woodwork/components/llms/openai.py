@@ -1,10 +1,11 @@
 from langchain_openai import ChatOpenAI
 
+from woodwork.helper_functions import print_debug
 from woodwork.components.llms.llm import llm
 
 class openai(llm):
     def __init__(self, name, config):
-        print(f"Establishing connection with model...")
+        print_debug(f"Establishing connection with model...")
         
         llm = ChatOpenAI(
             model=config["model"],
@@ -21,4 +22,4 @@ class openai(llm):
         
         super().__init__(name, llm, retriever, config)
 
-        print("Model initialised.")
+        print_debug("Model initialised.")

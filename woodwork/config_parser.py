@@ -1,8 +1,8 @@
 import re
 import os
 from dotenv import load_dotenv
-import sys
 
+from woodwork.helper_functions import print_debug
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
@@ -24,7 +24,7 @@ def dependency_resolver(commands, component):
     # How do we get each variable? Dict of commands, key = name, value = component dictionary
     # Traverse the depends_on as DFS
     
-    print(component)
+    print_debug(component)
     # Base case: no dependencies in the depends_on array
     if component["depends_on"] == []:
         # Initialise component, return object reference
@@ -45,7 +45,7 @@ def dependency_resolver(commands, component):
                         value[i] = component_object
             
             if value == dependency:
-                print(value, dependency)
+                print_debug(value, dependency)
                 component["config"][key] = component_object
     
     # Return component object
@@ -104,7 +104,7 @@ def main_function():
         
         entry_pattern = r".+=.+\{[\s\S]*?\}"
         entries = re.findall(entry_pattern, lines)
-        print(entries)
+        print_debug(entries)
 
         for entry in entries:
             command = {}
@@ -142,14 +142,14 @@ def main_function():
                     for i in range(len(value)):
                         command["depends_on"].append(value[i])
                     
-                    print(f"values = {value}")
+                    print_debug(f"values = {value}")
                                     
                 elif (value[0] == "\"" and value[-1] == "\"") or (value[0] == "\'" and value[-1] == "\'"):
                     value = value[1:-1:]
 
                 command["config"][key] = value
             
-            print("[COMMAND]", command)
+            print_debug("[COMMAND]", command)
             commands[command["variable"]] = command
     
     command_checker(commands)
@@ -161,4 +161,4 @@ def main_function():
     
     task_m.add_tools(tools)
     
-    # print("[COMMANDS]", commands)
+    # print_debug("[COMMANDS]", commands)
