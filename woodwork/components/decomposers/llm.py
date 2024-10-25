@@ -40,12 +40,12 @@ class llm(decomposer):
                 end_index = i
         
         if start_index == -1:
-            return None
+            return x
 
         try:
             return json.loads(x[start_index:end_index+1:])
         except:
-            print("Failed to load:", x)
+            return x
     
     def input_handler(self, query):
         # Search cache for similar results
@@ -89,6 +89,9 @@ class llm(decomposer):
         # Clean output as JSON
         result = self.__clean(result)
         
+        if isinstance(result, str):
+            return result
+    
         # Cache instructions
         if self._cache_mode: self._cache_actions(query, result)
         

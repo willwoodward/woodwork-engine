@@ -13,10 +13,9 @@ class task_master(component):
         print(instructions)
         
         variables = {}
+        prev_instructon = ""
         
-        for instruction in instructions:
-            result = None
-            
+        for instruction in instructions:            
             # Substitute variable inputs
             for key in instruction["inputs"]:
                 variable = instruction["inputs"][key]
@@ -30,11 +29,15 @@ class task_master(component):
 
             # Add the result to the variables
             variables[instruction["output"]] = result
+            prev_instructon = result
             print(f"instruction = {instruction}")
             print(f"result = {result}")
+        
+        return prev_instructon
 
     def _use_tool(self, instruction):
         try:
+            result = None
             if instruction["tool"] == "api":
                 # Call the api
                 api = list(filter(lambda x: x.type == "api", self.__tools))[0]
@@ -49,7 +52,6 @@ class task_master(component):
                 llm = list(filter(lambda x: x.type == "llm", self.__tools))[0]
                 result = llm.question_answer(prompt)
             
-            else: return
             return result
         except:
             print("This instruction was not able to execute.")
