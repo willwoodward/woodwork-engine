@@ -11,10 +11,22 @@ class neo4j(graph_database):
         
         if not self._config_checker(name, ["uri", "user", "password", "api_key"], config): exit()
         self._driver = GraphDatabase.driver(config["uri"], auth=(config["user"], config["password"]))
+        if not self._connected(): exit()
+        
         self._api_key = config["api_key"]
         self._openai_client = OpenAI()
         
         print(f"Neo4j Knowledge Base {name} created.")
+    
+    def _connected(self):
+        try:
+            with self._driver.session() as session:
+                session.run("RETURN 1")
+                return True
+        except Exception as e:
+            return False
+        finally:
+            self._driver.close()
         
     def close(self):
         self._driver.close()
