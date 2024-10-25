@@ -4,12 +4,14 @@ import subprocess
 import sys
 import importlib.resources as pkg_resources
 
+from woodwork.helper_functions import print_debug
+
 def setup_virtual_env(options):
     isolated = options["isolated"]
 
     # Create the virtual environment    
     if not os.path.exists('.woodwork/env'):
-        print("Setting up a virtual environment...")
+        print_debug("Setting up a virtual environment...")
         
         if isolated:
             subprocess.check_call([sys.executable, '-m', 'venv', '.woodwork/env'])
@@ -41,7 +43,7 @@ def activate_virtual_environment():
 
     # Check if we're already in the virtual environment
     if sys.prefix == venv_path:
-        print("Virtual environment is already active.")
+        print_debug("Virtual environment is already active.")
         return
 
     # Execute the activation script
@@ -55,7 +57,7 @@ def activate_virtual_environment():
     site_packages = os.path.join(venv_path, 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}', 'site-packages')
     sys.path.insert(0, site_packages)
 
-    print("Virtual environment activated.")
+    print_debug("Virtual environment activated.")
 
 def parse_requirements(requirements_set, file_path):
     if os.path.isfile(file_path):
