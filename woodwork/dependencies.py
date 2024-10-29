@@ -127,7 +127,7 @@ def init(options={"isolated": False}):
         if os.path.exists(temp_requirements_file):
             os.remove(temp_requirements_file)
 
-
+    activate_virtual_environment()
     print("Initialization complete.")
 
 def get_subdirectories(path: str) -> list[str]:
@@ -138,6 +138,11 @@ def get_subdirectories(path: str) -> list[str]:
 
 def install_all():
     print("Installing all dependencies...")
+
+    setup_virtual_env({"isolated": True})
+   
+    # Change this to work with windows
+    activate_script = '.woodwork/env/bin/activate'
     
     # Access the requirements directory as a package resource
     requirements_dir = pkg_resources.files('woodwork')/'requirements'
@@ -167,7 +172,7 @@ def install_all():
             f.write(f"{requirement}\n")
 
     try:
-        subprocess.check_call([f"pip install -r {temp_requirements_file}"], shell=True)
+        subprocess.check_call([f". {activate_script} && pip install -r {temp_requirements_file}"], shell=True)
         print(f"Installed all combined dependencies.")
     except subprocess.CalledProcessError:
         sys.exit(1)
