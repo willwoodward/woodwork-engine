@@ -24,4 +24,4 @@ With 3. and 4. traditionally being merged. These components often have reinforce
 ### Agent Memory
 This is typically referred to as the Knowledge Base (KB), used primarily in Retrieval Augmented Generation (RAG). This essentially allows us to use similar or relevant information to pass as to another part of the AI Agent workflow.
 
-Typically, the problem with AI Agent performance is related to its context, assuming that modern LLMs are able to reason relatively well given the correct information.
+Typically, the problem with AI Agent performance is related to its context, assuming that modern LLMs are able to reason relatively well given the correct information. Design of this system should accomodate future developments.
