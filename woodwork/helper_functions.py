@@ -24,8 +24,13 @@ def import_all_classes(package_name: str) -> bool:
             if file.endswith(".py") and file != "__init__.py":
                 # Derive the full module path
                 relative_path = os.path.relpath(root, package_path)
+                print("RELPATH =", relative_path)
                 module_name = os.path.splitext(file)[0]
-                full_module_name = f"{package_name}.{relative_path.replace(os.path.sep, '.')}.{module_name}"
+                
+                if relative_path == ".":
+                    full_module_name = f"{package_name}.{module_name}"
+                else:
+                    full_module_name = f"{package_name}.{relative_path.replace(os.path.sep, '.')}.{module_name}"
                 
                 # Import the module
                 try:
