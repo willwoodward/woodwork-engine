@@ -4,22 +4,25 @@ from woodwork.helper_functions import print_debug
 from woodwork.components.llms.llm import llm
 
 class openai(llm):
-    def __init__(self, name, config):
+    def __init__(self, name, api_key: str, model="gpt-4o-mini", **config):
         print_debug(f"Establishing connection with model...")
         
-        llm = ChatOpenAI(
-            model=config["model"],
+        self._llm_value = ChatOpenAI(
+            model=model,
             temperature=0,
             max_tokens=None,
             timeout=None,
             max_retries=2,
-            api_key=config["api_key"]
+            api_key=api_key
         )
         
-        retriever = None
-        if "knowledge_base" in config:
-            retriever = config["knowledge_base"].retriever
+        self._retriever = config.get("knowledge_base")
+        if self._retriever:
+            self._retriever = self._retriever.retriever
         
-        super().__init__(name, llm, retriever, config)
+        super().__init__(name, **config)
 
         print_debug("Model initialised.")
+
+    @property
+    def _llm(self): return self._llm_value

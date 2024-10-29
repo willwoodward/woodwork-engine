@@ -67,7 +67,7 @@ def create_object(command):
 
     if component == "llm":
         if type == "hugging_face": return hugging_face(command["variable"], command["config"])
-        if type == "openai": return openai(command["variable"], command["config"])
+        if type == "openai": return openai(command["variable"], **command["config"])
 
     if component == "input":
         if type == "command_line": return command_line(command["variable"], command["config"])
