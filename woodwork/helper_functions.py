@@ -12,12 +12,13 @@ def print_debug(*args: any) -> None:
         print(*args)
 
 
-def import_all_classes(package_name: str):
+def import_all_classes(package_name: str) -> bool:
     # Get the package path
     package = importlib.import_module(package_name)
     package_path = package.__path__[0]
 
     # Traverse directories and import all .py files as modules
+    imported_all = True
     for root, _, files in os.walk(package_path):
         for file in files:
             if file.endswith(".py") and file != "__init__.py":
@@ -31,3 +32,6 @@ def import_all_classes(package_name: str):
                     importlib.import_module(full_module_name)
                 except ImportError as e:
                     print(f"Could not import {full_module_name}: {e}")
+                    imported_all = False
+    
+    return imported_all
