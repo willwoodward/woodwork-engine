@@ -160,7 +160,7 @@ def install_all():
             sys.exit(1)
     
     # Write combined unique requirements to a temporary file
-    os.makedirs(os.path.dirname(".woodwork"), exist_ok=True)
+    os.makedirs(".woodwork", exist_ok=True)
     temp_requirements_file = '.woodwork/requirements.txt'
     with open(temp_requirements_file, 'w') as f:
         for requirement in sorted(requirements_set):
