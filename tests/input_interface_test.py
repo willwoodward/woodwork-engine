@@ -10,7 +10,23 @@ def get_all_subclasses(cls):
         subclasses.extend(get_all_subclasses(subclass))
     return subclasses
 
-input_implementors = get_all_subclasses(input_interface)
+def get_leaf_subclasses(cls):
+    # Get direct subclasses of the provided class
+    subclasses = cls.__subclasses__()
+    leaf_subclasses = []
+
+    for subclass in subclasses:
+        # Recursively find leaf subclasses
+        leaves = get_leaf_subclasses(subclass)
+        # If the subclass has no further subclasses, it’s a leaf node
+        if not leaves:
+            leaf_subclasses.append(subclass)
+        else:
+            leaf_subclasses.extend(leaves)
+    
+    return leaf_subclasses
+
+input_implementors = get_leaf_subclasses(input_interface)
 print("Collected subclasses of input_interface:", input_implementors)
 
 @pytest.mark.parametrize("input_implementor", input_implementors)
