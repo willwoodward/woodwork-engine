@@ -8,12 +8,9 @@ from abc import ABC, abstractmethod
 
 class llm(component, input_interface, ABC):
     def __init__(self, name, **config):
-        # Each LLM will have a: LLM object, input_handler, retriever?
         super().__init__(name, "llm")
         
-        self._memory = None
-        if "memory" in config:
-            self._memory = config["memory"]
+        self._memory = config.get("memory")
     
     @property
     @abstractmethod
@@ -52,7 +49,12 @@ class llm(component, input_interface, ABC):
         )
         
         chain = prompt | self._llm
-        response = chain.invoke({"input": query}).content
+        response = chain.invoke({"input": query})
+        
+        try:
+            response = response.content
+        except:
+            pass
         
         # Adding to memory
         if self._memory:

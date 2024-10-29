@@ -34,8 +34,12 @@ def create_instance(cls):
     # class_name: parameters
     default_config = {
         "openai": {
-            "name": "openai-example",
+            "name": "openai_example",
             "api_key": os.getenv("OPENAI_API_KEY"),
+        },
+        "hugging_face": {
+            "name": "hugging_face-example",
+            "api_key": os.getenv("HF_API_TOKEN"),
         }
     }
     
