@@ -143,7 +143,7 @@ def install_all():
     requirements_dir = pkg_resources.files('woodwork')/'requirements'
     
     components = get_subdirectories(requirements_dir)
-    requirements_set = {}
+    requirements_set = set()
     
     for component in components:
         component_requirements = os.path.join(requirements_dir, component, f"{component}.txt")
