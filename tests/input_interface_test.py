@@ -11,6 +11,7 @@ def get_all_subclasses(cls):
     return subclasses
 
 input_implementors = get_all_subclasses(input_interface)
+print("Collected subclasses of input_interface:", input_implementors)
 
 @pytest.mark.parametrize("input_implementor", input_implementors)
 def test_input_returns(input_implementor):
