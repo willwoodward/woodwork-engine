@@ -1,10 +1,11 @@
 from woodwork.components.component import component
+from woodwork.components.input_interface import input_interface
 
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
-class llm(component):
+class llm(component, input_interface):
     def __init__(self, name, llm, retriever, config):
         # Each LLM will have a: LLM object, input_handler, retriever?
         super().__init__(name, "llm")
@@ -16,7 +17,8 @@ class llm(component):
         if "memory" in config:
             self._memory = config["memory"]
     
-
+    def input(self, input: str) -> str:
+        return self.input_handler(input)
 
     def input_handler(self, query):
         # If there is no retriever object, there is no connected Knowledge Base
