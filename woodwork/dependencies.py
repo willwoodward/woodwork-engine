@@ -127,7 +127,6 @@ def init(options={"isolated": False}):
         if os.path.exists(temp_requirements_file):
             os.remove(temp_requirements_file)
 
-    activate_virtual_environment()
     print("Initialization complete.")
 
 def get_subdirectories(path: str) -> list[str]:
@@ -181,5 +180,5 @@ def install_all():
         if os.path.exists(temp_requirements_file):
             os.remove(temp_requirements_file)
 
-
+    activate_virtual_environment()
     print("Initialization complete.")
