@@ -129,3 +129,52 @@ def init(options={"isolated": False}):
 
 
     print("Initialization complete.")
+
+def get_subdirectories(path: str) -> list[str]:
+    entries = os.listdir(path)
+    
+    # Filter the entries to include only directories
+    return [entry for entry in entries if os.path.isdir(os.path.join(path, entry))]
+
+def install_all():
+    print("Installing all dependencies...")
+    
+    # Access the requirements directory as a package resource
+    requirements_dir = pkg_resources.files('woodwork')/'requirements'
+    
+    components = get_subdirectories(requirements_dir)
+    requirements_set = set()
+    
+    for component in components:
+        component_requirements = os.path.join(requirements_dir, component, f"{component}.txt")
+        try:
+            parse_requirements(requirements_set, component_requirements)
+        except subprocess.CalledProcessError:
+            sys.exit(1)
+        
+        # Install the component type dependencies
+        type_requirements = os.path.join(requirements_dir, component, f"{type}.txt")
+        try:
+            parse_requirements(requirements_set, type_requirements)
+        except subprocess.CalledProcessError:
+            sys.exit(1)
+    
+    # Write combined unique requirements to a temporary file
+    os.makedirs(".woodwork", exist_ok=True)
+    temp_requirements_file = '.woodwork/requirements.txt'
+    with open(temp_requirements_file, 'w') as f:
+        for requirement in sorted(requirements_set):
+            f.write(f"{requirement}\n")
+
+    try:
+        subprocess.check_call([f"pip install -r {temp_requirements_file}"], shell=True)
+        print(f"Installed all combined dependencies.")
+    except subprocess.CalledProcessError:
+        sys.exit(1)
+    finally:
+        # Clean up temporary requirements file
+        if os.path.exists(temp_requirements_file):
+            os.remove(temp_requirements_file)
+
+
+    print("Initialization complete.")
