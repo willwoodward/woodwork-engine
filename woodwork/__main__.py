@@ -1,4 +1,4 @@
-from woodwork.dependencies import init, activate_virtual_environment
+from woodwork.dependencies import init, activate_virtual_environment, install_all
 from woodwork.helper_functions import set_globals
 
 import sys
@@ -26,3 +26,5 @@ def main():
         else:
             if sys.argv[2] == "--isolated":
                 init({"isolated": True})
+            if sys.argv[2] == "--all":
+                install_all()

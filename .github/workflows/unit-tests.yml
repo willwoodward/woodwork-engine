@@ -22,6 +22,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install pytest
+          woodwork init --all
 
       - name: Run tests
         run: pytest -s tests/
