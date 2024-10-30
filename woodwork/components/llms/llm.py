@@ -4,25 +4,24 @@ from woodwork.components.input_interface import input_interface
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
+from abc import ABC, abstractmethod
 
-class llm(component, input_interface):
-    def __init__(self, name, llm, retriever, config):
-        # Each LLM will have a: LLM object, input_handler, retriever?
+class llm(component, input_interface, ABC):
+    def __init__(self, name, **config):
         super().__init__(name, "llm")
-                        
-        self.__llm = llm
-        self.__retriever = retriever
         
-        self._memory = None
-        if "memory" in config:
-            self._memory = config["memory"]
+        self._memory = config.get("memory")
+    
+    @property
+    @abstractmethod
+    def _llm(self): pass
     
     def input(self, input: str) -> str:
         return self.input_handler(input)
 
     def input_handler(self, query):
         # If there is no retriever object, there is no connected Knowledge Base
-        if not self.__retriever:
+        if not self._retriever:
             return self.question_answer(query)
         else:
             return self.context_answer(query)
@@ -49,8 +48,13 @@ class llm(component, input_interface):
             ]
         )
         
-        chain = prompt | self.__llm
-        response = chain.invoke({"input": query}).content
+        chain = prompt | self._llm
+        response = chain.invoke({"input": query})
+        
+        try:
+            response = response.content
+        except:
+            pass
         
         # Adding to memory
         if self._memory:
@@ -75,8 +79,8 @@ class llm(component, input_interface):
             ]
         )
         
-        question_answer_chain = create_stuff_documents_chain(self.__llm, prompt)
-        chain = create_retrieval_chain(self.__retriever, question_answer_chain)
+        question_answer_chain = create_stuff_documents_chain(self._llm, prompt)
+        chain = create_retrieval_chain(self._retriever, question_answer_chain)
 
         return chain.invoke({"input": query})['answer']
 
