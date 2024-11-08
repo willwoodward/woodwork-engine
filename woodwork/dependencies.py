@@ -129,6 +129,57 @@ def init(options={"isolated": False}):
 
     print("Initialization complete.")
 
+# This function is for testing
+def init_all(options={"isolated": False}):
+    # Make sure the virtual environment is set up properly
+    setup_virtual_env(options)
+   
+    # Change this to work with windows
+    activate_script = '.woodwork/env/bin/activate'
+    
+    print("Installing dependencies...")
+    root_folder = "woodwork/requirements"
+    temp_requirements_file = ".woodwork/requirements.txt"
+    compile_requirements(root_folder, temp_requirements_file)
+    print("Compiled all requirements")
+
+    try:
+        subprocess.check_call([f". {activate_script} && pip install -r {temp_requirements_file}"], shell=True)
+        print(f"Installed all combined dependencies.")
+    except subprocess.CalledProcessError:
+        sys.exit(1)
+    finally:
+        # Clean up temporary requirements file
+        if os.path.exists(temp_requirements_file):
+            os.remove(temp_requirements_file)
+
+    print("Initialization complete.")
+
+# Also used for testing
+import os
+
+def compile_requirements(root_dir, output_file):
+    # Set to store unique requirements
+    all_requirements = set()
+    
+    # Walk through the directory structure
+    for root, dirs, files in os.walk(root_dir):
+        for file in files:
+            file_path = os.path.join(root, file)
+            with open(file_path, "r") as f:
+                for line in f:
+                    requirement = line.strip()
+                    if requirement and not requirement.startswith("#"):  # Exclude comments and blank lines
+                        all_requirements.add(requirement)
+    
+    # Write the compiled requirements to the output file
+    with open(output_file, "w") as f:
+        for requirement in sorted(all_requirements):  # Sort for consistency
+            f.write(requirement + "\n")
+    
+    print(f"Compiled requirements saved to {output_file}")
+
+
 def get_subdirectories(path: str) -> list[str]:
     entries = os.listdir(path)
     
