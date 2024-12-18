@@ -15,21 +15,6 @@ class llm(component, tool_interface, ABC):
     @property
     @abstractmethod
     def _llm(self): pass
-    
-    def input(self, query: str, inputs: dict) -> str:
-        # Substitute inputs
-        prompt = query
-        for key in inputs:
-            prompt = prompt.replace(key, inputs[key])
-        
-        return self.input_handler(prompt)
-
-    def input_handler(self, query):
-        # If there is no retriever object, there is no connected Knowledge Base
-        if not self._retriever:
-            return self.question_answer(query)
-        else:
-            return self.context_answer(query)
             
     def question_answer(self, query):
         # Defining the system prompt
@@ -91,4 +76,21 @@ class llm(component, tool_interface, ABC):
 
     @property
     def description(self):
-        return "Ask the LLM a prompt in the form of the string and it will return an answer to that prompt."
+        return """Ask the LLM a prompt in the form of the string and it will return an answer to that prompt.
+            The action is the prompt, and inputs represent a dictionary where keys in the prompt will be substituted in for their value.
+            The input value should reference a string or variable name from one of the previous action's output.
+            Contain the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs dictionary.
+            The LLM will automatically use a knowledge base if one is attached for RAG.
+            """
+
+    def input(self, query: str, inputs: dict) -> str:
+        # Substitute inputs
+        prompt = query
+        for key in inputs:
+            prompt = prompt.replace(key, inputs[key])
+
+        # If there is no retriever object, there is no connected Knowledge Base
+        if not self._retriever:
+            return self.question_answer(prompt)
+        else:
+            return self.context_answer(prompt)

@@ -64,15 +64,16 @@ class llm(decomposer):
         system_prompt = (
             "Given the following tools and their descriptions:\n"
             "{tools} "
-            "Answer the user's prompt, returning only the necessary endpoint URIs or LLM prompts "
+            "Answer the user's prompt, returning only the necessary action plan "
             "to carry out the steps to solving the user's prompt. "
             "If you do not have necessary tools, say so."
             "Structure your steps in the following schema: "
-            "[{{{{\"tool\": tool, \"action\": prompt or function or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}, ...]"
-            "Containing the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs array."
+            "[{{{{\"tool\": tool, \"action\": prompt, function or endpoint, \"inputs\": {{{{variable: value}}}}, \"output\": value}}}}, ...]"
             "Format this JSON into an array of steps, returing only this array. "
-            "Specify only the function or endpoint name when they are used. "
+            "Include only these keys in the JSON object, no others. "
+            "Specify only the function or endpoint name as an action when they are used, do not include them as a function key. "
             "If you do not have the necessary information, ask for the required information. "
+            "Always specify an output. "
         ).format(tools=tool_documentation)
         
         prompt = ChatPromptTemplate.from_messages(
