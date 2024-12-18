@@ -63,3 +63,20 @@ class neo4j(graph_database):
         RETURN elementId(node) AS nodeID, node.{property} AS {property}, score"""
         
         return self.run(query)
+
+    @property
+    def description(self):
+        return """
+            A graph database that can be added to, queried and cleared. The query language is Cypher.
+            The following functions can be used as actions, with inputs as a dictionary of kwargs:
+            similarity_search(prompt, label, proptery): returns nodes labelled label with similar text in the property property.
+            run(query): runs a cypher query on the graph.
+        """
+    
+    def input(self, function_name: str, inputs: dict) -> str:
+        func = None
+        
+        if function_name == "similarity_search": func = self.similarity_search
+        if function_name == "run": func = self.run
+        
+        return str(func(**inputs))

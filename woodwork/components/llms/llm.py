@@ -1,12 +1,12 @@
 from woodwork.components.component import component
-from woodwork.components.input_interface import input_interface
+from woodwork.interfaces.tool_interface import tool_interface
 
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod
 
-class llm(component, input_interface, ABC):
+class llm(component, tool_interface, ABC):
     def __init__(self, name, **config):
         super().__init__(name, "llm")
         
@@ -15,16 +15,6 @@ class llm(component, input_interface, ABC):
     @property
     @abstractmethod
     def _llm(self): pass
-    
-    def input(self, input: str) -> str:
-        return self.input_handler(input)
-
-    def input_handler(self, query):
-        # If there is no retriever object, there is no connected Knowledge Base
-        if not self._retriever:
-            return self.question_answer(query)
-        else:
-            return self.context_answer(query)
             
     def question_answer(self, query):
         # Defining the system prompt
@@ -84,5 +74,23 @@ class llm(component, input_interface, ABC):
 
         return chain.invoke({"input": query})['answer']
 
-    def describe(self):
-        return "Ask the LLM a prompt in the form of the string and it will return an answer to that prompt."
+    @property
+    def description(self):
+        return """Ask the LLM a prompt in the form of the string and it will return an answer to that prompt.
+            The action is the prompt, and inputs represent a dictionary where keys in the prompt will be substituted in for their value.
+            The input value should reference a string or variable name from one of the previous action's output.
+            Contain the LLM prompt inside action, with curly braces to denote variable inputs, and then containing the variable inputs inside the inputs dictionary.
+            The LLM will automatically use a knowledge base if one is attached for RAG.
+            """
+
+    def input(self, query: str, inputs: dict) -> str:
+        # Substitute inputs
+        prompt = query
+        for key in inputs:
+            prompt = prompt.replace(key, inputs[key])
+
+        # If there is no retriever object, there is no connected Knowledge Base
+        if not self._retriever:
+            return self.question_answer(prompt)
+        else:
+            return self.context_answer(prompt)

@@ -3,14 +3,13 @@ model2 = llm openai {
     api_key: $OPENAI_API_KEY
 }
 
-endpoint = api web {
-    url: "http://localhost:3000"
-    documentation: "endpoint.txt"
+document = knowledge_base text_file {
+    path: "./database.txt"
 }
 
 action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
-    tools: [model2, endpoint]
+    tools: [model2, document]
 }
 
 in = input command_line {

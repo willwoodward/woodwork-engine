@@ -15,12 +15,14 @@ class web(api):
         if "documentation" in config:
             with open (os.getcwd() + "/" + config["documentation"]) as f:
                 self._documentation = f.read()
+
+        self._documentation += "Call the endpoints by specifying just the endpoint name as the action, and the parameters as a dictionary in inputs."
         
         print_debug("API configured.")
 
-    def call(self, req, inputs):
+    def input(self, req: str, inputs: dict):
         res = requests.get(f"http://127.0.0.1:3000/{req}", params=inputs)
         return res.text
 
-    def describe(self):
-        return self._documentation
+    @property
+    def description(self): return self._documentation

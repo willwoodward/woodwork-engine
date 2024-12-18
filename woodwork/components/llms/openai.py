@@ -4,7 +4,7 @@ from woodwork.helper_functions import print_debug
 from woodwork.components.llms.llm import llm
 
 class openai(llm):
-    def __init__(self, name, api_key: str, model="gpt-4o-mini", **config):
+    def __init__(self, name, api_key: str, model="gpt-4o", **config):
         print_debug(f"Establishing connection with model...")
         
         self._llm_value = ChatOpenAI(
