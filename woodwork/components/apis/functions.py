@@ -70,7 +70,7 @@ class functions(api):
             self._documentation += f"[FUNCTION] {func['name']}({params}) -> {func['return_type']}\n"
             self._documentation += f"[DOCUMENTATION] {func['docstring']}\n"
             
-            print_debug(self.describe())
+            print_debug(self.description)
 
     def _dynamic_import(self):
         module_path = os.path.join(os.getcwd(), f"{self._path}")
@@ -80,6 +80,9 @@ class functions(api):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
+    
+    def input(self, function_name: str, inputs):
+        return self.call(function_name, inputs)
 
     def call(self, function_name: str, inputs):
         module = self._dynamic_import()
@@ -87,5 +90,5 @@ class functions(api):
         func = getattr(module, function_name)
         return func(**inputs)
 
-    def describe(self):
-        return self._documentation
+    @property
+    def description(self): return self._documentation

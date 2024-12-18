@@ -1,12 +1,12 @@
 from woodwork.components.component import component
-from woodwork.components.input_interface import input_interface
+from woodwork.interfaces.tool_interface import tool_interface
 
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod
 
-class llm(component, input_interface, ABC):
+class llm(component, tool_interface, ABC):
     def __init__(self, name, **config):
         super().__init__(name, "llm")
         

@@ -22,5 +22,5 @@ class web(api):
         res = requests.get(f"http://127.0.0.1:3000/{req}", params=inputs)
         return res.text
 
-    def describe(self):
-        return self._documentation
+    @property
+    def description(self): return self._documentation

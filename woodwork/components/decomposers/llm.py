@@ -58,7 +58,7 @@ class llm(decomposer):
         
         tool_documentation = ""
         for obj in self._tools:
-            tool_documentation += f"{obj.type}:\n{obj.describe()}\n\n"
+            tool_documentation += f"{obj.type}:\n{obj.description}\n\n"
         
         print_debug(f"[DOCUMENTATION]:\n {tool_documentation}")
         system_prompt = (
