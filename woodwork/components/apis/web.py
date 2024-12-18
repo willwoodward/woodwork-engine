@@ -17,13 +17,10 @@ class web(api):
                 self._documentation = f.read()
         
         print_debug("API configured.")
-    
-    def call(self, req, inputs):
+
+    def input(self, req: str, inputs: dict):
         res = requests.get(f"http://127.0.0.1:3000/{req}", params=inputs)
         return res.text
     
-    def input(self, req: str, inputs: dict):
-        return self.call(req, inputs)
-
     @property
     def description(self): return self._documentation

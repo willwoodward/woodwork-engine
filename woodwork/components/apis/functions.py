@@ -82,9 +82,6 @@ class functions(api):
         return module
     
     def input(self, function_name: str, inputs: dict):
-        return self.call(function_name, inputs)
-
-    def call(self, function_name: str, inputs):
         module = self._dynamic_import()
 
         func = getattr(module, function_name)
