@@ -84,5 +84,6 @@ class llm(component, tool_interface, ABC):
 
         return chain.invoke({"input": query})['answer']
 
-    def describe(self):
+    @property
+    def description(self):
         return "Ask the LLM a prompt in the form of the string and it will return an answer to that prompt."

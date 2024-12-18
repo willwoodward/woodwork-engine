@@ -40,6 +40,9 @@ class neo4j(graph_database):
     def query(self, query):
         return
     
+    def input(self, query):
+        return self.query(query)
+    
     def embed(self, label, property):
         query = f"""MATCH (a:{label})
         WHERE a.embedding IS null
