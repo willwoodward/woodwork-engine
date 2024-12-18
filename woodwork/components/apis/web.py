@@ -7,7 +7,7 @@ from woodwork.components.apis.api import api
 class web(api):
     def __init__(self, name, config):
         print_debug("Configuring API...")
-        self.__url = config["url"]
+        self._url = config["url"]
         
         super().__init__(name, config)
         
@@ -21,7 +21,7 @@ class web(api):
         print_debug("API configured.")
 
     def input(self, req: str, inputs: dict):
-        res = requests.get(f"http://127.0.0.1:3000/{req}", params=inputs)
+        res = requests.get(f"http://{self._url}/{req}", params=inputs)
         return res.text
 
     @property
