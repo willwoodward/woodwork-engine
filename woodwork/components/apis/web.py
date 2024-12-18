@@ -16,7 +16,7 @@ class web(api):
             with open (os.getcwd() + "/" + config["documentation"]) as f:
                 self._documentation = f.read()
 
-        self._documentation += "\nCall the endpoints by specifying just the endpoint name as the action, and the parameters as a dictionary in inputs."
+        self._documentation += "Call the endpoints by specifying just the endpoint name as the action, and the parameters as a dictionary in inputs."
         
         print_debug("API configured.")
 

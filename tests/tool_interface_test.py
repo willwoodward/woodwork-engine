@@ -55,7 +55,9 @@ def test_input_returns(input_implementor):
     input_instance = create_instance(input_implementor)
     
     try:
-        result = input_instance.input("Some input")
-        assert isinstance(result, str)
+        # Pass in a dummy action and inputs dictionary.
+        # Should return a str response, or None if it is invalid
+        result = input_instance.input("action", {})
+        assert isinstance(result, str) or isinstance(result, None)
     except:
         assert False
