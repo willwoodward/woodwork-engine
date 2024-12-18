@@ -81,7 +81,7 @@ class functions(api):
         spec.loader.exec_module(module)
         return module
     
-    def input(self, function_name: str, inputs):
+    def input(self, function_name: str, inputs: dict):
         return self.call(function_name, inputs)
 
     def call(self, function_name: str, inputs):

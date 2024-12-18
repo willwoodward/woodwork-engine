@@ -22,7 +22,7 @@ class web(api):
         res = requests.get(f"http://127.0.0.1:3000/{req}", params=inputs)
         return res.text
     
-    def input(self, req, inputs):
+    def input(self, req: str, inputs: dict):
         return self.call(req, inputs)
 
     @property

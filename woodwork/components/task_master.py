@@ -36,18 +36,12 @@ class task_master(component):
         try:
             result = None
             if instruction["tool"] == "api":
-                # Call the api
                 api = list(filter(lambda x: x.type == "api", self.__tools))[0]
-                result = api.call(instruction["action"], instruction["inputs"])
+                result = api.input(instruction["action"], instruction["inputs"])
             
             if instruction["tool"] == "llm":
-                # Substitute inputs
-                prompt = instruction["action"]
-                for key in instruction["inputs"]:
-                    prompt = prompt.replace(key, instruction["inputs"][key])
-                
                 llm = list(filter(lambda x: x.type == "llm", self.__tools))[0]
-                result = llm.question_answer(prompt)
+                result = llm.input(instruction["action"], instruction["inputs"])
             
             return result
         except:

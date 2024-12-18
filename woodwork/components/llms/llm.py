@@ -16,8 +16,13 @@ class llm(component, tool_interface, ABC):
     @abstractmethod
     def _llm(self): pass
     
-    def input(self, input: str) -> str:
-        return self.input_handler(input)
+    def input(self, query: str, inputs: dict) -> str:
+        # Substitute inputs
+        prompt = query
+        for key in inputs:
+            prompt = prompt.replace(key, inputs[key])
+        
+        return self.input_handler(prompt)
 
     def input_handler(self, query):
         # If there is no retriever object, there is no connected Knowledge Base
