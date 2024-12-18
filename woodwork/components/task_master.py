@@ -8,7 +8,8 @@ class task_master(component):
     def add_tools(self, tools):
         self.__tools = tools
 
-    def execute(self, instructions: list):        
+    def execute(self, instructions: list):   
+        print_debug("Executing instructions...")     
         variables = {}
         prev_instructon = ""
                 

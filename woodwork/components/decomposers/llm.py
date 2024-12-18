@@ -48,6 +48,8 @@ class llm(decomposer):
         try:
             return json.loads(x[start_index:end_index+1:])
         except:
+            print("Couldn't load array as JSON")
+            print(x[start_index:end_index+1:])
             return x
     
     def input_handler(self, query):
