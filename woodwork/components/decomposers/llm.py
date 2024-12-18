@@ -52,7 +52,7 @@ class llm(decomposer):
             print(x[start_index:end_index+1:])
             return x
     
-    def input_handler(self, query):
+    def input(self, query):
         # Search cache for similar results
         if self._cache_mode:
             closest_query = self._cache_search_actions(query)

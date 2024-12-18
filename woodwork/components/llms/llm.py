@@ -83,7 +83,7 @@ class llm(component, tool_interface, ABC):
             The LLM will automatically use a knowledge base if one is attached for RAG.
             """
 
-    def input(self, query: str, inputs: dict) -> str:
+    def input(self, query: str, inputs: dict = {}) -> str:
         # Substitute inputs
         prompt = query
         for key in inputs:

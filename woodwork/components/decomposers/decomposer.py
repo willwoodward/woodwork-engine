@@ -26,7 +26,7 @@ class decomposer(component, ABC):
             self._cache_mode = False
 
     @abstractmethod
-    def input_handler(self, query):
+    def input(self, query):
         """Given a query, return the JSON array denoting the actions to take, passed to the task master."""
         pass
 
