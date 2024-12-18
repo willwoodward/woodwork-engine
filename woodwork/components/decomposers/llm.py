@@ -35,10 +35,12 @@ class llm(decomposer):
         for i in range(len(x)-1):
             if x[i] == "[":
                 start_index = i
+                break
 
         for i in range(len(x)-1, 0, -1):
             if x[i] == "]":
                 end_index = i
+                break
         
         if start_index == -1:
             return x
@@ -73,7 +75,7 @@ class llm(decomposer):
             "Include only these keys in the JSON object, no others. "
             "Specify only the function or endpoint name as an action when they are used, do not include them as a function key. "
             "If you do not have the necessary information, ask for the required information. "
-            "Always specify an output. "
+            "Always specify an output variable. "
         ).format(tools=tool_documentation)
         
         prompt = ChatPromptTemplate.from_messages(

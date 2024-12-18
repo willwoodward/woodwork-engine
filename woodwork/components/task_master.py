@@ -8,14 +8,14 @@ class task_master(component):
     def add_tools(self, tools):
         self.__tools = tools
 
-    def execute(self, instructions: str):        
+    def execute(self, instructions: list):        
         variables = {}
         prev_instructon = ""
-        
+                
         for instruction in instructions:            
             # Substitute variable inputs
             for key in instruction["inputs"]:
-                variable = instruction["inputs"][key]
+                variable = str(instruction["inputs"][key])
                 if variable in variables:
                     instruction["inputs"][key] = variables[variable]
             
