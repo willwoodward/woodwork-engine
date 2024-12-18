@@ -35,14 +35,10 @@ class task_master(component):
     def _use_tool(self, instruction):
         try:
             result = None
-            if instruction["tool"] == "api":
-                api = list(filter(lambda x: x.type == "api", self.__tools))[0]
-                result = api.input(instruction["action"], instruction["inputs"])
             
-            if instruction["tool"] == "llm":
-                llm = list(filter(lambda x: x.type == "llm", self.__tools))[0]
-                result = llm.input(instruction["action"], instruction["inputs"])
-            
+            tool = list(filter(lambda x: x.name == instruction["tool"], self.__tools))[0]
+            result = tool.input(instruction["action"], instruction["inputs"])
+                        
             return result
         except:
             print("This instruction was not able to execute.")

@@ -70,7 +70,8 @@ class functions(api):
             self._documentation += f"[FUNCTION] {func['name']}({params}) -> {func['return_type']}\n"
             self._documentation += f"[DOCUMENTATION] {func['docstring']}\n"
             
-            print_debug(self.description)
+        self._documentation += "\nCall the functions by specifying only the function name as the action, and the arguments as a dictionary of kwargs."
+        print_debug(self.description)
 
     def _dynamic_import(self):
         module_path = os.path.join(os.getcwd(), f"{self._path}")
