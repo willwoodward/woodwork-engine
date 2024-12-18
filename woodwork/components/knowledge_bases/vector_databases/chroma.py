@@ -37,5 +37,21 @@ class chroma(vector_database):
         
         print_debug(f"Chroma Knowledge Base {name} created.")
     
-    def query(self, query):
+    def query(self, query, n=3):
         pass
+    
+    @property
+    def description(self):
+        return """
+            A vector database, where the action represents a function name, and inputs is a dictionary of kwargs:
+            query(query, n=3) - returns the n (defaults to 3) most similar text embeddings to the supplied query string 
+        """
+    
+    def input(self, function_name, inputs) -> str:
+        func = None
+        if function_name == "query": func = self.query
+        
+        if func is None: return
+        
+        return func(**inputs)
+        
