@@ -6,3 +6,5 @@ build
 dist
 .woodwork
 woodwork_engine.egg-info
+.pytest_cache
+.ruff_cache
