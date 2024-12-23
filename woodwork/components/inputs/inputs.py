@@ -1,12 +1,14 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from woodwork.components.component import component
+
 
 class inputs(component):
     def __init__(self, name, config):
         super().__init__(name, "input")
-        
-        if not self._config_checker(name, ["to"], config): exit()
+
+        if not self._config_checker(name, ["to"], config):
+            exit()
 
         self._output = config["to"]
 
