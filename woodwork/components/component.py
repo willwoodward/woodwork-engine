@@ -2,7 +2,7 @@ class component:
     def __init__(self, name, type):
         self.name = name
         self.type = type
-    
+
     @staticmethod
     def _config_checker(name, keys: list[str], config):
         for key in keys:

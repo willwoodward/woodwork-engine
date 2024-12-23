@@ -6,16 +6,18 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod
 
+
 class llm(component, tool_interface, ABC):
     def __init__(self, name, **config):
         super().__init__(name, "llm")
-        
+
         self._memory = config.get("memory")
-    
+
     @property
     @abstractmethod
-    def _llm(self): pass
-            
+    def _llm(self):
+        pass
+
     def question_answer(self, query):
         # Defining the system prompt
         if self._memory:
@@ -26,33 +28,30 @@ class llm(component, tool_interface, ABC):
                 "{context}"
             ).format(context=self._memory.data)
         else:
-            system_prompt = (
-                "You are a helpful assistant, answer the provided question, "
-                "In 3 sentences or less. "
-            )
-        
+            system_prompt = "You are a helpful assistant, answer the provided question, " "In 3 sentences or less. "
+
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", system_prompt),
                 ("human", "{input}"),
             ]
         )
-        
+
         chain = prompt | self._llm
         response = chain.invoke({"input": query})
-        
+
         try:
             response = response.content
         except:
             pass
-        
+
         # Adding to memory
         if self._memory:
             self._memory.add(f"[USER] {query}")
             self._memory.add(f"[AI] {response}")
 
         return response
-        
+
     def context_answer(self, query):
         system_prompt = (
             "Use the given context to answer the question. "
@@ -61,18 +60,18 @@ class llm(component, tool_interface, ABC):
             "Return only the answer to the question. "
             "Context: {context}"
         )
-        
+
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", system_prompt),
                 ("human", "{input}"),
             ]
         )
-        
+
         question_answer_chain = create_stuff_documents_chain(self._llm, prompt)
         chain = create_retrieval_chain(self._retriever, question_answer_chain)
 
-        return chain.invoke({"input": query})['answer']
+        return chain.invoke({"input": query})["answer"]
 
     @property
     def description(self):

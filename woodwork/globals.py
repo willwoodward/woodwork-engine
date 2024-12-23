@@ -1,3 +1,1 @@
-global_config = {
-    "mode": "run"
-}
+global_config = {"mode": "run"}
