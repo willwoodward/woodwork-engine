@@ -68,10 +68,10 @@ class neo4j(graph_database):
         # Check if the container already exists
         try:
             container = client.containers.get(container_name)
-            print(f"Container '{container_name}' already exists. Starting it...")
+            print_debug(f"Container '{container_name}' already exists. Starting it...")
             container.start()
         except docker.errors.NotFound:
-            print(f"Container '{container_name}' not found. Creating a new one...")
+            print_debug(f"Container '{container_name}' not found. Creating a new one...")
             client.containers.run(
                 image_name,
                 name=container_name,
