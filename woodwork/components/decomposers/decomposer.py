@@ -22,14 +22,14 @@ class decomposer(component, ABC):
             if config["cache"] == "true":
                 # Initialise neo4j cache
                 self._cache_mode = True
-                if not self._config_checker(name, ["uri", "user", "password", "api_key"], config):
+                if not self._config_checker(name, ["api_key"], config):
                     exit()
                 self._cache = neo4j(
                     "decomposer_cache",
                     {
-                        "uri": config["uri"],
-                        "user": config["user"],
-                        "password": config["password"],
+                        "uri": "bolt://localhost:7687",
+                        "user": "neo4j",
+                        "password": "testpassword",
                         "api_key": config["api_key"],
                     },
                 )
