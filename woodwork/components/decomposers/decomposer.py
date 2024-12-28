@@ -33,6 +33,7 @@ class decomposer(component, ABC):
                         "api_key": config["api_key"],
                     },
                 )
+                self._cache.init_vector_index("embeddings", "Prompt", "embedding")
         else:
             self._cache_mode = False
 
@@ -43,6 +44,7 @@ class decomposer(component, ABC):
 
     def _cache_actions(self, prompt: str, instructions: list[any]):
         """Add the actions to the graph if they aren't already present, as a chain."""
+        print_debug(self._cache.similarity_search(prompt, "Prompt", "value"))
         # Check to see if the action has been cached
         if self._cache_search_actions(prompt)["score"] > 0.95:
             print_debug("Similar prompts have already been cached.")

@@ -34,6 +34,19 @@ class neo4j(graph_database):
         finally:
             self._driver.close()
 
+    def init_vector_index(self, index_name, label, property):
+        query = f"""
+        CREATE VECTOR INDEX {index_name} IF NOT EXISTS
+        FOR (a:{label})
+        ON a.{property}
+        OPTIONS {{ indexConfig: {{
+            `vector.dimensions`: 1536,
+            `vector.similarity_function`: 'cosine'
+        }} }};
+        """
+
+        return self.run(query)
+
     def close(self):
         self._driver.close()
 
