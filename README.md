@@ -1,27 +1,39 @@
-## AI Agents
-In this project, I've thought of an AI Agent as an AI replacement for a human that can perform many tasks. For example, we've seen the rise of AI software engineers, that aim to complete the many tasks a software engineer has to carry-out.
+[![PyPI - Version](https://img.shields.io/pypi/v/woodwork-engine.svg?logo=pypi&label=PyPI&logoColor=gold)](https://pypi.org/project/woodwork-engine/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/woodwork-engine.svg?logo=python&label=Python&logoColor=gold)](https://pypi.org/project/woodwork-engine/)
+[![PyPI - Installs](https://img.shields.io/pypi/dm/woodwork-engine.svg?color=blue&label=Installs&logo=pypi&logoColor=gold)](https://pypi.org/project/woodwork-engine/)
+[![Release - Downloads](https://img.shields.io/github/downloads/willwoodward/woodwork-engine/total?label=Downloads)](https://github.com/willwoodward/woodwork-engine/releases)
+[![License](https://img.shields.io/github/license/willwoodward/woodwork-engine?label=License&logo=open-source-initiative)](https://github.com/willwoodward/woodwork-engine/blob/main/LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/willwoodward/woodwork-engine?label=Stars&logo=github)](https://github.com/willwoodward/woodwork-engine/stargazers)
 
-The main issue in these agents is simulating human workflows. Using the AI software engineer agent example, if a segmentation fault occurs but it didn't previously, we can isolate the problem down to the last couple of sections of code. Currently, AI agents lack this decision making capability, however the current state-of-the-art solutions cobble together an LLM with an API and a knowledge base and expect it to just work.
+# woodwork-engine
+Welcome to woodwork-engine, an AI Agent IaC tool that aims to make developing and deploying AI Agents easier.
 
-The investigation of this project is to see if focus on development of the infrastructure of these AI solutions can lead to better performance. This will aim to alleviate as much hard-coding as possible, hopefully in a step towards AGI.
+Through defining components in a configuration language, an LLM will decompose the task into actionable steps, which can be executed using the supplied tools. We use latest research to inform design decisions, and we implement this as most of the setup is copy/paste across projects. Through only focussing on the necessary components of a system, this package should make designing custom, vertical agents much easier.
 
-## The Project
-Through creating an IaC tool for AI Agent workflows, I'll aim to create a general structure and workflow for similar projects. I'll aim to include an example of this workflow in use to create one of my own AI Agents.
+## Table of Contents
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [License](#license)
 
-Personally, as I have a large interest in software engineering, a lot of my time will be in designing the config file parser and infrastructure code. I'll also aim to keep up with recent research to develop a thoughtful solution.
+## Features
+- A custom config language, woodwork (.ww files), allowing agent components to be declared
+- Integrations and communication between components are handled
+- Additional customisation or extension can be provided by implementing some of our interfaces
 
-## AI Agent Solution
-### Components of an AI Agent
-There seems to be a couple of main components:
-1. Memory
-2. Input Formatter
-3. Decision Maker
-4. Output Formatter
-5. Functions
+![Screenshot 2025-01-01 160031](https://github.com/user-attachments/assets/1a1c759e-aa5e-4499-902f-6d8abd23b3b8)
 
-With 3. and 4. traditionally being merged. These components often have reinforcement learning applied to fine tune the agent.
+## Installation
 
-### Agent Memory
-This is typically referred to as the Knowledge Base (KB), used primarily in Retrieval Augmented Generation (RAG). This essentially allows us to use similar or relevant information to pass as to another part of the AI Agent workflow.
+## Configuration
 
-Typically, the problem with AI Agent performance is related to its context, assuming that modern LLMs are able to reason relatively well given the correct information. Design of this system should accomodate future developments.
+## Examples
+
+## Contributing
+
+## License
+woodwork-engine uses a GPL license, which can be read in full [here](./LICENSE).
+
