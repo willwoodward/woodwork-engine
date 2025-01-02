@@ -14,7 +14,6 @@ Through defining components in a configuration language, an LLM will decompose t
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Configuration](#configuration)
 - [Examples](#examples)
 - [Contributing](#contributing)
 - [License](#license)
@@ -26,13 +25,22 @@ Through defining components in a configuration language, an LLM will decompose t
 
 ![Screenshot 2025-01-01 160031](https://github.com/user-attachments/assets/1a1c759e-aa5e-4499-902f-6d8abd23b3b8)
 
-## Installation
+A [roadmap](https://github.com/willwoodward/woodwork-meta/blob/main/ROADMAP.md) is provided with details on future features.
 
-## Configuration
+## Installation
+1. **Run `pip install woodwork-engine`**: This gives access to the `woodwork` CLI tool, along with the ability to parse and deploy AI Agent components from .ww files
+2. **Install the Woodwork extension on VSCode if relevant**: This provides syntax highlighting and intellisense for code in .ww files
+
+## Usage
+1. **Create a main.ww file and write some code**: This file is where component declarations are read from. For some inspiration, consult the examples
+2. **Run `woodwork init`**: This installs the necessary dependencies to run your components
+3. **Run `woodwork`**: This activates the components
 
 ## Examples
+For some examples, consult the examples folder. ENV variables are denotes by a '$', place a .env file in the same directory as the main.ww file and populate it with the necessary variables.
 
 ## Contributing
+To view the contributing guide for woodwork, the [CONTRIBUTING.md](https://github.com/willwoodward/woodwork-meta/blob/main/CONTRIBUTING.md) file in the meta repository contains more information. We would love your help! Additionally, if you prefer working on other projects aligned with language servers or web development, [woodwork-language](https://github.com/willwoodward/woodwork-language) and [woodwork-website](https://github.com/willwoodward/woodwork-website) could be worth taking a look at.
 
 ## License
 woodwork-engine uses a GPL license, which can be read in full [here](./LICENSE).
