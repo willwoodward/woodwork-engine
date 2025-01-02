@@ -1,5 +1,9 @@
 from neo4j import GraphDatabase
 from openai import OpenAI
+import os
+import docker
+import io
+import time
 
 from woodwork.helper_functions import print_debug
 from woodwork.components.knowledge_bases.graph_databases.graph_database import (
@@ -12,6 +16,7 @@ class neo4j(graph_database):
         print_debug("Initialising Neo4j Knowledge Base...")
 
         super().__init__(name, config)
+        self._local_init()
 
         if not self._config_checker(name, ["uri", "user", "password", "api_key"], config):
             exit()
@@ -33,6 +38,82 @@ class neo4j(graph_database):
             return False
         finally:
             self._driver.close()
+
+    def _ensure_data_directory(self, path):
+        """Ensure the data directory exists."""
+        if not os.path.exists(path):
+            os.makedirs(path)
+            print_debug(f"Created data directory at {path}")
+        else:
+            print_debug(f"Data directory already exists at {path}")
+
+    def _build_docker_image(self, client, image_name):
+        """Build the Docker image."""
+        print_debug("Building Docker image...")
+
+        dockerfile_content = """
+        FROM neo4j:latest
+        ENV NEO4J_AUTH=neo4j/testpassword
+        EXPOSE 7474 7687
+        CMD ["neo4j"]
+        """
+
+        client.images.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=image_name)
+        print_debug(f"Successfully built image: {image_name}")
+
+    def _run_docker_container(self, client, image_name, container_name, path):
+        """Run the Neo4j Docker container."""
+        print_debug("Running Docker container...")
+        
+        # Check if the container already exists
+        try:
+            container = client.containers.get(container_name)
+            print_debug(f"Container '{container_name}' already exists. Starting it...")
+            container.start()
+        except docker.errors.NotFound:
+            print_debug(f"Container '{container_name}' not found. Creating a new one...")
+            client.containers.run(
+                image_name,
+                name=container_name,
+                ports={
+                    f"7474/tcp": 7474,
+                    f"7687/tcp": 7687,
+                },
+                environment={
+                    "NEO4J_AUTH": "neo4j/testpassword",
+                    "NEO4J_PLUGINS": '["genai"]',
+                    "NEO4J_dbms_security_procedures_unrestricted": "genai.*",  # Allow unrestricted genai procedures
+                    "NEO4J_dbms_security_procedures_allowlist": "genai.*",  # Allowlist genai procedures
+                },
+                volumes={
+                    os.path.abspath(path): {
+                        "bind": "/data",
+                        "mode": "rw",
+                    }
+                },
+                detach=True,
+            )
+        print_debug(f"Neo4j container '{container_name}' is running.")
+
+    def _local_init(self):
+        self._ensure_data_directory(".woodwork/neo4j/data")
+        client = docker.from_env()
+        self._build_docker_image(client, "custom-neo4j")
+        self._run_docker_container(client, "custom-neo4j", "neo4j-container", ".woodwork/neo4j/data")
+        time.sleep(15)
+
+    def init_vector_index(self, index_name, label, property):
+        query = f"""
+        CREATE VECTOR INDEX {index_name} IF NOT EXISTS
+        FOR (a:{label})
+        ON a.{property}
+        OPTIONS {{ indexConfig: {{
+            `vector.dimensions`: 1536,
+            `vector.similarity_function`: 'cosine'
+        }} }};
+        """
+
+        return self.run(query)
 
     def close(self):
         self._driver.close()
