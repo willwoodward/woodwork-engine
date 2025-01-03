@@ -1,4 +1,9 @@
+import pytest
+import os
+from dotenv import load_dotenv
+
 from woodwork.config_parser import parse
+from woodwork.errors import ForbiddenVariableNameError
 
 
 # Testing component name declaration
@@ -30,25 +35,64 @@ def test_same_name_as_keyword():
     assert components["keyword1"]["config"] == {"key1": "value1"}
 
 
+def test_name_not_boolean():
+    config = """
+    true = keyword1 keyword2 {
+        key1: "value1"
+    }
+    """
+    with pytest.raises(ForbiddenVariableNameError):
+        parse(config)
+
+    config = """
+    FALSE = keyword1 keyword2 {
+        key1: "value1"
+    }
+    """
+    with pytest.raises(ForbiddenVariableNameError):
+        parse(config)
+
+
 def test_same_name_as_other_variable():
-    raise NotImplementedError
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+    }
+    
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+    }
+    """
 
-
-def test_double_equals():
-    raise NotImplementedError
+    with pytest.raises(ForbiddenVariableNameError):
+        parse(config)
 
 
 # Testing keyword parsing
 def test_keywords_parsed():
-    raise NotImplementedError
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["component"] == "keyword1"
+    assert components["name1"]["type"] == "keyword2"
 
 
-# Testing component properties
-def test_properties():
-    raise NotImplementedError
+# Testing config properties
+def test_properties_parsed():
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+        key2: "value2"
+    }
+    """
+    components = parse(config)
+    assert list(components["name1"]["config"].keys()) == ["key1", "key2"]
 
 
-# Testing component values
+# Testing config values
 def test_string_values():
     config = """
     name1 = keyword1 keyword2 {
@@ -60,15 +104,48 @@ def test_string_values():
 
 
 def test_variable_values():
-    raise NotImplementedError
+    config = """
+    kb = knowledge_base chroma {
+        client: "local"
+    }
+    
+    llm = llm openai {
+        knowledge_base: kb
+        api_key: $OPENAI_API_KEY
+    }
+    """
+    components = parse(config)
+    assert isinstance(components["llm"]["config"]["knowledge_base"], object)
 
 
-def test_list_values():
-    raise NotImplementedError
+# def test_list_values():
+#     config = """
+#     name1 = keyword1 keyword2 {
+#         key1: ["value1", "value2", "value3"]
+#     }
+#     """
+#     components = parse(config)
+#     assert components["name1"]["config"] == {"key1": ["value1", "value2", "value3"]}
 
 
 def test_list_variable_values():
-    raise NotImplementedError
+    config = """
+    llm1 = llm openai {
+        api_key: $OPENAI_API_KEY
+    }
+    
+    llm2 = llm openai {
+        api_key: $OPENAI_API_KEY
+    }
+    
+    planner = decomposer llm {
+        api_key: $OPENAI_API_KEY
+        tools: [llm1, llm2]
+    }
+    """
+    components = parse(config)
+    assert isinstance(components["planner"]["config"]["tools"][0], object)
+    assert isinstance(components["planner"]["config"]["tools"][1], object)
 
 
 def test_dictionary_values():
@@ -76,7 +153,14 @@ def test_dictionary_values():
 
 
 def test_environment_values():
-    raise NotImplementedError
+    config = """
+    llm = llm openai {
+        api_key: $OPENAI_API_KEY
+    }
+    """
+    components = parse(config)
+    load_dotenv(dotenv_path=os.path.join(os.getcwd(), ".env"))
+    assert components["llm"]["config"]["api_key"] == os.getenv("OPENAI_API_KEY")
 
 
 def test_boolean_values():

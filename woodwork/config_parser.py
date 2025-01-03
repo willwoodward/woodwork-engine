@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from woodwork.helper_functions import print_debug
+from woodwork.errors import ForbiddenVariableNameError
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.components.knowledge_bases.text_files.text_file import text_file
@@ -128,6 +129,12 @@ def parse(config: str) -> dict:
         command["variable"] = entry.split("=")[0].strip()
         command["component"] = entry.split("=")[1].split(" ")[1].strip()
         command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
+
+        if command["variable"].lower() == "true" or command["variable"].lower() == "false":
+            raise ForbiddenVariableNameError("A boolean cannot be used as a variable name.")
+
+        if command["variable"] in commands:
+            raise ForbiddenVariableNameError("The same variable name cannot be used.")
 
         config_items = list(
             map(
