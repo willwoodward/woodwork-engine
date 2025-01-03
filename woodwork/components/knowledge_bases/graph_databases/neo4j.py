@@ -58,13 +58,13 @@ class neo4j(graph_database):
         CMD ["neo4j"]
         """
 
-        client.images.build(fileobj=io.BytesIO(dockerfile_content.encode('utf-8')), tag=image_name)
+        client.images.build(fileobj=io.BytesIO(dockerfile_content.encode("utf-8")), tag=image_name)
         print_debug(f"Successfully built image: {image_name}")
 
     def _run_docker_container(self, client, image_name, container_name, path):
         """Run the Neo4j Docker container."""
         print_debug("Running Docker container...")
-        
+
         # Check if the container already exists
         try:
             container = client.containers.get(container_name)
@@ -76,8 +76,8 @@ class neo4j(graph_database):
                 image_name,
                 name=container_name,
                 ports={
-                    f"7474/tcp": 7474,
-                    f"7687/tcp": 7687,
+                    "7474/tcp": 7474,
+                    "7687/tcp": 7687,
                 },
                 environment={
                     "NEO4J_AUTH": "neo4j/testpassword",

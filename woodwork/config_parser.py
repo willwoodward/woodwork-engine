@@ -127,7 +127,7 @@ def parse(config: str) -> dict:
         # Replace these with some fancy regex
         command["variable"] = entry.split("=")[0].strip()
         command["component"] = entry.split("=")[1].split(" ")[1].strip()
-        command["type"] = entry.split(command["component"])[1].split("{")[0].strip()
+        command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
 
         config_items = list(
             map(
@@ -153,6 +153,7 @@ def parse(config: str) -> dict:
                     value = True
                 elif value.lower() == "false":
                     value = False
+
                 else:
                     # Add variable to depends_on
                     command["depends_on"].append(value)
@@ -187,7 +188,7 @@ def parse(config: str) -> dict:
         tools.append(commands[name]["object"])
 
     task_m.add_tools(tools)
-    
+
     return commands
 
 
