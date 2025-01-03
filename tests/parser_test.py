@@ -1,3 +1,5 @@
+from woodwork.config_parser import parse
+
 # Testing component name declaration
 def test_same_name_as_keyword():
     raise NotImplementedError
@@ -18,7 +20,14 @@ def test_properties():
 
 # Testing component values
 def test_string_values():
-    raise NotImplementedError
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+    }
+    """
+    
+    components = parse(config)
+    assert components["name1"]["config"] == {"key1": "value1"}
 
 def test_variable_values():
     raise NotImplementedError

@@ -104,69 +104,74 @@ def command_checker(commands):
                 exit()
 
 
-def main_function():
+def get_declarations(file: str) -> list[str]:
+    """Given a file, returns an array of strings containing the component declarations."""
+
+    entry_pattern = r".+=.+\{[\s\S]*?\}"
+    return re.findall(entry_pattern, file)
+
+
+def parse(config: str) -> dict:
     commands = {}
 
+    # Load environment variables to be substituted in later
     current_directory = os.getcwd()
     load_dotenv(dotenv_path=os.path.join(current_directory, ".env"))
 
-    with open(current_directory + "/main.ww", "r") as f:
-        lines = f.read()
+    # Get a list of all the component declarations
+    entries = get_declarations(config)
+    print_debug(entries)
 
-        entry_pattern = r".+=.+\{[\s\S]*?\}"
-        entries = re.findall(entry_pattern, lines)
-        print_debug(entries)
+    for entry in entries:
+        command = {}
+        # Replace these with some fancy regex
+        command["variable"] = entry.split("=")[0].strip()
+        command["component"] = entry.split("=")[1].split(" ")[1].strip()
+        command["type"] = entry.split(command["component"])[1].split("{")[0].strip()
 
-        for entry in entries:
-            command = {}
-            # Replace these with some fancy regex
-            command["variable"] = entry.split("=")[0].strip()
-            command["component"] = entry.split("=")[1].split(" ")[1].strip()
-            command["type"] = entry.split(command["component"])[1].split("{")[0].strip()
-
-            config_items = list(
-                map(
-                    lambda x: x.replace("\n", "").strip(),
-                    re.findall(r"\n[^\n\}]+", entry),
-                )
+        config_items = list(
+            map(
+                lambda x: x.replace("\n", "").strip(),
+                re.findall(r"\n[^\n\}]+", entry),
             )
-            config_items = [x for x in config_items if x != ""]
+        )
+        config_items = [x for x in config_items if x != ""]
 
-            # Parses the settings for each command
-            command["config"] = {}
-            # Make to a set
-            command["depends_on"] = []
-            for item in config_items:
-                key = item.split(":")[0].strip()
-                value = item.split(":")[1].strip()
+        # Parses the settings for each command
+        command["config"] = {}
+        # Make to a set
+        command["depends_on"] = []
+        for item in config_items:
+            key = item.split(":")[0].strip()
+            value = item.split(":")[1].strip()
 
-                # If the value is not a string, it references a variable
-                # We replace this variable with a reference to the object
-                if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[":
-                    # Add variable to depends_on
-                    command["depends_on"].append(value)
+            # If the value is not a string, it references a variable
+            # We replace this variable with a reference to the object
+            if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[":
+                # Add variable to depends_on
+                command["depends_on"].append(value)
 
-                # If the value starts with $, then it is a secret key in the .env file
-                # Replace this with the secret
-                elif value[0] == "$":
-                    value = os.getenv(value[1::])
+            # If the value starts with $, then it is a secret key in the .env file
+            # Replace this with the secret
+            elif value[0] == "$":
+                value = os.getenv(value[1::])
 
-                # If the value is an array, parse it as an array of references
-                elif value[0] == "[":
-                    value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
+            # If the value is an array, parse it as an array of references
+            elif value[0] == "[":
+                value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
 
-                    for i in range(len(value)):
-                        command["depends_on"].append(value[i])
+                for i in range(len(value)):
+                    command["depends_on"].append(value[i])
 
-                    print_debug(f"values = {value}")
+                print_debug(f"values = {value}")
 
-                elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
-                    value = value[1:-1:]
+            elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
+                value = value[1:-1:]
 
-                command["config"][key] = value
+            command["config"][key] = value
 
-            print_debug("[COMMAND]", command)
-            commands[command["variable"]] = command
+        print_debug("[COMMAND]", command)
+        commands[command["variable"]] = command
 
     command_checker(commands)
 
@@ -176,5 +181,12 @@ def main_function():
         tools.append(commands[name]["object"])
 
     task_m.add_tools(tools)
+    
+    return commands
 
-    # print_debug("[COMMANDS]", commands)
+
+def main_function():
+    current_directory = os.getcwd()
+    with open(current_directory + "/main.ww", "r") as f:
+        lines = f.read()
+        parse(lines)
