@@ -148,8 +148,14 @@ def parse(config: str) -> dict:
             # If the value is not a string, it references a variable
             # We replace this variable with a reference to the object
             if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[":
-                # Add variable to depends_on
-                command["depends_on"].append(value)
+                # Could be a boolean
+                if value.lower() == "true":
+                    value = True
+                elif value.lower() == "false":
+                    value = False
+                else:
+                    # Add variable to depends_on
+                    command["depends_on"].append(value)
 
             # If the value starts with $, then it is a secret key in the .env file
             # Replace this with the secret

@@ -25,7 +25,6 @@ def test_string_values():
         key1: "value1"
     }
     """
-    
     components = parse(config)
     assert components["name1"]["config"] == {"key1": "value1"}
 
@@ -45,4 +44,28 @@ def test_environment_values():
     raise NotImplementedError
 
 def test_boolean_values():
-    raise NotImplementedError
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: true
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["config"] == {"key1": True}
+    
+    # Testing with capitalised T
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: True
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["config"] == {"key1": True}
+    
+    # Testing with all caps
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: TRUE
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["config"] == {"key1": True}
