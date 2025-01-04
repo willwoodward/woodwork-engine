@@ -1,0 +1,12 @@
+name1 = keyword1 keyword2 {
+    key1: "value1"
+    key2: {
+        subkey1: "subvalue1"
+        subkey2: "subvalue2"
+    }
+    key3: "value3"
+}
+
+name2 = keyword1 keyword2 {
+    key1: "value1"
+}

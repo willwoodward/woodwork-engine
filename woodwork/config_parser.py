@@ -1,6 +1,6 @@
-import re
 import os
 from dotenv import load_dotenv
+import re
 
 from woodwork.helper_functions import print_debug
 from woodwork.errors import ForbiddenVariableNameError
@@ -105,11 +105,39 @@ def command_checker(commands):
                 exit()
 
 
-def get_declarations(file: str) -> list[str]:
+def old_get_declarations(file: str) -> list[str]:
     """Given a file, returns an array of strings containing the component declarations."""
 
     entry_pattern = r".+=.+\{[\s\S]*?\}"
     return re.findall(entry_pattern, file)
+
+
+def get_declarations(file: str) -> list[str]:
+    """Given a file, returns an array of strings containing the component declarations."""
+
+    entry_pattern = r".+=.+\{"
+    matches = []
+    
+    for match in re.finditer(entry_pattern, file):
+        start_pos = match.start()
+        stack = 1
+        end_pos = match.end()
+
+        # Use a stack to find the closing brace
+        for i in range(end_pos, len(file)):
+            char = file[i]
+            if char == '{':
+                stack += 1
+            elif char == '}':
+                stack -= 1
+                if stack == 0:
+                    end_pos = i + 1
+                    break
+
+        # Add the full declaration text to the matches
+        matches.append(file[start_pos:end_pos])
+    
+    return matches
 
 
 def parse(config: str) -> dict:
@@ -136,6 +164,7 @@ def parse(config: str) -> dict:
         if command["variable"] in commands:
             raise ForbiddenVariableNameError("The same variable name cannot be used.")
 
+        # Parses the config for each command
         config_items = list(
             map(
                 lambda x: x.replace("\n", "").strip(),
@@ -144,7 +173,6 @@ def parse(config: str) -> dict:
         )
         config_items = [x for x in config_items if x != ""]
 
-        # Parses the settings for each command
         command["config"] = {}
         # Make to a set
         command["depends_on"] = []

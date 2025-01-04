@@ -149,7 +149,25 @@ def test_list_variable_values():
 
 
 def test_dictionary_values():
-    raise NotImplementedError
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+        key2: {
+            subkey1: "subvalue1"
+            subkey2: "subvalue2"
+        }
+        key3: "value3"
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["config"] == {
+        "key1": "value1",
+        "key2": {
+            "subkey1": "subvalue1",
+            "subkey2": "subvalue2"
+        },
+        "key3": "value3"
+    }
 
 
 def test_environment_values():
