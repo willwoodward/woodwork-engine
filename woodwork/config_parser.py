@@ -179,6 +179,8 @@ def parse_config(entry: str) -> dict:
             if brace_counter == 0:
                 deletion_mode = False
         elif deletion_mode:
+            if "{" in config_items[i]:
+                brace_counter += 1
             config_items.pop(i)
         elif "{" in config_items[i]:
             brace_counter += 1
@@ -226,11 +228,10 @@ def parse_config(entry: str) -> dict:
             for i in range(len(value)):
                 depends_on.append(value[i])
 
-            print_debug(f"values = {value}")
-
         elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
             value = value[1:-1:]
 
+        print("value =", value)
         config[key] = value
     
     return config, depends_on

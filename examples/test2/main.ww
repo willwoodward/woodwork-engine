@@ -2,7 +2,11 @@ name1 = keyword1 keyword2 {
     key1: "value1"
     key2: {
         subkey1: "subvalue1"
-        subkey2: "subvalue2"
+        subkey2: {
+            subkey3: "subvalue3"
+            subkey4: "subvalue4"
+        }
+        subkey5: "subvalue5"
     }
     key3: "value3"
 }

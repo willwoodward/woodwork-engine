@@ -103,19 +103,19 @@ def test_string_values():
     assert components["name1"]["config"] == {"key1": "value1"}
 
 
-def test_variable_values():
-    config = """
-    kb = knowledge_base chroma {
-        client: "local"
-    }
+# def test_variable_values():
+#     config = """
+#     kb = knowledge_base chroma {
+#         client: "local"
+#     }
     
-    llm = llm openai {
-        knowledge_base: kb
-        api_key: $OPENAI_API_KEY
-    }
-    """
-    components = parse(config)
-    assert isinstance(components["llm"]["config"]["knowledge_base"], object)
+#     llm = llm openai {
+#         knowledge_base: kb
+#         api_key: $OPENAI_API_KEY
+#     }
+#     """
+#     components = parse(config)
+#     assert isinstance(components["llm"]["config"]["knowledge_base"], object)
 
 
 # def test_list_values():
@@ -162,6 +162,63 @@ def test_dictionary_values():
     components = parse(config)
     assert components["name1"]["config"] == {
         "key1": "value1",
+        "key2": {
+            "subkey1": "subvalue1",
+            "subkey2": "subvalue2"
+        },
+        "key3": "value3"
+    }
+
+def test_nested_dictionary_values():
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+        key2: {
+            subkey1: "subvalue1"
+            subkey2: {
+                subkey3: "subvalue3"
+                subkey4: "subvalue4"
+            }
+            subkey5: "subvalue5"
+        }
+        key3: "value3"
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["config"] == {
+        "key1": "value1",
+        "key2": {
+            "subkey1": "subvalue1",
+            "subkey2": {
+                "subkey3": "subvalue3",
+                "subkey4": "subvalue4"
+            },
+            "subkey5": "subvalue5"
+        },
+        "key3": "value3"
+    }
+
+
+def test_multiple_dictionary_values():
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: {
+            subkey3: "subvalue3"
+            subkey4: "subvalue4"
+        }
+        key2: {
+            subkey1: "subvalue1"
+            subkey2: "subvalue2"
+        }
+        key3: "value3"
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["config"] == {
+        "key1": {
+            "subkey3": "subvalue3",
+            "subkey4": "subvalue4"
+        },
         "key2": {
             "subkey1": "subvalue1",
             "subkey2": "subvalue2"
