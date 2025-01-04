@@ -159,6 +159,83 @@ def extract_nested_dict(key: str, text: str) -> str:
     return ""  # Return empty string if no complete dictionary is found
 
 
+def parse_config(entry: str) -> dict:
+    config_items = list(
+        map(
+            lambda x: x.replace("\n", "").strip(),
+            re.findall(r"\n[^\n]+", entry),
+        )
+    )
+    config_items = [x for x in config_items if x != ""]
+    
+    # If the value is a {, delete the nested elements (will be parsed later)
+    i = 0
+    brace_counter = 0
+    deletion_mode = False
+    while i < len(config_items):            
+        if "}" in config_items[i]:
+            config_items.pop(i)
+            brace_counter -= 1
+            if brace_counter == 0:
+                deletion_mode = False
+        elif deletion_mode:
+            config_items.pop(i)
+        elif "{" in config_items[i]:
+            brace_counter += 1
+            deletion_mode = True
+            i += 1
+        else:
+            i += 1
+    
+    print(config_items)
+    config = {}
+    # Make to a set
+    depends_on = []
+    for item in config_items:
+        key = item.split(":")[0].strip()
+        value = item.split(":")[1].strip()
+
+        # If the value is not a string, it references a variable
+        # We replace this variable with a reference to the object
+        if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[" and value[0] != "{" and value[0] != "}":
+            # Could be a boolean
+            if value.lower() == "true":
+                value = True
+            elif value.lower() == "false":
+                value = False
+
+            else:
+                # Add variable to depends_on
+                depends_on.append(value)
+        
+        # Dealing with nested dictionaries:
+        elif value[0] == "{":
+            # Find inside the string
+            value, nested_deps = parse_config(extract_nested_dict(key, entry))
+            depends_on += nested_deps
+
+        # If the value starts with $, then it is a secret key in the .env file
+        # Replace this with the secret
+        elif value[0] == "$":
+            value = os.getenv(value[1::])
+
+        # If the value is an array, parse it as an array of references
+        elif value[0] == "[":
+            value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
+
+            for i in range(len(value)):
+                depends_on.append(value[i])
+
+            print_debug(f"values = {value}")
+
+        elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
+            value = value[1:-1:]
+
+        config[key] = value
+    
+    return config, depends_on
+
+
 def parse(config: str) -> dict:
     commands = {}
 
@@ -183,77 +260,8 @@ def parse(config: str) -> dict:
         if command["variable"] in commands:
             raise ForbiddenVariableNameError("The same variable name cannot be used.")
 
-        config_items = list(
-            map(
-                lambda x: x.replace("\n", "").strip(),
-                re.findall(r"\n[^\n]+", entry),
-            )
-        )
-        config_items = [x for x in config_items if x != ""]
-        
-        # If the value is a {, delete the nested elements (will be parsed later)
-        i = 0
-        brace_counter = 0
-        deletion_mode = False
-        while i < len(config_items):            
-            if "}" in config_items[i]:
-                config_items.pop(i)
-                brace_counter -= 1
-                if brace_counter == 0:
-                    deletion_mode = False
-            elif deletion_mode:
-                config_items.pop(i)
-            elif "{" in config_items[i]:
-                brace_counter += 1
-                deletion_mode = True
-                i += 1
-            else:
-                i += 1
-        
-        print(config_items)
-        command["config"] = {}
-        # Make to a set
-        command["depends_on"] = []
-        for item in config_items:
-            key = item.split(":")[0].strip()
-            value = item.split(":")[1].strip()
-
-            # If the value is not a string, it references a variable
-            # We replace this variable with a reference to the object
-            if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[" and value[0] != "{" and value[0] != "}":
-                # Could be a boolean
-                if value.lower() == "true":
-                    value = True
-                elif value.lower() == "false":
-                    value = False
-
-                else:
-                    # Add variable to depends_on
-                    command["depends_on"].append(value)
-            
-            # Dealing with nested dictionaries:
-            elif value[0] == "{":
-                # Find inside the string
-                print(extract_nested_dict(key, entry))
-
-            # If the value starts with $, then it is a secret key in the .env file
-            # Replace this with the secret
-            elif value[0] == "$":
-                value = os.getenv(value[1::])
-
-            # If the value is an array, parse it as an array of references
-            elif value[0] == "[":
-                value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
-
-                for i in range(len(value)):
-                    command["depends_on"].append(value[i])
-
-                print_debug(f"values = {value}")
-
-            elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
-                value = value[1:-1:]
-
-            command["config"][key] = value
+        # Parse config
+        command["config"], command["depends_on"] = parse_config(entry)
 
         print_debug("[COMMAND]", command)
         commands[command["variable"]] = command
