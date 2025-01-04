@@ -4,6 +4,7 @@ from woodwork.errors import WoodworkException
 
 import sys
 
+
 def custom_excepthook(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, WoodworkException):
         print(f"{exc_value}")
@@ -13,7 +14,7 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 def main():
     sys.excepthook = custom_excepthook
-    
+
     # woodwork
     if len(sys.argv) == 1:
         activate_virtual_environment()

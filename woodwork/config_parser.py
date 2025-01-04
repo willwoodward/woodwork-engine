@@ -140,8 +140,11 @@ def get_declarations(file: str) -> list[str]:
                     end_pos = i + 1
                     break
 
+        # Determine the starting line number
+        line_number = file[:start_pos].count("\n") + 1
+
         # Add the full declaration text to the matches
-        matches.append(file[start_pos:end_pos])
+        matches.append((file[start_pos:end_pos], line_number))
 
     return matches
 
@@ -259,7 +262,7 @@ def parse(config: str) -> dict:
     entries = get_declarations(config)
     print_debug(entries)
 
-    for entry in entries:
+    for entry, line_number in entries:
         command = {}
         # Replace these with some fancy regex
         command["variable"] = entry.split("=")[0].strip()
@@ -267,10 +270,14 @@ def parse(config: str) -> dict:
         command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
 
         if command["variable"].lower() == "true" or command["variable"].lower() == "false":
-            raise ForbiddenVariableNameError("A boolean cannot be used as a variable name.")
+            raise ForbiddenVariableNameError(
+                "A boolean cannot be used as a variable name.", line_number, 1, entry.split("\n", 1)[0]
+            )
 
         if command["variable"] in commands:
-            raise ForbiddenVariableNameError("The same variable name cannot be used.")
+            raise ForbiddenVariableNameError(
+                "The same variable name cannot be used.", line_number, 1, entry.split("\n", 1)[0]
+            )
 
         # Parse config
         command["config"], command["depends_on"] = parse_config(entry)
