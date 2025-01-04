@@ -104,19 +104,18 @@ def test_string_values():
     assert components["name1"]["config"] == {"key1": "value1"}
 
 
-# def test_variable_values():
-#     config = """
-#     kb = knowledge_base chroma {
-#         client: "local"
-#     }
+def test_variable_values():
+    config = """
+    llm = llm openai {
+        api_key: $OPENAI_API_KEY
+    }
     
-#     llm = llm openai {
-#         knowledge_base: kb
-#         api_key: $OPENAI_API_KEY
-#     }
-#     """
-#     components = parse(config)
-#     assert isinstance(components["llm"]["config"]["knowledge_base"], object)
+    name1 = keyword1 keyword2 {
+        key1: llm
+    }
+    """
+    components = parse(config)
+    assert isinstance(components["name1"]["config"]["key1"], openai)
 
 
 # def test_list_values():

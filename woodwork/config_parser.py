@@ -202,29 +202,15 @@ def parse_config(entry: str) -> dict:
         else:
             i += 1
     
-    print(config_items)
     config = {}
     # Make to a set
     depends_on = []
     for item in config_items:
         key = item.split(":")[0].strip()
         value = item.split(":")[1].strip()
-
-        # If the value is not a string, it references a variable
-        # We replace this variable with a reference to the object
-        if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[" and value[0] != "{" and value[0] != "}":
-            # Could be a boolean
-            if value.lower() == "true":
-                value = True
-            elif value.lower() == "false":
-                value = False
-
-            else:
-                # Add variable to depends_on
-                depends_on.append(value)
         
         # Dealing with nested dictionaries:
-        elif value[0] == "{":
+        if value[0] == "{":
             # Find inside the string
             value, nested_deps = parse_config(extract_nested_dict(key, entry))
             depends_on += nested_deps
@@ -244,7 +230,19 @@ def parse_config(entry: str) -> dict:
         elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
             value = value[1:-1:]
 
-        print("value =", value)
+        # If the value is not a string, it references a variable
+        # We replace this variable with a reference to the object
+        else:
+            # Could be a boolean
+            if value.lower() == "true":
+                value = True
+            elif value.lower() == "false":
+                value = False
+
+            else:
+                # Add variable to depends_on
+                depends_on.append(value)
+
         config[key] = value
     
     return config, depends_on
