@@ -1,2 +1,5 @@
-class ForbiddenVariableNameError(Exception):
+class WoodworkException(Exception):
+    pass
+
+class ForbiddenVariableNameError(WoodworkException):
     pass

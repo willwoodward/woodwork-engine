@@ -53,10 +53,10 @@ def dependency_resolver(commands, component):
                 for i in range(len(value)):
                     if value[i] == dependency:
                         value[i] = component_object
-            
+
             # Handle dictionaries
             if isinstance(value, dict):
-                resolve_dict(value, dependency, component_object)                    
+                resolve_dict(value, dependency, component_object)
 
             if value == dependency:
                 print_debug(value, dependency)
@@ -74,11 +74,11 @@ def create_object(command):
 
     if component == "knowledge_base":
         if type == "chroma":
-            return chroma(command["variable"], command["config"])
+            return chroma(command["variable"], **command["config"])
         if type == "neo4j":
-            return neo4j(command["variable"], command["config"])
+            return neo4j(command["variable"], **command["config"])
         if type == "text_file":
-            return text_file(command["variable"], command["config"])
+            return text_file(command["variable"], **command["config"])
 
     if component == "memory":
         if type == "short_term":
@@ -123,7 +123,7 @@ def get_declarations(file: str) -> list[str]:
 
     entry_pattern = r".+=.+\{"
     matches = []
-    
+
     for match in re.finditer(entry_pattern, file):
         start_pos = match.start()
         stack = 1
@@ -132,9 +132,9 @@ def get_declarations(file: str) -> list[str]:
         # Use a stack to find the closing brace
         for i in range(end_pos, len(file)):
             char = file[i]
-            if char == '{':
+            if char == "{":
                 stack += 1
-            elif char == '}':
+            elif char == "}":
                 stack -= 1
                 if stack == 0:
                     end_pos = i + 1
@@ -142,7 +142,7 @@ def get_declarations(file: str) -> list[str]:
 
         # Add the full declaration text to the matches
         matches.append(file[start_pos:end_pos])
-    
+
     return matches
 
 
@@ -158,16 +158,16 @@ def extract_nested_dict(key: str, text: str) -> str:
     stack = []
     dict_start = -1
 
-    for i in range(start_pos-1, len(text)):
+    for i in range(start_pos - 1, len(text)):
         char = text[i]
-        if char == '{':
+        if char == "{":
             if not stack:
                 dict_start = i
-            stack.append('{')
-        elif char == '}':
+            stack.append("{")
+        elif char == "}":
             stack.pop()
             if not stack:  # Found the matching closing brace
-                return text[dict_start:i + 1].strip()
+                return text[dict_start : i + 1].strip()
 
     return ""  # Return empty string if no complete dictionary is found
 
@@ -180,12 +180,12 @@ def parse_config(entry: str) -> dict:
         )
     )
     config_items = [x for x in config_items if x != ""]
-    
+
     # If the value is a {, delete the nested elements (will be parsed later)
     i = 0
     brace_counter = 0
     deletion_mode = False
-    while i < len(config_items):            
+    while i < len(config_items):
         if "}" in config_items[i]:
             config_items.pop(i)
             brace_counter -= 1
@@ -201,14 +201,14 @@ def parse_config(entry: str) -> dict:
             i += 1
         else:
             i += 1
-    
+
     config = {}
     # Make to a set
     depends_on = []
     for item in config_items:
         key = item.split(":")[0].strip()
         value = item.split(":")[1].strip()
-        
+
         # Dealing with nested dictionaries:
         if value[0] == "{":
             # Find inside the string
@@ -244,7 +244,7 @@ def parse_config(entry: str) -> dict:
                 depends_on.append(value)
 
         config[key] = value
-    
+
     return config, depends_on
 
 

@@ -1,10 +1,19 @@
 from woodwork.dependencies import init, activate_virtual_environment, install_all
 from woodwork.helper_functions import set_globals
+from woodwork.errors import WoodworkException
 
 import sys
 
+def custom_excepthook(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, WoodworkException):
+        print(f"{exc_value}")
+    else:
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
 
 def main():
+    sys.excepthook = custom_excepthook
+    
     # woodwork
     if len(sys.argv) == 1:
         activate_virtual_environment()

@@ -42,3 +42,22 @@ def import_all_classes(package_name: str) -> bool:
                     imported_all = False
 
     return imported_all
+
+
+def get_optional(dictionary: dict, key: str, default=None, type: type | None = None):
+    """
+    Given the key to look up in a dictionary, assert that the variable is of the correct type.
+    Then return either the value, or the default value, or None if this is blank.
+    """
+
+    value = dictionary.get(key)
+
+    if value is None:
+        return default
+
+    if type is None:
+        return value
+
+    if not isinstance(value, type):
+        raise TypeError(f"{value} is not of type {type}.")
+    return value
