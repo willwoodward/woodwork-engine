@@ -1,9 +1,10 @@
 import os
 from dotenv import load_dotenv
 import re
+import inspect
 
 from woodwork.helper_functions import print_debug
-from woodwork.errors import ForbiddenVariableNameError
+from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.components.knowledge_bases.text_files.text_file import text_file
@@ -68,42 +69,72 @@ def dependency_resolver(commands, component):
     return component["object"]
 
 
+def get_required_args(cls):
+    constructor = inspect.signature(cls.__init__)
+    required_args = [
+        name
+        for name, param in constructor.parameters.items()
+        if param.default is inspect.Parameter.empty and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    ]
+    return required_args
+
+
+def init_object(cls, name, **params):
+    required_args = get_required_args(cls)
+    required_args.remove("name")
+    required_args.remove("self")
+    
+    for param in list(params.keys()):
+        if param in required_args:
+            required_args.remove(param)
+    
+    if len(required_args) == 1:
+        raise MissingConfigKeyError(f"Key \"{required_args[0]}\" missing from {cls.__name__}.")
+    
+    if len(required_args) > 1:
+        raise MissingConfigKeyError(f"Keys {required_args} missing from {cls.__name__}.")
+    
+    return cls(name, **params)
+
+
 def create_object(command):
     component = command["component"]
     type = command["type"]
+    variable = command["variable"]
+    config = command["config"]
 
     if component == "knowledge_base":
         if type == "chroma":
-            return chroma(command["variable"], **command["config"])
+            return init_object(chroma, variable, **config)
         if type == "neo4j":
-            return neo4j(command["variable"], **command["config"])
+            return init_object(neo4j, variable, **config)
         if type == "text_file":
-            return text_file(command["variable"], **command["config"])
+            return init_object(text_file, variable, **config)
 
     if component == "memory":
         if type == "short_term":
-            return short_term(command["variable"], command["config"])
+            return short_term(variable, config)
 
     if component == "llm":
         if type == "hugging_face":
-            return hugging_face(command["variable"], **command["config"])
+            return init_object(hugging_face, variable, **config)
         if type == "openai":
-            return openai(command["variable"], **command["config"])
+            return init_object(openai, variable, **config)
 
     if component == "input":
         if type == "command_line":
-            return command_line(command["variable"], command["config"])
+            return command_line(variable, config)
 
     if component == "api":
         if type == "web":
-            return web(command["variable"], command["config"])
+            return web(variable, config)
         if type == "functions":
-            return functions(command["variable"], command["config"])
+            return functions(variable, config)
 
     if component == "decomposer":
-        command["config"]["output"] = task_m
+        config["output"] = task_m
         if type == "llm":
-            return llm(command["variable"], command["config"])
+            return llm(variable, config)
 
 
 def command_checker(commands):
