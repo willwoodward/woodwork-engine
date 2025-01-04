@@ -1,8 +1,9 @@
-import re
 import os
 from dotenv import load_dotenv
+import re
 
 from woodwork.helper_functions import print_debug
+from woodwork.errors import ForbiddenVariableNameError
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.components.knowledge_bases.text_files.text_file import text_file
@@ -16,6 +17,15 @@ from woodwork.components.decomposers.llm import llm
 from woodwork.components.task_master import task_master
 
 task_m = task_master("task_master")
+
+
+def resolve_dict(dictionary, dependency, component_object):
+    # Modify the value to be the object
+    for key, value in dictionary.items():
+        if value == dependency:
+            dictionary[key] = component_object
+        elif isinstance(value, dict):
+            resolve_dict(value, dependency, component_object)
 
 
 def dependency_resolver(commands, component):
@@ -43,6 +53,10 @@ def dependency_resolver(commands, component):
                 for i in range(len(value)):
                     if value[i] == dependency:
                         value[i] = component_object
+            
+            # Handle dictionaries
+            if isinstance(value, dict):
+                resolve_dict(value, dependency, component_object)                    
 
             if value == dependency:
                 print_debug(value, dependency)
@@ -104,69 +118,165 @@ def command_checker(commands):
                 exit()
 
 
-def main_function():
+def get_declarations(file: str) -> list[str]:
+    """Given a file, returns an array of strings containing the component declarations."""
+
+    entry_pattern = r".+=.+\{"
+    matches = []
+    
+    for match in re.finditer(entry_pattern, file):
+        start_pos = match.start()
+        stack = 1
+        end_pos = match.end()
+
+        # Use a stack to find the closing brace
+        for i in range(end_pos, len(file)):
+            char = file[i]
+            if char == '{':
+                stack += 1
+            elif char == '}':
+                stack -= 1
+                if stack == 0:
+                    end_pos = i + 1
+                    break
+
+        # Add the full declaration text to the matches
+        matches.append(file[start_pos:end_pos])
+    
+    return matches
+
+
+def extract_nested_dict(key: str, text: str) -> str:
+    # Match {key} followed by optional whitespace and a colon
+    pattern = re.escape(key) + r"\s*:\s*\{"
+    match = re.search(pattern, text)
+    if not match:
+        return ""
+
+    # Start parsing from where the dictionary begins
+    start_pos = match.end()  # Position after the colon and whitespace
+    stack = []
+    dict_start = -1
+
+    for i in range(start_pos-1, len(text)):
+        char = text[i]
+        if char == '{':
+            if not stack:
+                dict_start = i
+            stack.append('{')
+        elif char == '}':
+            stack.pop()
+            if not stack:  # Found the matching closing brace
+                return text[dict_start:i + 1].strip()
+
+    return ""  # Return empty string if no complete dictionary is found
+
+
+def parse_config(entry: str) -> dict:
+    config_items = list(
+        map(
+            lambda x: x.replace("\n", "").strip(),
+            re.findall(r"\n[^\n]+", entry),
+        )
+    )
+    config_items = [x for x in config_items if x != ""]
+    
+    # If the value is a {, delete the nested elements (will be parsed later)
+    i = 0
+    brace_counter = 0
+    deletion_mode = False
+    while i < len(config_items):            
+        if "}" in config_items[i]:
+            config_items.pop(i)
+            brace_counter -= 1
+            if brace_counter == 0:
+                deletion_mode = False
+        elif deletion_mode:
+            if "{" in config_items[i]:
+                brace_counter += 1
+            config_items.pop(i)
+        elif "{" in config_items[i]:
+            brace_counter += 1
+            deletion_mode = True
+            i += 1
+        else:
+            i += 1
+    
+    config = {}
+    # Make to a set
+    depends_on = []
+    for item in config_items:
+        key = item.split(":")[0].strip()
+        value = item.split(":")[1].strip()
+        
+        # Dealing with nested dictionaries:
+        if value[0] == "{":
+            # Find inside the string
+            value, nested_deps = parse_config(extract_nested_dict(key, entry))
+            depends_on += nested_deps
+
+        # If the value starts with $, then it is a secret key in the .env file
+        # Replace this with the secret
+        elif value[0] == "$":
+            value = os.getenv(value[1::])
+
+        # If the value is an array, parse it as an array of references
+        elif value[0] == "[":
+            value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
+
+            for i in range(len(value)):
+                depends_on.append(value[i])
+
+        elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
+            value = value[1:-1:]
+
+        # If the value is not a string, it references a variable
+        # We replace this variable with a reference to the object
+        else:
+            # Could be a boolean
+            if value.lower() == "true":
+                value = True
+            elif value.lower() == "false":
+                value = False
+
+            else:
+                # Add variable to depends_on
+                depends_on.append(value)
+
+        config[key] = value
+    
+    return config, depends_on
+
+
+def parse(config: str) -> dict:
     commands = {}
 
+    # Load environment variables to be substituted in later
     current_directory = os.getcwd()
     load_dotenv(dotenv_path=os.path.join(current_directory, ".env"))
 
-    with open(current_directory + "/main.ww", "r") as f:
-        lines = f.read()
+    # Get a list of all the component declarations
+    entries = get_declarations(config)
+    print_debug(entries)
 
-        entry_pattern = r".+=.+\{[\s\S]*?\}"
-        entries = re.findall(entry_pattern, lines)
-        print_debug(entries)
+    for entry in entries:
+        command = {}
+        # Replace these with some fancy regex
+        command["variable"] = entry.split("=")[0].strip()
+        command["component"] = entry.split("=")[1].split(" ")[1].strip()
+        command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
 
-        for entry in entries:
-            command = {}
-            # Replace these with some fancy regex
-            command["variable"] = entry.split("=")[0].strip()
-            command["component"] = entry.split("=")[1].split(" ")[1].strip()
-            command["type"] = entry.split(command["component"])[1].split("{")[0].strip()
+        if command["variable"].lower() == "true" or command["variable"].lower() == "false":
+            raise ForbiddenVariableNameError("A boolean cannot be used as a variable name.")
 
-            config_items = list(
-                map(
-                    lambda x: x.replace("\n", "").strip(),
-                    re.findall(r"\n[^\n\}]+", entry),
-                )
-            )
-            config_items = [x for x in config_items if x != ""]
+        if command["variable"] in commands:
+            raise ForbiddenVariableNameError("The same variable name cannot be used.")
 
-            # Parses the settings for each command
-            command["config"] = {}
-            # Make to a set
-            command["depends_on"] = []
-            for item in config_items:
-                key = item.split(":")[0].strip()
-                value = item.split(":")[1].strip()
+        # Parse config
+        command["config"], command["depends_on"] = parse_config(entry)
 
-                # If the value is not a string, it references a variable
-                # We replace this variable with a reference to the object
-                if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[":
-                    # Add variable to depends_on
-                    command["depends_on"].append(value)
-
-                # If the value starts with $, then it is a secret key in the .env file
-                # Replace this with the secret
-                elif value[0] == "$":
-                    value = os.getenv(value[1::])
-
-                # If the value is an array, parse it as an array of references
-                elif value[0] == "[":
-                    value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
-
-                    for i in range(len(value)):
-                        command["depends_on"].append(value[i])
-
-                    print_debug(f"values = {value}")
-
-                elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
-                    value = value[1:-1:]
-
-                command["config"][key] = value
-
-            print_debug("[COMMAND]", command)
-            commands[command["variable"]] = command
+        print_debug("[COMMAND]", command)
+        commands[command["variable"]] = command
 
     command_checker(commands)
 
@@ -177,4 +287,11 @@ def main_function():
 
     task_m.add_tools(tools)
 
-    # print_debug("[COMMANDS]", commands)
+    return commands
+
+
+def main_function():
+    current_directory = os.getcwd()
+    with open(current_directory + "/main.ww", "r") as f:
+        lines = f.read()
+        parse(lines)

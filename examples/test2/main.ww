@@ -1,0 +1,11 @@
+llm = llm openai {
+    api_key: $OPENAI_API_KEY
+}
+
+name1 = keyword1 keyword2 {
+    key1: {
+        subkey1: {
+            subkey2: llm
+        }
+    }
+}

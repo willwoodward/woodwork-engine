@@ -1,0 +1,2 @@
+class ForbiddenVariableNameError(Exception):
+    pass
