@@ -105,13 +105,6 @@ def command_checker(commands):
                 exit()
 
 
-def old_get_declarations(file: str) -> list[str]:
-    """Given a file, returns an array of strings containing the component declarations."""
-
-    entry_pattern = r".+=.+\{[\s\S]*?\}"
-    return re.findall(entry_pattern, file)
-
-
 def get_declarations(file: str) -> list[str]:
     """Given a file, returns an array of strings containing the component declarations."""
 
@@ -140,6 +133,32 @@ def get_declarations(file: str) -> list[str]:
     return matches
 
 
+def extract_nested_dict(key: str, text: str) -> str:
+    # Match {key} followed by optional whitespace and a colon
+    pattern = re.escape(key) + r"\s*:\s*\{"
+    match = re.search(pattern, text)
+    if not match:
+        return ""
+
+    # Start parsing from where the dictionary begins
+    start_pos = match.end()  # Position after the colon and whitespace
+    stack = []
+    dict_start = -1
+
+    for i in range(start_pos-1, len(text)):
+        char = text[i]
+        if char == '{':
+            if not stack:
+                dict_start = i
+            stack.append('{')
+        elif char == '}':
+            stack.pop()
+            if not stack:  # Found the matching closing brace
+                return text[dict_start:i + 1].strip()
+
+    return ""  # Return empty string if no complete dictionary is found
+
+
 def parse(config: str) -> dict:
     commands = {}
 
@@ -164,15 +183,34 @@ def parse(config: str) -> dict:
         if command["variable"] in commands:
             raise ForbiddenVariableNameError("The same variable name cannot be used.")
 
-        # Parses the config for each command
         config_items = list(
             map(
                 lambda x: x.replace("\n", "").strip(),
-                re.findall(r"\n[^\n\}]+", entry),
+                re.findall(r"\n[^\n]+", entry),
             )
         )
         config_items = [x for x in config_items if x != ""]
-
+        
+        # If the value is a {, delete the nested elements (will be parsed later)
+        i = 0
+        brace_counter = 0
+        deletion_mode = False
+        while i < len(config_items):            
+            if "}" in config_items[i]:
+                config_items.pop(i)
+                brace_counter -= 1
+                if brace_counter == 0:
+                    deletion_mode = False
+            elif deletion_mode:
+                config_items.pop(i)
+            elif "{" in config_items[i]:
+                brace_counter += 1
+                deletion_mode = True
+                i += 1
+            else:
+                i += 1
+        
+        print(config_items)
         command["config"] = {}
         # Make to a set
         command["depends_on"] = []
@@ -182,7 +220,7 @@ def parse(config: str) -> dict:
 
             # If the value is not a string, it references a variable
             # We replace this variable with a reference to the object
-            if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[":
+            if value[0] != '"' and value[0] != "'" and value[0] != "$" and value[0] != "[" and value[0] != "{" and value[0] != "}":
                 # Could be a boolean
                 if value.lower() == "true":
                     value = True
@@ -192,6 +230,11 @@ def parse(config: str) -> dict:
                 else:
                     # Add variable to depends_on
                     command["depends_on"].append(value)
+            
+            # Dealing with nested dictionaries:
+            elif value[0] == "{":
+                # Find inside the string
+                print(extract_nested_dict(key, entry))
 
             # If the value starts with $, then it is a secret key in the .env file
             # Replace this with the secret
