@@ -1,16 +1,11 @@
-name1 = keyword1 keyword2 {
-    key1: "value1"
-    key2: {
-        subkey1: "subvalue1"
-        subkey2: {
-            subkey3: "subvalue3"
-            subkey4: "subvalue4"
-        }
-        subkey5: "subvalue5"
-    }
-    key3: "value3"
+llm = llm openai {
+    api_key: $OPENAI_API_KEY
 }
 
-name2 = keyword1 keyword2 {
-    key1: "value1"
+name1 = keyword1 keyword2 {
+    key1: {
+        subkey1: {
+            subkey2: llm
+        }
+    }
 }

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 from woodwork.config_parser import parse
 from woodwork.errors import ForbiddenVariableNameError
+from woodwork.components.llms.openai import openai
 
 
 # Testing component name declaration
@@ -144,8 +145,8 @@ def test_list_variable_values():
     }
     """
     components = parse(config)
-    assert isinstance(components["planner"]["config"]["tools"][0], object)
-    assert isinstance(components["planner"]["config"]["tools"][1], object)
+    assert isinstance(components["planner"]["config"]["tools"][0], openai)
+    assert isinstance(components["planner"]["config"]["tools"][1], openai)
 
 
 def test_dictionary_values():
@@ -225,6 +226,46 @@ def test_multiple_dictionary_values():
         },
         "key3": "value3"
     }
+
+
+def test_nested_special_values():
+    config = """
+    name1 = keyword1 keyword2 {
+        key1: "value1"
+        key2: {
+            subkey1: true
+            subkey2: "subvalue2"
+        }
+        key3: "value3"
+    }
+    """
+    components = parse(config)
+    assert components["name1"]["config"] == {
+        "key1": "value1",
+        "key2": {
+            "subkey1": True,
+            "subkey2": "subvalue2"
+        },
+        "key3": "value3"
+    }
+
+
+def test_nested_variable_references():
+    config = """
+    llm = llm openai {
+        api_key: $OPENAI_API_KEY
+    }
+    
+    name1 = keyword1 keyword2 {
+        key1: {
+            subkey1: {
+                subkey2: llm
+            }
+        }
+    }
+    """
+    components = parse(config)
+    assert isinstance(components["name1"]["config"]["key1"]["subkey1"]["subkey2"], openai)
 
 
 def test_environment_values():

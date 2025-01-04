@@ -19,6 +19,15 @@ from woodwork.components.task_master import task_master
 task_m = task_master("task_master")
 
 
+def resolve_dict(dictionary, dependency, component_object):
+    # Modify the value to be the object
+    for key, value in dictionary.items():
+        if value == dependency:
+            dictionary[key] = component_object
+        elif isinstance(value, dict):
+            resolve_dict(value, dependency, component_object)
+
+
 def dependency_resolver(commands, component):
     # Parser parses into JSON for each component
     # Each component should have a 'depends_on' array if it uses a variable as a value, init as []
@@ -44,6 +53,10 @@ def dependency_resolver(commands, component):
                 for i in range(len(value)):
                     if value[i] == dependency:
                         value[i] = component_object
+            
+            # Handle dictionaries
+            if isinstance(value, dict):
+                resolve_dict(value, dependency, component_object)                    
 
             if value == dependency:
                 print_debug(value, dependency)
