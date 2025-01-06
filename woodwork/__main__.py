@@ -1,5 +1,5 @@
 from woodwork.dependencies import init, activate_virtual_environment, install_all
-from woodwork.helper_functions import set_globals
+from woodwork.helper_functions import set_globals, import_all_classes
 from woodwork.errors import WoodworkException
 
 import sys
@@ -41,3 +41,7 @@ def main():
                 init({"isolated": True})
             if sys.argv[2] == "--all":
                 install_all()
+
+    elif sys.argv[1] == "test":
+        activate_virtual_environment()
+        import_all_classes("woodwork.components")

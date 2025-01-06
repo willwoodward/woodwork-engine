@@ -1,9 +1,9 @@
-from langchain_chroma import Chroma
+# from langchain_chroma import Chroma
 
 # from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
-from langchain_community.embeddings import HuggingFaceEmbeddings
+# from langchain_community.embeddings import HuggingFaceEmbeddings
 
-from woodwork.helper_functions import print_debug, get_optional
+from woodwork.helper_functions import print_debug
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
     vector_database,
 )
@@ -14,19 +14,19 @@ class chroma(vector_database):
         super().__init__(name, **config)
         print_debug("Initialising Chroma Knowledge Base...")
 
-        client = get_optional(config, "client", "local")
-        path = get_optional(config, "path", ".woodwork/chroma")
+        # client = get_optional(config, "client", "local")
+        # path = get_optional(config, "path", ".woodwork/chroma")
 
-        embedding_function = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        # embedding_function = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-        self.__db = Chroma(
-            client=client,
-            collection_name="embedding_store",
-            embedding_function=embedding_function,
-            persist_directory=path,
-        )
+        # self.__db = Chroma(
+        #     client=client,
+        #     collection_name="embedding_store",
+        #     embedding_function=embedding_function,
+        #     persist_directory=path,
+        # )
 
-        self.retriever = self.__db.as_retriever()
+        # self.retriever = self.__db.as_retriever()
 
         print_debug(f"Chroma Knowledge Base {name} created.")
 

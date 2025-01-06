@@ -5,16 +5,6 @@ import inspect
 
 from woodwork.helper_functions import print_debug
 from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
-from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
-from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
-from woodwork.components.knowledge_bases.text_files.text_file import text_file
-from woodwork.components.memory.short_term import short_term
-from woodwork.components.llms.hugging_face import hugging_face
-from woodwork.components.llms.openai import openai
-from woodwork.components.inputs.command_line import command_line
-from woodwork.components.apis.web import web
-from woodwork.components.apis.functions import functions
-from woodwork.components.decomposers.llm import llm
 from woodwork.components.task_master import task_master
 
 task_m = task_master("task_master")
@@ -117,35 +107,55 @@ def create_object(command):
 
     if component == "knowledge_base":
         if type == "chroma":
+            from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
+
             return init_object(chroma, variable, **config)
         if type == "neo4j":
+            from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+
             return init_object(neo4j, variable, **config)
         if type == "text_file":
+            from woodwork.components.knowledge_bases.text_files.text_file import text_file
+
             return init_object(text_file, variable, **config)
 
     if component == "memory":
         if type == "short_term":
+            from woodwork.components.memory.short_term import short_term
+
             return init_object(short_term, variable, **config)
 
     if component == "llm":
         if type == "hugging_face":
+            from woodwork.components.llms.hugging_face import hugging_face
+
             return init_object(hugging_face, variable, **config)
         if type == "openai":
+            from woodwork.components.llms.openai import openai
+
             return init_object(openai, variable, **config)
 
     if component == "input":
         if type == "command_line":
+            from woodwork.components.inputs.command_line import command_line
+
             return init_object(command_line, variable, **config)
 
     if component == "api":
         if type == "web":
+            from woodwork.components.apis.web import web
+
             return init_object(web, variable, **config)
         if type == "functions":
+            from woodwork.components.apis.functions import functions
+
             return init_object(functions, variable, **config)
 
     if component == "decomposer":
         config["output"] = task_m
         if type == "llm":
+            from woodwork.components.decomposers.llm import llm
+
             return init_object(llm, variable, **config)
 
 
