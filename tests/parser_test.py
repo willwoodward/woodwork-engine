@@ -1,3 +1,6 @@
+from woodwork.dependencies import activate_virtual_environment
+activate_virtual_environment()
+
 import pytest
 import os
 from dotenv import load_dotenv
