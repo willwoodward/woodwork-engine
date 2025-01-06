@@ -1,19 +1,10 @@
 import os
 from dotenv import load_dotenv
 import re
+import inspect
 
 from woodwork.helper_functions import print_debug
-from woodwork.errors import ForbiddenVariableNameError
-from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
-from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
-from woodwork.components.knowledge_bases.text_files.text_file import text_file
-from woodwork.components.memory.short_term import short_term
-from woodwork.components.llms.hugging_face import hugging_face
-from woodwork.components.llms.openai import openai
-from woodwork.components.inputs.command_line import command_line
-from woodwork.components.apis.web import web
-from woodwork.components.apis.functions import functions
-from woodwork.components.decomposers.llm import llm
+from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
 from woodwork.components.task_master import task_master
 
 task_m = task_master("task_master")
@@ -53,10 +44,10 @@ def dependency_resolver(commands, component):
                 for i in range(len(value)):
                     if value[i] == dependency:
                         value[i] = component_object
-            
+
             # Handle dictionaries
             if isinstance(value, dict):
-                resolve_dict(value, dependency, component_object)                    
+                resolve_dict(value, dependency, component_object)
 
             if value == dependency:
                 print_debug(value, dependency)
@@ -68,42 +59,104 @@ def dependency_resolver(commands, component):
     return component["object"]
 
 
+def get_required_args(cls):
+    """
+    Gets the required arguments for the class constructor and all parent classes,
+    excluding the class named 'component'.
+    """
+    required_args = []
+
+    # Traverse the MRO and skip the class named 'Component'
+    for base in inspect.getmro(cls):
+        if base.__name__ == "component":
+            continue  # Skip 'Component' class
+        constructor = inspect.signature(base.__init__)
+        for name, param in constructor.parameters.items():
+            if (
+                param.default is inspect.Parameter.empty
+                and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+                and name != "self"
+            ):
+                required_args.append(name)
+
+    return list(set(required_args))
+
+
+def init_object(cls, name, **params):
+    required_args = get_required_args(cls)
+    required_args.remove("name")
+
+    for param in list(params.keys()):
+        if param in required_args:
+            required_args.remove(param)
+
+    if len(required_args) == 1:
+        raise MissingConfigKeyError(f'Key "{required_args[0]}" missing from {cls.__name__}.')
+
+    if len(required_args) > 1:
+        raise MissingConfigKeyError(f"Keys {required_args} missing from {cls.__name__}.")
+
+    return cls(name, **params)
+
+
 def create_object(command):
     component = command["component"]
     type = command["type"]
+    variable = command["variable"]
+    config = command["config"]
 
     if component == "knowledge_base":
         if type == "chroma":
-            return chroma(command["variable"], command["config"])
+            from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
+
+            return init_object(chroma, variable, **config)
         if type == "neo4j":
-            return neo4j(command["variable"], command["config"])
+            from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+
+            return init_object(neo4j, variable, **config)
         if type == "text_file":
-            return text_file(command["variable"], command["config"])
+            from woodwork.components.knowledge_bases.text_files.text_file import text_file
+
+            return init_object(text_file, variable, **config)
 
     if component == "memory":
         if type == "short_term":
-            return short_term(command["variable"], command["config"])
+            from woodwork.components.memory.short_term import short_term
+
+            return init_object(short_term, variable, **config)
 
     if component == "llm":
         if type == "hugging_face":
-            return hugging_face(command["variable"], **command["config"])
+            from woodwork.components.llms.hugging_face import hugging_face
+
+            return init_object(hugging_face, variable, **config)
         if type == "openai":
-            return openai(command["variable"], **command["config"])
+            from woodwork.components.llms.openai import openai
+
+            return init_object(openai, variable, **config)
 
     if component == "input":
         if type == "command_line":
-            return command_line(command["variable"], command["config"])
+            from woodwork.components.inputs.command_line import command_line
+
+            return init_object(command_line, variable, **config)
 
     if component == "api":
         if type == "web":
-            return web(command["variable"], command["config"])
+            from woodwork.components.apis.web import web
+
+            return init_object(web, variable, **config)
         if type == "functions":
-            return functions(command["variable"], command["config"])
+            from woodwork.components.apis.functions import functions
+
+            return init_object(functions, variable, **config)
 
     if component == "decomposer":
-        command["config"]["output"] = task_m
+        config["output"] = task_m
         if type == "llm":
-            return llm(command["variable"], command["config"])
+            from woodwork.components.decomposers.llm import llm
+
+            return init_object(llm, variable, **config)
 
 
 def command_checker(commands):
@@ -123,7 +176,7 @@ def get_declarations(file: str) -> list[str]:
 
     entry_pattern = r".+=.+\{"
     matches = []
-    
+
     for match in re.finditer(entry_pattern, file):
         start_pos = match.start()
         stack = 1
@@ -132,17 +185,20 @@ def get_declarations(file: str) -> list[str]:
         # Use a stack to find the closing brace
         for i in range(end_pos, len(file)):
             char = file[i]
-            if char == '{':
+            if char == "{":
                 stack += 1
-            elif char == '}':
+            elif char == "}":
                 stack -= 1
                 if stack == 0:
                     end_pos = i + 1
                     break
 
+        # Determine the starting line number
+        line_number = file[:start_pos].count("\n") + 1
+
         # Add the full declaration text to the matches
-        matches.append(file[start_pos:end_pos])
-    
+        matches.append((file[start_pos:end_pos], line_number))
+
     return matches
 
 
@@ -158,16 +214,16 @@ def extract_nested_dict(key: str, text: str) -> str:
     stack = []
     dict_start = -1
 
-    for i in range(start_pos-1, len(text)):
+    for i in range(start_pos - 1, len(text)):
         char = text[i]
-        if char == '{':
+        if char == "{":
             if not stack:
                 dict_start = i
-            stack.append('{')
-        elif char == '}':
+            stack.append("{")
+        elif char == "}":
             stack.pop()
             if not stack:  # Found the matching closing brace
-                return text[dict_start:i + 1].strip()
+                return text[dict_start : i + 1].strip()
 
     return ""  # Return empty string if no complete dictionary is found
 
@@ -180,12 +236,12 @@ def parse_config(entry: str) -> dict:
         )
     )
     config_items = [x for x in config_items if x != ""]
-    
+
     # If the value is a {, delete the nested elements (will be parsed later)
     i = 0
     brace_counter = 0
     deletion_mode = False
-    while i < len(config_items):            
+    while i < len(config_items):
         if "}" in config_items[i]:
             config_items.pop(i)
             brace_counter -= 1
@@ -201,14 +257,14 @@ def parse_config(entry: str) -> dict:
             i += 1
         else:
             i += 1
-    
+
     config = {}
     # Make to a set
     depends_on = []
     for item in config_items:
         key = item.split(":")[0].strip()
         value = item.split(":")[1].strip()
-        
+
         # Dealing with nested dictionaries:
         if value[0] == "{":
             # Find inside the string
@@ -244,7 +300,7 @@ def parse_config(entry: str) -> dict:
                 depends_on.append(value)
 
         config[key] = value
-    
+
     return config, depends_on
 
 
@@ -259,7 +315,7 @@ def parse(config: str) -> dict:
     entries = get_declarations(config)
     print_debug(entries)
 
-    for entry in entries:
+    for entry, line_number in entries:
         command = {}
         # Replace these with some fancy regex
         command["variable"] = entry.split("=")[0].strip()
@@ -267,10 +323,14 @@ def parse(config: str) -> dict:
         command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
 
         if command["variable"].lower() == "true" or command["variable"].lower() == "false":
-            raise ForbiddenVariableNameError("A boolean cannot be used as a variable name.")
+            raise ForbiddenVariableNameError(
+                "A boolean cannot be used as a variable name.", line_number, 1, entry.split("\n", 1)[0]
+            )
 
         if command["variable"] in commands:
-            raise ForbiddenVariableNameError("The same variable name cannot be used.")
+            raise ForbiddenVariableNameError(
+                "The same variable name cannot be used.", line_number, 1, entry.split("\n", 1)[0]
+            )
 
         # Parse config
         command["config"], command["depends_on"] = parse_config(entry)

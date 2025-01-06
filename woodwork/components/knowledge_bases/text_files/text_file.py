@@ -4,17 +4,17 @@ from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
 
 
 class text_file(knowledge_base):
-    def __init__(self, name, config):
-        super().__init__(name, config)
+    def __init__(self, name, path, **config):
+        super().__init__(name, **config)
 
-        self._path = config["path"]
+        self._path = path
 
         # Check if the file exists before creating it
-        if not os.path.exists(config["path"]):
-            with open(config["path"], "w"):
+        if not os.path.exists(path):
+            with open(path, "w"):
                 pass
 
-        with open(config["path"], "r") as file:
+        with open(path, "r") as file:
             self.__data = file.read()
 
     def query(self, query):

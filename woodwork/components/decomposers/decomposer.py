@@ -1,36 +1,36 @@
 from abc import ABC, abstractmethod
 import json
 
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, get_optional
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 
 
 class decomposer(component, ABC):
-    def __init__(self, name, config):
+    def __init__(self, name, tools, output, **config):
         super().__init__(name, "decomposer")
         print_debug("Creating the decomposer...")
 
-        if not self._config_checker(name, ["tools", "output"], config):
-            exit()
-
-        self._tools = config["tools"]
-        self._output = config["output"]
+        self._tools = tools
+        self._output = output
         self._cache = None
+        api_key = get_optional(config, "api_key")
 
         if "cache" in config:
-            if config["cache"] == "true":
+            if config["cache"]:
                 # Initialise neo4j cache
                 self._cache_mode = True
-                if not self._config_checker(name, ["api_key"], config):
+
+                if api_key is None:
                     exit()
+
                 self._cache = neo4j(
                     "decomposer_cache",
-                    {
+                    **{
                         "uri": "bolt://localhost:7687",
                         "user": "neo4j",
                         "password": "testpassword",
-                        "api_key": config["api_key"],
+                        "api_key": api_key,
                     },
                 )
                 self._cache.init_vector_index("embeddings", "Prompt", "embedding")

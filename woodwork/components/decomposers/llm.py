@@ -1,4 +1,4 @@
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.decomposers.decomposer import decomposer
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,12 +7,10 @@ import json
 
 
 class llm(decomposer):
-    def __init__(self, name, config):
-        super().__init__(name, config)
+    def __init__(self, name, api_key, **config):
+        format_kwargs(config, api_key=api_key)
+        super().__init__(name, **config)
         print_debug("Initialising decomposer...")
-
-        if not self._config_checker(name, ["api_key"], config):
-            exit()
 
         self.__llm = ChatOpenAI(
             model="gpt-4o-mini",
@@ -20,7 +18,7 @@ class llm(decomposer):
             max_tokens=None,
             timeout=None,
             max_retries=2,
-            api_key=config["api_key"],
+            api_key=api_key,
         )
 
         # self.__retriever = None

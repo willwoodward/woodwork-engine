@@ -12,19 +12,17 @@ from woodwork.components.knowledge_bases.graph_databases.graph_database import (
 
 
 class neo4j(graph_database):
-    def __init__(self, name, config):
+    def __init__(self, name, uri, user, password, api_key, **config):
+        super().__init__(name, **config)
         print_debug("Initialising Neo4j Knowledge Base...")
 
-        super().__init__(name, config)
         self._local_init()
 
-        if not self._config_checker(name, ["uri", "user", "password", "api_key"], config):
-            exit()
-        self._driver = GraphDatabase.driver(config["uri"], auth=(config["user"], config["password"]))
+        self._driver = GraphDatabase.driver(uri, auth=(user, password))
         if not self._connected():
             exit()
 
-        self._api_key = config["api_key"]
+        self._api_key = api_key
         self._openai_client = OpenAI()
 
         print_debug(f"Neo4j Knowledge Base {name} created.")
