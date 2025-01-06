@@ -70,20 +70,31 @@ def dependency_resolver(commands, component):
 
 
 def get_required_args(cls):
-    constructor = inspect.signature(cls.__init__)
-    required_args = [
-        name
-        for name, param in constructor.parameters.items()
-        if param.default is inspect.Parameter.empty
-        and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    ]
-    return required_args
+    """
+    Gets the required arguments for the class constructor and all parent classes,
+    excluding the class named 'component'.
+    """
+    required_args = []
+
+    # Traverse the MRO and skip the class named 'Component'
+    for base in inspect.getmro(cls):
+        if base.__name__ == "component":
+            continue  # Skip 'Component' class
+        constructor = inspect.signature(base.__init__)
+        for name, param in constructor.parameters.items():
+            if (
+                param.default is inspect.Parameter.empty
+                and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+                and name != "self"
+            ):
+                required_args.append(name)
+
+    return list(set(required_args))
 
 
 def init_object(cls, name, **params):
     required_args = get_required_args(cls)
     required_args.remove("name")
-    required_args.remove("self")
 
     for param in list(params.keys()):
         if param in required_args:
@@ -114,7 +125,7 @@ def create_object(command):
 
     if component == "memory":
         if type == "short_term":
-            return short_term(variable, **config)
+            return init_object(short_term, variable, **config)
 
     if component == "llm":
         if type == "hugging_face":
@@ -124,18 +135,18 @@ def create_object(command):
 
     if component == "input":
         if type == "command_line":
-            return command_line(variable, **config)
+            return init_object(command_line, variable, **config)
 
     if component == "api":
         if type == "web":
-            return web(variable, **config)
+            return init_object(web, variable, **config)
         if type == "functions":
-            return functions(variable, **config)
+            return init_object(functions, variable, **config)
 
     if component == "decomposer":
         config["output"] = task_m
         if type == "llm":
-            return llm(variable, **config)
+            return init_object(llm, variable, **config)
 
 
 def command_checker(commands):
