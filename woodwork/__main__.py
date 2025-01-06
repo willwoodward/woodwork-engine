@@ -1,4 +1,4 @@
-from woodwork.dependencies import init, activate_virtual_environment, install_all, init_all
+from woodwork.dependencies import init, activate_virtual_environment, init_all
 from woodwork.helper_functions import set_globals, import_all_classes
 from woodwork.errors import WoodworkException
 

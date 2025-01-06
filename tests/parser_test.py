@@ -1,13 +1,12 @@
 from woodwork.dependencies import activate_virtual_environment
-activate_virtual_environment()
+from woodwork.config_parser import parse
+from woodwork.errors import ForbiddenVariableNameError
 
 import pytest
 import os
 from dotenv import load_dotenv
 
-from woodwork.config_parser import parse
-from woodwork.errors import ForbiddenVariableNameError
-from woodwork.components.llms.openai import openai
+activate_virtual_environment()
 
 
 # Testing component name declaration
@@ -108,6 +107,8 @@ def test_string_values():
 
 
 def test_variable_values():
+    from woodwork.components.llms.openai import openai
+
     config = """
     llm = llm openai {
         api_key: $OPENAI_API_KEY
@@ -132,6 +133,8 @@ def test_variable_values():
 
 
 def test_list_variable_values():
+    from woodwork.components.llms.openai import openai
+
     config = """
     llm1 = llm openai {
         api_key: $OPENAI_API_KEY
@@ -239,6 +242,8 @@ def test_nested_special_values():
 
 
 def test_nested_variable_references():
+    from woodwork.components.llms.openai import openai
+
     config = """
     llm = llm openai {
         api_key: $OPENAI_API_KEY

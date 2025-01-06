@@ -45,17 +45,9 @@ def create_instance(cls):
             "name": "hugging_face-example",
             "api_key": os.getenv("HF_API_TOKEN"),
         },
-        "chroma": {
-            "name": "chroma-example"
-        },
-        "web": {
-            "name": "web-example",
-            "url": "url"
-        },
-        "functions": {
-            "name": "functions-example",
-            "path" : "./functions"
-        }
+        "chroma": {"name": "chroma-example"},
+        "web": {"name": "web-example", "url": "url"},
+        "functions": {"name": "functions-example", "path": "./functions"},
     }
 
     if cls.__name__ in default_config.keys():
