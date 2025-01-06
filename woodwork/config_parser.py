@@ -74,7 +74,8 @@ def get_required_args(cls):
     required_args = [
         name
         for name, param in constructor.parameters.items()
-        if param.default is inspect.Parameter.empty and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+        if param.default is inspect.Parameter.empty
+        and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
     ]
     return required_args
 
@@ -83,17 +84,17 @@ def init_object(cls, name, **params):
     required_args = get_required_args(cls)
     required_args.remove("name")
     required_args.remove("self")
-    
+
     for param in list(params.keys()):
         if param in required_args:
             required_args.remove(param)
-    
+
     if len(required_args) == 1:
-        raise MissingConfigKeyError(f"Key \"{required_args[0]}\" missing from {cls.__name__}.")
-    
+        raise MissingConfigKeyError(f'Key "{required_args[0]}" missing from {cls.__name__}.')
+
     if len(required_args) > 1:
         raise MissingConfigKeyError(f"Keys {required_args} missing from {cls.__name__}.")
-    
+
     return cls(name, **params)
 
 
@@ -113,7 +114,7 @@ def create_object(command):
 
     if component == "memory":
         if type == "short_term":
-            return short_term(variable, config)
+            return short_term(variable, **config)
 
     if component == "llm":
         if type == "hugging_face":
@@ -123,18 +124,18 @@ def create_object(command):
 
     if component == "input":
         if type == "command_line":
-            return command_line(variable, config)
+            return command_line(variable, **config)
 
     if component == "api":
         if type == "web":
-            return web(variable, config)
+            return web(variable, **config)
         if type == "functions":
-            return functions(variable, config)
+            return functions(variable, **config)
 
     if component == "decomposer":
         config["output"] = task_m
         if type == "llm":
-            return llm(variable, config)
+            return llm(variable, **config)
 
 
 def command_checker(commands):

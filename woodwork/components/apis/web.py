@@ -6,11 +6,11 @@ from woodwork.components.apis.api import api
 
 
 class web(api):
-    def __init__(self, name, config):
+    def __init__(self, name, url, **config):
+        super().__init__(name, **config)
         print_debug("Configuring API...")
-        self._url = config["url"]
 
-        super().__init__(name, config)
+        self._url = url
 
         # Ingest the API documentation
         if "documentation" in config:

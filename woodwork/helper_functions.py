@@ -61,3 +61,15 @@ def get_optional(dictionary: dict, key: str, default=None, type: type | None = N
     if not isinstance(value, type):
         raise TypeError(f"{value} is not of type {type}.")
     return value
+
+
+def format_kwargs(kwarg_dict, **kwargs) -> None:
+    """
+    Used to pass mandatory args in the child to the parent, by adding those variables to kwargs.
+
+    Modifies the kwarg_dict in place.
+    """
+
+    for kwarg in kwargs:
+        kwarg_dict[kwarg] = kwargs[kwarg]
+    return

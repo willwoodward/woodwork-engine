@@ -32,5 +32,6 @@ class ForbiddenVariableNameError(WoodworkException):
     def __init__(self, message, line=None, column=None, line_content=None):
         super().__init__(message, line, column, line_content)
 
+
 class MissingConfigKeyError(WoodworkException):
     pass

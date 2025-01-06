@@ -1,1 +1,3 @@
-kb = memory short_term {}
+kb = knowledge_base neo4j {
+    api_key: $OPENAI_API_KEY
+}

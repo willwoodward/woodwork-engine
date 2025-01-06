@@ -5,8 +5,8 @@ from woodwork.components.inputs.inputs import inputs
 
 
 class command_line(inputs):
-    def __init__(self, name, config):
-        super().__init__(name, config)
+    def __init__(self, name, **config):
+        super().__init__(name, **config)
         print_debug("Creating command line input...")
         print('Command line input initialised, type ";" to exit. Begin typing a message:')
 

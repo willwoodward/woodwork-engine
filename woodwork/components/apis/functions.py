@@ -7,14 +7,12 @@ from woodwork.components.apis.api import api
 
 
 class functions(api):
-    def __init__(self, name, config):
+    def __init__(self, name, path, **config):
+        super().__init__(name, **config)
         print_debug("Configuring API...")
-        super().__init__(name, config)
 
-        self._config_checker(name, ["path"], config)
-
-        self._path = config["path"]
-        self._generate_docs(self._path)
+        self._path = path
+        self._generate_docs(path)
 
         print_debug("API configured.")
 

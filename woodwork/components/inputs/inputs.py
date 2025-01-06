@@ -4,13 +4,10 @@ from woodwork.components.component import component
 
 
 class inputs(component):
-    def __init__(self, name, config):
+    def __init__(self, name, to, **config):
         super().__init__(name, "input")
 
-        if not self._config_checker(name, ["to"], config):
-            exit()
-
-        self._output = config["to"]
+        self._output = to
 
     @abstractmethod
     def __input_handler(self):
