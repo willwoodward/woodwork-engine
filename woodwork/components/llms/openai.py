@@ -18,7 +18,7 @@ class openai(llm):
         )
 
         self._retriever = config.get("knowledge_base")
-        if self._retriever:
+        if self._retriever is not None:
             self._retriever = self._retriever.retriever
 
         super().__init__(name, **config)

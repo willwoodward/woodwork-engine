@@ -53,13 +53,17 @@ class llm(component, tool_interface, ABC):
         return response
 
     def context_answer(self, query):
+        results = self._retriever.invoke(query)
+
+        print('\n'.join(list(map(lambda x: x.page_content, results))))
+
         system_prompt = (
             "Use the given context to answer the question. "
             "If you don't know the answer, say you don't know. "
             "Use three sentence maximum and keep the answer concise. "
             "Return only the answer to the question. "
             "Context: {context}"
-        )
+        ).format(context='\n'.join(list(map(lambda x: x.page_content, results))))
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -68,10 +72,15 @@ class llm(component, tool_interface, ABC):
             ]
         )
 
-        question_answer_chain = create_stuff_documents_chain(self._llm, prompt)
-        chain = create_retrieval_chain(self._retriever, question_answer_chain)
+        chain = prompt | self._llm
+        response = chain.invoke({"input": query})
 
-        return chain.invoke({"input": query})["answer"]
+        try:
+            response = response.content
+        except:
+            pass
+
+        return response
 
     @property
     def description(self):
@@ -89,7 +98,7 @@ class llm(component, tool_interface, ABC):
             prompt = prompt.replace(key, inputs[key])
 
         # If there is no retriever object, there is no connected Knowledge Base
-        if not self._retriever:
+        if self._retriever is None:
             return self.question_answer(prompt)
         else:
             return self.context_answer(prompt)

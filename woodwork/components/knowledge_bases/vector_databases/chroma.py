@@ -1,37 +1,50 @@
-# from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain.text_splitter import CharacterTextSplitter
 
-# from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
-# from langchain_community.embeddings import HuggingFaceEmbeddings
-
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, get_optional
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
     vector_database,
 )
 
 
 class chroma(vector_database):
-    def __init__(self, name, **config):
+    def __init__(self, name, api_key, **config):
         super().__init__(name, **config)
         print_debug("Initialising Chroma Knowledge Base...")
 
-        # client = get_optional(config, "client", "local")
-        # path = get_optional(config, "path", ".woodwork/chroma")
+        path = get_optional(config, "path", ".woodwork/chroma")
 
-        # embedding_function = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
-        # self.__db = Chroma(
-        #     client=client,
-        #     collection_name="embedding_store",
-        #     embedding_function=embedding_function,
-        #     persist_directory=path,
-        # )
+        self._db = Chroma(
+            collection_name="collection",
+            embedding_function=embeddings,
+            persist_directory=path,
+        )
 
-        # self.retriever = self.__db.as_retriever()
+        self.retriever = self._db.as_retriever()
+
+        text_splitter = CharacterTextSplitter(
+            separator="\n\n",  # Split by paragraphs
+            chunk_size=1000,   # Maximum characters per chunk
+            chunk_overlap=200  # Overlap between chunks (change to 200)
+        )
+
+        # Split the document
+        chunks = text_splitter.split_text("""text""")
+        
+        print(chunks)
+
+        self._db.add_texts(chunks)
 
         print_debug(f"Chroma Knowledge Base {name} created.")
 
     def query(self, query, n=3):
         pass
+
+    def embed(self, document: str):
+        return
 
     @property
     def description(self):

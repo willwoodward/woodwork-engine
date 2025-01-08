@@ -1,27 +1,13 @@
-model2 = llm openai {
+kb = knowledge_base chroma {
+    api_key: $OPENAI_API_KEY
+}
+
+model = llm openai {
     model: "gpt-4o-mini"
-    knowledge_base: name1
+    knowledge_base: kb
     api_key: $OPENAI_API_KEY
-}
-
-name1 = knowledge_base chroma {
-    client: "local"
-}
-
-short_term_memory = knowledge_base text_file {
-    path: "./short_term_memory.txt"
-}
-
-endpoint = api web {
-    url: "http://localhost:3000"
-    documentation: "endpoint.txt"
-}
-
-action_model = decomposer llm {
-    api_key: $OPENAI_API_KEY
-    tools: [model2, endpoint]
 }
 
 in = input command_line {
-    to: action_model
+    to: model
 }
