@@ -42,6 +42,9 @@ def main():
             if sys.argv[2] == "--all":
                 init_all({"isolated": True})
 
-    elif sys.argv[1] == "test":
+    # woodwork embed
+    elif sys.argv[1] == "embed":
+        set_globals(inputs_activated=False, mode="embed")
         activate_virtual_environment()
-        import_all_classes("woodwork.components")
+        from woodwork.config_parser import main_function
+        main_function()

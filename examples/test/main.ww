@@ -1,11 +1,12 @@
 kb = knowledge_base chroma {
     api_key: $OPENAI_API_KEY
+    file_to_embed: "./endpoint.txt"
 }
 
 model = llm openai {
     model: "gpt-4o-mini"
-    knowledge_base: kb
     api_key: $OPENAI_API_KEY
+    knowledge_base: kb
 }
 
 in = input command_line {

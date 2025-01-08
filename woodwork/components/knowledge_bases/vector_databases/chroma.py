@@ -1,11 +1,13 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain.text_splitter import CharacterTextSplitter
+import os
 
 from woodwork.helper_functions import print_debug, get_optional
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
     vector_database,
 )
+from woodwork.globals import global_config
 
 
 class chroma(vector_database):
@@ -14,6 +16,7 @@ class chroma(vector_database):
         print_debug("Initialising Chroma Knowledge Base...")
 
         path = get_optional(config, "path", ".woodwork/chroma")
+        file_to_embed = get_optional(config, "file_to_embed")
 
         embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
 
@@ -25,25 +28,26 @@ class chroma(vector_database):
 
         self.retriever = self._db.as_retriever()
 
-        text_splitter = CharacterTextSplitter(
+        self._text_splitter = CharacterTextSplitter(
             separator="\n\n",  # Split by paragraphs
             chunk_size=1000,   # Maximum characters per chunk
             chunk_overlap=200  # Overlap between chunks (change to 200)
         )
 
-        # Split the document
-        chunks = text_splitter.split_text("""text""")
-        
-        print(chunks)
-
-        self._db.add_texts(chunks)
-
         print_debug(f"Chroma Knowledge Base {name} created.")
+
+        if global_config["mode"] == "embed":
+            if file_to_embed is not None and os.path.exists(file_to_embed):
+                with open(file_to_embed, "r") as file:
+                    self.embed(file.read())
 
     def query(self, query, n=3):
         pass
 
     def embed(self, document: str):
+        print("embedding")
+        chunks = self._text_splitter.split_text(document)
+        self._db.add_texts(chunks)
         return
 
     @property

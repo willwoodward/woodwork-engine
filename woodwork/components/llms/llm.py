@@ -55,8 +55,6 @@ class llm(component, tool_interface, ABC):
     def context_answer(self, query):
         results = self._retriever.invoke(query)
 
-        print('\n'.join(list(map(lambda x: x.page_content, results))))
-
         system_prompt = (
             "Use the given context to answer the question. "
             "If you don't know the answer, say you don't know. "
