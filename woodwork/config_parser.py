@@ -363,3 +363,11 @@ def embed_all():
     for tool in task_m._tools:
         if isinstance(tool, knowledge_base):
             tool.embed_init()
+
+
+def clear_all():
+    from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
+
+    for tool in task_m._tools:
+        if isinstance(tool, knowledge_base):
+            tool.clear_all()

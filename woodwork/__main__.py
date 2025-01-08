@@ -50,3 +50,12 @@ def main():
 
         main_function()
         embed_all()
+
+    # woodwork clear
+    elif sys.argv[1] == "clear":
+        set_globals(inputs_activated=False, mode="clear")
+        activate_virtual_environment()
+        from woodwork.config_parser import main_function, clear_all
+
+        main_function()
+        clear_all()

@@ -1,7 +1,6 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain.text_splitter import CharacterTextSplitter
-import os
 
 from woodwork.helper_functions import print_debug, get_optional
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
@@ -14,7 +13,7 @@ class chroma(vector_database):
         super().__init__(name, **config)
         print_debug("Initialising Chroma Knowledge Base...")
 
-        path = get_optional(config, "path", ".woodwork/chroma")
+        self._path = get_optional(config, "path", ".woodwork/chroma")
         self._file_to_embed = get_optional(config, "file_to_embed")
 
         embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
@@ -22,7 +21,7 @@ class chroma(vector_database):
         self._db = Chroma(
             collection_name="collection",
             embedding_function=embeddings,
-            persist_directory=path,
+            persist_directory=self._path,
         )
 
         self.retriever = self._db.as_retriever()
