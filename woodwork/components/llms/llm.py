@@ -1,8 +1,6 @@
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
 
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod
 
@@ -61,7 +59,7 @@ class llm(component, tool_interface, ABC):
             "Use three sentence maximum and keep the answer concise. "
             "Return only the answer to the question. "
             "Context: {context}"
-        ).format(context='\n'.join(list(map(lambda x: x.page_content, results))))
+        ).format(context="\n".join(list(map(lambda x: x.page_content, results))))
 
         prompt = ChatPromptTemplate.from_messages(
             [

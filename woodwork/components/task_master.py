@@ -7,7 +7,7 @@ class task_master(component):
         super().__init__(name, "task_master")
 
     def add_tools(self, tools):
-        self.__tools = tools
+        self._tools = tools
 
     def execute(self, instructions: list):
         print_debug("Executing instructions...")
@@ -39,7 +39,7 @@ class task_master(component):
         try:
             result = None
 
-            tool = list(filter(lambda x: x.name == instruction["tool"], self.__tools))[0]
+            tool = list(filter(lambda x: x.name == instruction["tool"], self._tools))[0]
             result = tool.input(instruction["action"], instruction["inputs"])
 
             return result

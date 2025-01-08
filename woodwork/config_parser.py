@@ -355,3 +355,11 @@ def main_function():
     with open(current_directory + "/main.ww", "r") as f:
         lines = f.read()
         parse(lines)
+
+
+def embed_all():
+    from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
+
+    for tool in task_m._tools:
+        if isinstance(tool, knowledge_base):
+            tool.embed_init()

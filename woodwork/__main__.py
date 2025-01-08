@@ -1,5 +1,5 @@
 from woodwork.dependencies import init, activate_virtual_environment, init_all
-from woodwork.helper_functions import set_globals, import_all_classes
+from woodwork.helper_functions import set_globals
 from woodwork.errors import WoodworkException
 
 import sys
@@ -46,5 +46,7 @@ def main():
     elif sys.argv[1] == "embed":
         set_globals(inputs_activated=False, mode="embed")
         activate_virtual_environment()
-        from woodwork.config_parser import main_function
+        from woodwork.config_parser import main_function, embed_all
+
         main_function()
+        embed_all()
