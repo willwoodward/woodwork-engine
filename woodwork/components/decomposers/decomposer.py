@@ -62,7 +62,7 @@ class decomposer(component, ABC):
 
         for instruction in instructions:
             query += f'-[:NEXT]->(:Action {{value: "{instruction}"}})'
-        
+
         query += "\nRETURN elementId(p) as id"
 
         # Execute query

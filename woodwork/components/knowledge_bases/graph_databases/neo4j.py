@@ -91,6 +91,7 @@ class neo4j(graph_database):
                 },
                 detach=True,
             )
+            time.sleep(15)
         print_debug(f"Neo4j container '{container_name}' is running.")
 
     def _local_init(self):
@@ -98,7 +99,6 @@ class neo4j(graph_database):
         client = docker.from_env()
         self._build_docker_image(client, "custom-neo4j")
         self._run_docker_container(client, "custom-neo4j", "neo4j-container", ".woodwork/neo4j/data")
-        time.sleep(15)
 
     def init_vector_index(self, index_name, label, property):
         query = f"""
@@ -138,8 +138,7 @@ class neo4j(graph_database):
         # Extract the embedding (a list of 1536 numbers)
         embedding = response.data[0].embedding
 
-        query = f"""MATCH (a:{label})
-        CALL db.index.vector.queryNodes('embeddings', 10, {embedding})
+        query = f"""CALL db.index.vector.queryNodes('embeddings', 10, {embedding})
         YIELD node AS node, score
         RETURN elementId(node) AS nodeID, node.{property} AS {property}, node.inputs AS inputs, score"""
 

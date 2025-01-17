@@ -384,6 +384,7 @@ def add_action_plan(file_path: str):
                 print(f"Successfully added a new workflow with ID: {id}")
     return
 
+
 def delete_action_plan(id: str):
     from woodwork.components.decomposers.decomposer import decomposer
 
@@ -393,6 +394,22 @@ def delete_action_plan(id: str):
                 WHERE elementId(n) = "{id}"
                 DETACH DELETE n
                 DETACH DELETE m""")
-    
+
     print(f"Successfully removed a new workflow with ID: {id}")
+    return
+
+
+def find_action_plan(query: str):
+    from woodwork.components.decomposers.decomposer import decomposer
+
+    for tool in task_m._tools:
+        if isinstance(tool, decomposer):
+            similar_prompts = tool._cache.similarity_search(query, "Prompt", "value")
+            num_results = min(len(similar_prompts), 10)
+
+            print(f"Here are the top {num_results} most similar results:")
+            for i in range(num_results):
+                result = similar_prompts[i]
+
+                print(f"{result["value"]} {result["nodeID"]}")
     return
