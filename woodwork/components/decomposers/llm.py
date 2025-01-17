@@ -29,13 +29,15 @@ class llm(decomposer):
         start_index = -1
         end_index = -1
 
+        print(x)
+
         for i in range(len(x) - 1):
-            if x[i] == "[":
+            if x[i] == "{":
                 start_index = i
                 break
 
         for i in range(len(x) - 1, 0, -1):
-            if x[i] == "]":
+            if x[i] == "}":
                 end_index = i
                 break
 
@@ -75,6 +77,17 @@ class llm(decomposer):
             "Specify only the function or endpoint name as an action when they are used, do not include them as a function key. "
             "If you do not have the necessary information, ask for the required information. "
             "Always specify an output variable. "
+            "Once this array of steps has been constructed, insert it into the following JSON schema: "
+            '{{{{"name": name, "inputs": dictionary of inputs, "plan": array of steps}}}}'
+            "The name should be the user's prompt, with input variables in curly braces and proper punctuation."
+            "The dictionary of inputs should have keys as the input variables, and values as the hardcoded value to be substituted into the name. These will be replaced whenever the action is called."
+            "For example, a prompt could be: what is the length of the word orange, which will have name: What is the length of the word {{{{word}}}}?"
+            'Where the dictionary of inputs is {{{{"word": "orange"}}}}.'
+            "The inputs of the action plan should not be hardcoded. Using this example:"
+            '{{{{"inputs": {{{{"word": "word"}}}}}}}}, not {{{{"inputs": {{{{"word": "orange"}}}}}}}}.'
+            "Just a reminder that inputs of the plan should be a string (which references a variable), and not wrapped in curly braces when used as a key."
+            "And an extra reminder that the inputs inside an action plan should not be hardcoded. For example, if the word changed, the action plan should be able to execute on the different word."
+            "Return only this fully constructed JSON object."
         ).format(tools=tool_documentation)
 
         prompt = ChatPromptTemplate.from_messages(

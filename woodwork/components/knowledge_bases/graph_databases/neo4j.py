@@ -144,6 +144,14 @@ class neo4j(graph_database):
         RETURN elementId(node) AS nodeID, node.{property} AS {property}, score"""
 
         return self.run(query)
+    
+    @property
+    def embedding_model(self):
+        return
+    
+    @property
+    def retriever(self):
+        return
 
     @property
     def description(self):

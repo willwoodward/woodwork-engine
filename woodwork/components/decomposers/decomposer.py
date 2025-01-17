@@ -81,7 +81,7 @@ class decomposer(component, ABC):
                 WHERE elementId(p) = \"{similar_prompts[0]["nodeID"]}\"
                 WITH p
                 MATCH path=(p)-[NEXT*]-(a:Action)
-                RETURN a AS result""")
+                RETURN a AS result, p as name""")
 
         actions = list(map(lambda x: json.loads(x["result"]["value"].replace("'", '"')), actions))
 
