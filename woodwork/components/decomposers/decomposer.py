@@ -49,7 +49,7 @@ class decomposer(component, ABC):
         instructions = workflow["plan"]
 
         # Check to see if the action has been cached
-        if self._cache_search_actions(prompt)["score"] > 0.95:
+        if self._cache_search_actions(prompt)["score"] > 0.90:
             print_debug("Similar prompts have already been cached.")
             return
 
@@ -79,6 +79,7 @@ class decomposer(component, ABC):
         print_debug(f"[SIMILAR PROMPTS] {similar_prompts}")
 
         best_prompt = similar_prompts[0]["value"]
+        best_inputs = similar_prompts[0]["inputs"]
         score = similar_prompts[0]["score"]
 
         actions = self._cache.run(f"""MATCH (p:Prompt)
@@ -89,4 +90,4 @@ class decomposer(component, ABC):
 
         actions = list(map(lambda x: json.loads(x["result"]["value"].replace("'", '"')), actions))
 
-        return {"prompt": best_prompt, "actions": actions, "score": score}
+        return {"prompt": best_prompt, "inputs": best_inputs, "actions": actions, "score": score}
