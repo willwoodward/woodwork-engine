@@ -22,3 +22,15 @@ class knowledge_base(component, tool_interface, ABC):
     @abstractmethod
     def query(self, query):
         pass
+
+    @property
+    @abstractmethod
+    def retriever():
+        # Each knowledge base should come with a default retriever. For use with LLMs.
+        pass
+
+    @property
+    @abstractmethod
+    def embedding_model(self):
+        # Each knowledge base should come with a default embedding model.
+        return self._embedding_model

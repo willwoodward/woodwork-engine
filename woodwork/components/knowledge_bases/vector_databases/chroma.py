@@ -1,6 +1,6 @@
-from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain.text_splitter import CharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
 
 from woodwork.helper_functions import print_debug, get_optional
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
@@ -15,16 +15,15 @@ class chroma(vector_database):
 
         self._path = get_optional(config, "path", ".woodwork/chroma")
         self._file_to_embed = get_optional(config, "file_to_embed")
-
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        self._embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
 
         self._db = Chroma(
             collection_name="collection",
-            embedding_function=embeddings,
+            embedding_function=self._embedding_model,
             persist_directory=self._path,
         )
 
-        self.retriever = self._db.as_retriever()
+        self._retriever = self._db.as_retriever()
 
         self._text_splitter = CharacterTextSplitter(
             separator="\n\n",  # Split by paragraphs
@@ -41,6 +40,14 @@ class chroma(vector_database):
         chunks = self._text_splitter.split_text(document)
         self._db.add_texts(chunks)
         return
+    
+    @property
+    def retriever(self):
+        return self._retriever
+    
+    @property
+    def embedding_model(self):
+        return self._embedding_model
 
     @property
     def description(self):
