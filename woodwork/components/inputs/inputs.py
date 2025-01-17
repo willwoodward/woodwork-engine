@@ -1,6 +1,7 @@
 from abc import abstractmethod
 
 from woodwork.components.component import component
+from woodwork.globals import global_config
 
 
 class inputs(component):
@@ -8,6 +9,7 @@ class inputs(component):
         super().__init__(name, "input")
 
         self._output = to
+        self._is_running = global_config["inputs_activated"]
 
     @abstractmethod
     def __input_handler(self):

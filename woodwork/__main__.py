@@ -1,5 +1,5 @@
 from woodwork.dependencies import init, activate_virtual_environment, init_all
-from woodwork.helper_functions import set_globals, import_all_classes
+from woodwork.helper_functions import set_globals
 from woodwork.errors import WoodworkException
 
 import sys
@@ -42,6 +42,20 @@ def main():
             if sys.argv[2] == "--all":
                 init_all({"isolated": True})
 
-    elif sys.argv[1] == "test":
+    # woodwork embed
+    elif sys.argv[1] == "embed":
+        set_globals(inputs_activated=False, mode="embed")
         activate_virtual_environment()
-        import_all_classes("woodwork.components")
+        from woodwork.config_parser import main_function, embed_all
+
+        main_function()
+        embed_all()
+
+    # woodwork clear
+    elif sys.argv[1] == "clear":
+        set_globals(inputs_activated=False, mode="clear")
+        activate_virtual_environment()
+        from woodwork.config_parser import main_function, clear_all
+
+        main_function()
+        clear_all()

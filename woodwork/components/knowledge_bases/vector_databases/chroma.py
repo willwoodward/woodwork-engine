@@ -1,37 +1,53 @@
-# from langchain_chroma import Chroma
+from langchain_chroma import Chroma
+from langchain.text_splitter import CharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
 
-# from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
-# from langchain_community.embeddings import HuggingFaceEmbeddings
-
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, get_optional
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
     vector_database,
 )
 
 
 class chroma(vector_database):
-    def __init__(self, name, **config):
+    def __init__(self, name, api_key, **config):
         super().__init__(name, **config)
         print_debug("Initialising Chroma Knowledge Base...")
 
-        # client = get_optional(config, "client", "local")
-        # path = get_optional(config, "path", ".woodwork/chroma")
+        self._path = get_optional(config, "path", ".woodwork/chroma")
+        self._file_to_embed = get_optional(config, "file_to_embed")
+        self._embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
 
-        # embedding_function = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        self._db = Chroma(
+            collection_name="collection",
+            embedding_function=self._embedding_model,
+            persist_directory=self._path,
+        )
 
-        # self.__db = Chroma(
-        #     client=client,
-        #     collection_name="embedding_store",
-        #     embedding_function=embedding_function,
-        #     persist_directory=path,
-        # )
+        self._retriever = self._db.as_retriever()
 
-        # self.retriever = self.__db.as_retriever()
+        self._text_splitter = CharacterTextSplitter(
+            separator="\n\n",  # Split by paragraphs
+            chunk_size=1000,  # Maximum characters per chunk
+            chunk_overlap=200,  # Overlap between chunks (change to 200)
+        )
 
         print_debug(f"Chroma Knowledge Base {name} created.")
 
     def query(self, query, n=3):
         pass
+
+    def embed(self, document: str):
+        chunks = self._text_splitter.split_text(document)
+        self._db.add_texts(chunks)
+        return
+    
+    @property
+    def retriever(self):
+        return self._retriever
+    
+    @property
+    def embedding_model(self):
+        return self._embedding_model
 
     @property
     def description(self):
