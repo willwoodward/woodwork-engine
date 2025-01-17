@@ -1,0 +1,14 @@
+{
+    "name": "Answer question",
+    "inputs": ["question"],
+    "plan": [
+        {
+            "tool": "model",
+            "action": "Respond to the user's question",
+            "inputs": {
+                "question": "question"
+            },
+            "output": "answer"
+        }
+    ]
+}

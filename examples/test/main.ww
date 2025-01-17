@@ -9,6 +9,12 @@ model = llm openai {
     knowledge_base: kb
 }
 
+planner = decomposer llm {
+    api_key: $OPENAI_API_KEY
+    tools: [model, kb]
+    workflow: "./workflow.json"
+}
+
 in = input command_line {
-    to: model
+    to: planner
 }
