@@ -58,6 +58,7 @@ class llm(decomposer):
             '{{{{input: extracted_text}}}}\n'
             "For example, if the user's prompt is: what are the letters in the word chicken?, given the inputs: ['word']"
             'The output would be: {{{{"word": "chicken"}}}}\n'
+            "When including data structures other than strings for the value, do not wrap them in a string."
             "Return only this JSON object."
         ).format(inputs=inputs)
 
