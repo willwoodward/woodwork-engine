@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import re
 import inspect
+import json
 
 from woodwork.helper_functions import print_debug
 from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
@@ -371,3 +372,13 @@ def clear_all():
     for tool in task_m._tools:
         if isinstance(tool, knowledge_base):
             tool.clear_all()
+
+
+def add_action_plan(file_path: str):
+    from woodwork.components.decomposers.decomposer import decomposer
+
+    for tool in task_m._tools:
+        if isinstance(tool, decomposer):
+            with open(file_path) as f:
+                tool._cache_actions(json.loads(f.read()))
+    return

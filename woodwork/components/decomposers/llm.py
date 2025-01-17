@@ -48,14 +48,14 @@ class llm(decomposer):
             print("Couldn't load array as JSON")
             print(x[start_index : end_index + 1 :])
             return x
-    
+
     def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, any]:
         """Given a prompt and the inputs to be extracted, return the input dictionary."""
         system_prompt = (
             "Given the following prompt from the user, and a list of inputs:"
             "{inputs} \n"
             "Extract these from the user's prompt, and return in the following JSON schema:"
-            '{{{{input: extracted_text}}}}\n'
+            "{{{{input: extracted_text}}}}\n"
             "For example, if the user's prompt is: what are the letters in the word chicken?, given the inputs: ['word']"
             'The output would be: {{{{"word": "chicken"}}}}\n'
             "When including data structures other than strings for the value, do not wrap them in a string."
@@ -75,13 +75,11 @@ class llm(decomposer):
         # Clean output as JSON
         result = self.__clean(result)
         return result
-    
+
     def _generate_workflow(self, query: str, partial_workflow: dict[str, any]):
         input_dict = self._find_inputs(query, partial_workflow["inputs"])
-        workflow = {
-            "inputs": input_dict,
-            "plan": partial_workflow["actions"]
-        }
+        print(input_dict)
+        workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
         return workflow
 
     def input(self, query):

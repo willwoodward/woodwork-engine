@@ -8,7 +8,7 @@ class task_master(component):
 
     def add_tools(self, tools):
         self._tools = tools
-    
+
     def execute(self, workflow: dict[str, any]):
         print_debug("Executing instructions...")
         variables = {}
