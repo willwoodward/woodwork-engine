@@ -383,3 +383,16 @@ def add_action_plan(file_path: str):
                 id = tool._cache_actions(json.loads(f.read()))
                 print(f"Successfully added a new workflow with ID: {id}")
     return
+
+def delete_action_plan(id: str):
+    from woodwork.components.decomposers.decomposer import decomposer
+
+    for tool in task_m._tools:
+        if isinstance(tool, decomposer):
+            tool._cache.run(f"""MATCH (n)-[:NEXT*]->(m)
+                WHERE elementId(n) = "{id}"
+                DETACH DELETE n
+                DETACH DELETE m""")
+    
+    print(f"Successfully removed a new workflow with ID: {id}")
+    return
