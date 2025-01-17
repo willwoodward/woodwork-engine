@@ -29,8 +29,6 @@ class llm(decomposer):
         start_index = -1
         end_index = -1
 
-        print(x)
-
         for i in range(len(x) - 1):
             if x[i] == "{":
                 start_index = i
@@ -112,7 +110,8 @@ class llm(decomposer):
 
         # Cache instructions
         if self._cache_mode:
-            self._cache_actions(query, result)
+            self._cache_actions(result)
 
         # Send to task_master
+        return
         return self._output.execute(result)

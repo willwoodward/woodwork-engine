@@ -42,8 +42,12 @@ class decomposer(component, ABC):
         """Given a query, return the JSON array denoting the actions to take, passed to the task master."""
         pass
 
-    def _cache_actions(self, prompt: str, instructions: list[any]):
+    def _cache_actions(self, workflow: dict[str, any]):
         """Add the actions to the graph if they aren't already present, as a chain."""
+        prompt = workflow["name"]
+        workflow_inputs = str(list(workflow["inputs"].keys()))
+        instructions = workflow["plan"]
+
         # Check to see if the action has been cached
         if self._cache_search_actions(prompt)["score"] > 0.95:
             print_debug("Similar prompts have already been cached.")
@@ -54,7 +58,7 @@ class decomposer(component, ABC):
             return
 
         # Generate the database query
-        query = f'MERGE (:Prompt {{value: "{prompt}"}})'
+        query = f'MERGE (:Prompt {{value: "{prompt}", inputs: {workflow_inputs}}})'
 
         for instruction in instructions:
             query += f'-[:NEXT]->(:Action {{value: "{instruction}"}})'

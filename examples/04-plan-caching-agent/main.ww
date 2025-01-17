@@ -4,6 +4,7 @@ endpoint = api functions {
 
 action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
+    cache: true
     tools: [endpoint]
 }
 
