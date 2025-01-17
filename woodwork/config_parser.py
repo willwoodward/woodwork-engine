@@ -380,5 +380,6 @@ def add_action_plan(file_path: str):
     for tool in task_m._tools:
         if isinstance(tool, decomposer):
             with open(file_path) as f:
-                tool._cache_actions(json.loads(f.read()))
+                id = tool._cache_actions(json.loads(f.read()))
+                print(f"Successfully added a new workflow with ID: {id}")
     return

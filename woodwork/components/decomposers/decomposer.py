@@ -58,17 +58,21 @@ class decomposer(component, ABC):
             return
 
         # Generate the database query
-        query = f'MERGE (:Prompt {{value: "{prompt}", inputs: {workflow_inputs}}})'
+        query = f'MERGE (p:Prompt {{value: "{prompt}", inputs: {workflow_inputs}}})'
 
         for instruction in instructions:
             query += f'-[:NEXT]->(:Action {{value: "{instruction}"}})'
+        
+        query += "\nRETURN elementId(p) as id"
 
         # Execute query
-        self._cache.run(query)
+        result = self._cache.run(query)[0]
 
         # Add the vector embedding for the prompt
         self._cache.embed("Prompt", "value")
-        return
+
+        # Return the ID of the prompt node
+        return result["id"]
 
     def _cache_search_actions(self, prompt: str):
         similar_prompts = self._cache.similarity_search(prompt, "Prompt", "value")
