@@ -2,14 +2,10 @@ endpoint = api functions {
     path: "functions.py"
 }
 
-model = llm openai {
-    api_key: $OPENAI_API_KEY
-}
-
 action_model = decomposer llm {
     api_key: $OPENAI_API_KEY
     cache: true
-    tools: [endpoint, model]
+    tools: [endpoint]
 }
 
 in = input command_line {
