@@ -9,10 +9,16 @@ class task_master(component):
     def add_tools(self, tools):
         self._tools = tools
 
-    def execute(self, instructions: list):
+    def execute(self, workflow: dict[str, any]):
         print_debug("Executing instructions...")
         variables = {}
         prev_instructon = ""
+
+        # Add the initial variables
+        for key in workflow["inputs"]:
+            variables[key] = workflow["inputs"][key]
+
+        instructions = workflow["plan"]
 
         for instruction in instructions:
             # Substitute variable inputs

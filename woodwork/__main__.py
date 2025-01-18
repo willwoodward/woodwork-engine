@@ -59,3 +59,39 @@ def main():
 
         main_function()
         clear_all()
+
+    # woodwork add
+    elif sys.argv[1] == "add":
+        # woodwork add workflow
+        if sys.argv[2] == "workflow":
+            file_path = sys.argv[3]
+            set_globals(inputs_activated=False)
+            activate_virtual_environment()
+            from woodwork.config_parser import main_function, add_action_plan
+
+            main_function()
+            add_action_plan(file_path)
+
+    # woodwork remove
+    elif sys.argv[1] == "remove":
+        # woodwork remove workflow
+        if sys.argv[2] == "workflow":
+            id = sys.argv[3]
+            set_globals(inputs_activated=False)
+            activate_virtual_environment()
+            from woodwork.config_parser import main_function, delete_action_plan
+
+            main_function()
+            delete_action_plan(id)
+
+    # woodwork find
+    elif sys.argv[1] == "find":
+        # woodwork find workflow
+        if sys.argv[2] == "workflow":
+            query = sys.argv[3]
+            set_globals(inputs_activated=False)
+            activate_virtual_environment()
+            from woodwork.config_parser import main_function, find_action_plan
+
+            main_function()
+            find_action_plan(query)

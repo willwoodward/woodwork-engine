@@ -1,0 +1,16 @@
+{
+    "name": "Write a poem about {content}.",
+    "inputs": {
+        "content": "love"
+    },
+    "plan": [
+        {
+            "tool": "model",
+            "action": "Write a short poem about {content}.",
+            "inputs": {
+                "content": "content"
+            },
+            "output": "answer"
+        }
+    ]
+}

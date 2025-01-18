@@ -40,11 +40,11 @@ class chroma(vector_database):
         chunks = self._text_splitter.split_text(document)
         self._db.add_texts(chunks)
         return
-    
+
     @property
     def retriever(self):
         return self._retriever
-    
+
     @property
     def embedding_model(self):
         return self._embedding_model

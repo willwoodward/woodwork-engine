@@ -1,0 +1,20 @@
+planner = decomposer llm {
+    api_key: $OPENAI_API_KEY
+    cache: True
+    tools: [code_generator]
+}
+
+input = input command_line {
+    to: planner
+}
+
+code_generator = llm openai {
+    api_key: $OPENAI_API_KEY
+    knowledge_base: codebase
+}
+
+codebase = knowledge_base chroma {}
+
+github_api = api functions {
+    path: "./github_api.py"
+}
