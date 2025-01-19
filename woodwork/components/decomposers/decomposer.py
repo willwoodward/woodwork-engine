@@ -26,12 +26,12 @@ class decomposer(component, ABC):
                     exit()
 
                 self._cache = neo4j(
-                    "decomposer_cache",
                     **{
                         "uri": "bolt://localhost:7687",
                         "user": "neo4j",
                         "password": "testpassword",
                         "api_key": api_key,
+                        "name": "decomposer_cache"
                     },
                 )
                 self._cache.init_vector_index("embeddings", "Prompt", "embedding")

@@ -26,3 +26,7 @@ class hugging_face(llm):
     @property
     def _llm(self):
         return self._llm_value
+
+    @property
+    def retriever(self):
+        return self._retriever

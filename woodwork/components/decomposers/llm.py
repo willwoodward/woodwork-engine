@@ -45,8 +45,8 @@ class llm(decomposer):
         try:
             return json.loads(x[start_index : end_index + 1 :])
         except:
-            print("Couldn't load array as JSON")
-            print(x[start_index : end_index + 1 :])
+            print_debug("Couldn't load array as JSON")
+            print_debug(x[start_index : end_index + 1 :])
             return x
 
     def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, any]:
@@ -78,7 +78,6 @@ class llm(decomposer):
 
     def _generate_workflow(self, query: str, partial_workflow: dict[str, any]):
         input_dict = self._find_inputs(query, partial_workflow["inputs"])
-        print(input_dict)
         workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
         return workflow
 
