@@ -1,10 +1,11 @@
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.component import component
 
 
 class task_master(component):
-    def __init__(self, name):
-        super().__init__(name, "task_master")
+    def __init__(self, **config):
+        format_kwargs(config, component="task_master", type="default")
+        super().__init__(**config)
 
     def add_tools(self, tools):
         self._tools = tools

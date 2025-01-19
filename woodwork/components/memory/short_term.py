@@ -1,9 +1,11 @@
 from woodwork.components.memory.memory import memory
+from woodwork.helper_functions import format_kwargs
 
 
 class short_term(memory):
-    def __init__(self, name, **config):
-        super().__init__(name, **config)
+    def __init__(self, **config):
+        format_kwargs(config, type="short_term")
+        super().__init__(**config)
 
         self._data = ""
 

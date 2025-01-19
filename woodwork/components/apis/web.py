@@ -1,13 +1,14 @@
 import requests
 import os
 
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.apis.api import api
 
 
 class web(api):
-    def __init__(self, name, url, **config):
-        super().__init__(name, **config)
+    def __init__(self, url: str, **config):
+        format_kwargs(config, url=url, type="web")
+        super().__init__(**config)
         print_debug("Configuring API...")
 
         self._url = url

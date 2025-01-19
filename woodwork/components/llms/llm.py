@@ -1,13 +1,16 @@
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
+from woodwork.interfaces.knowledge_base_interface import knowledge_base_interface
+from woodwork.helper_functions import format_kwargs
 
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod
 
 
-class llm(component, tool_interface, ABC):
-    def __init__(self, name, **config):
-        super().__init__(name, "llm")
+class llm(component, tool_interface, knowledge_base_interface, ABC):
+    def __init__(self, **config):
+        format_kwargs(config, component="llm")
+        super().__init__(**config)
 
         self._memory = config.get("memory")
 
@@ -26,7 +29,7 @@ class llm(component, tool_interface, ABC):
                 "{context}"
             ).format(context=self._memory.data)
         else:
-            system_prompt = "You are a helpful assistant, answer the provided question, " "In 3 sentences or less. "
+            system_prompt = "You are a helpful assistant, answer the provided question, In 3 sentences or less. "
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -91,7 +94,7 @@ class llm(component, tool_interface, ABC):
         # Substitute inputs
         prompt = query
         for key in inputs:
-            prompt = prompt.replace(key, inputs[key])
+            prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
         # If there is no retriever object, there is no connected Knowledge Base
         if self._retriever is None:

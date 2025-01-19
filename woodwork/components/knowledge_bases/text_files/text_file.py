@@ -1,11 +1,13 @@
 import os
 
 from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
+from woodwork.helper_functions import format_kwargs
 
 
 class text_file(knowledge_base):
-    def __init__(self, name, path, **config):
-        super().__init__(name, **config)
+    def __init__(self, path: str, **config):
+        format_kwargs(config, path=path, type="text_file")
+        super().__init__(**config)
 
         self._path = path
 

@@ -2,15 +2,16 @@ from langchain_chroma import Chroma
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 
-from woodwork.helper_functions import print_debug, get_optional
+from woodwork.helper_functions import print_debug, get_optional, format_kwargs
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
     vector_database,
 )
 
 
 class chroma(vector_database):
-    def __init__(self, name, api_key, **config):
-        super().__init__(name, **config)
+    def __init__(self, api_key: str, **config):
+        format_kwargs(config, api_key=api_key, type="chroma")
+        super().__init__(**config)
         print_debug("Initialising Chroma Knowledge Base...")
 
         self._path = get_optional(config, "path", ".woodwork/chroma")
@@ -31,7 +32,7 @@ class chroma(vector_database):
             chunk_overlap=200,  # Overlap between chunks (change to 200)
         )
 
-        print_debug(f"Chroma Knowledge Base {name} created.")
+        print_debug("Chroma Knowledge Base created.")
 
     def query(self, query, n=3):
         pass

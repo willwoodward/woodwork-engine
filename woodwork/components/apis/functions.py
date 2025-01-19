@@ -2,13 +2,14 @@ import ast
 import importlib
 import os
 
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.apis.api import api
 
 
 class functions(api):
-    def __init__(self, name, path, **config):
-        super().__init__(name, **config)
+    def __init__(self, path: str, **config):
+        format_kwargs(config, path=path, type="functions")
+        super().__init__(**config)
         print_debug("Configuring API...")
 
         self._path = path

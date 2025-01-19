@@ -8,7 +8,7 @@ from woodwork.helper_functions import print_debug
 from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
 from woodwork.components.task_master import task_master
 
-task_m = task_master("task_master")
+task_m = task_master(name="task_master")
 
 
 def resolve_dict(dictionary, dependency, component_object):
@@ -83,9 +83,8 @@ def get_required_args(cls):
     return list(set(required_args))
 
 
-def init_object(cls, name, **params):
+def init_object(cls, **params):
     required_args = get_required_args(cls)
-    required_args.remove("name")
 
     for param in list(params.keys()):
         if param in required_args:
@@ -97,7 +96,7 @@ def init_object(cls, name, **params):
     if len(required_args) > 1:
         raise MissingConfigKeyError(f"Keys {required_args} missing from {cls.__name__}.")
 
-    return cls(name, **params)
+    return cls(**params)
 
 
 def create_object(command):
@@ -106,58 +105,61 @@ def create_object(command):
     variable = command["variable"]
     config = command["config"]
 
+    # Add metadata to the config
+    config["name"] = variable
+
     if component == "knowledge_base":
         if type == "chroma":
             from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
 
-            return init_object(chroma, variable, **config)
+            return init_object(chroma, **config)
         if type == "neo4j":
             from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 
-            return init_object(neo4j, variable, **config)
+            return init_object(neo4j, **config)
         if type == "text_file":
             from woodwork.components.knowledge_bases.text_files.text_file import text_file
 
-            return init_object(text_file, variable, **config)
+            return init_object(text_file, **config)
 
     if component == "memory":
         if type == "short_term":
             from woodwork.components.memory.short_term import short_term
 
-            return init_object(short_term, variable, **config)
+            return init_object(short_term, **config)
 
     if component == "llm":
         if type == "hugging_face":
             from woodwork.components.llms.hugging_face import hugging_face
 
-            return init_object(hugging_face, variable, **config)
+            return init_object(hugging_face, **config)
         if type == "openai":
             from woodwork.components.llms.openai import openai
 
-            return init_object(openai, variable, **config)
+            return init_object(openai, **config)
 
     if component == "input":
         if type == "command_line":
             from woodwork.components.inputs.command_line import command_line
 
-            return init_object(command_line, variable, **config)
+            return init_object(command_line, **config)
 
     if component == "api":
         if type == "web":
             from woodwork.components.apis.web import web
 
-            return init_object(web, variable, **config)
+            return init_object(web, **config)
         if type == "functions":
             from woodwork.components.apis.functions import functions
 
-            return init_object(functions, variable, **config)
+            return init_object(functions, **config)
 
     if component == "decomposer":
         config["output"] = task_m
         if type == "llm":
             from woodwork.components.decomposers.llm import llm
 
-            return init_object(llm, variable, **config)
+            return init_object(llm, **config)
 
 
 def command_checker(commands):
@@ -378,7 +380,7 @@ def validate_action_plan(workflow: dict[str, any], tools: list):
     # Check tools exist
     for action in workflow["plan"]:
         tool_names = list(map(lambda x: x.name, tools))
-        
+
         if action["tool"] not in tool_names:
             raise SyntaxError("Tool not found.")
     return
@@ -423,5 +425,5 @@ def find_action_plan(query: str):
             for i in range(num_results):
                 result = similar_prompts[i]
 
-                print(f"{result["value"]} {result["nodeID"]}")
+                print(f"{result['value']} {result['nodeID']}")
     return

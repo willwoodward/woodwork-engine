@@ -1,12 +1,13 @@
 from threading import Thread
 
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.inputs.inputs import inputs
 
 
 class command_line(inputs):
-    def __init__(self, name, **config):
-        super().__init__(name, **config)
+    def __init__(self, **config):
+        format_kwargs(config, type="command_line")
+        super().__init__(**config)
         print_debug("Creating command line input...")
 
         if self._is_running:

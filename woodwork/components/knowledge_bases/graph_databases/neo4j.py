@@ -5,15 +5,16 @@ import docker
 import io
 import time
 
-from woodwork.helper_functions import print_debug
+from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.knowledge_bases.graph_databases.graph_database import (
     graph_database,
 )
 
 
 class neo4j(graph_database):
-    def __init__(self, name, uri, user, password, api_key, **config):
-        super().__init__(name, **config)
+    def __init__(self, uri, user, password, api_key, **config):
+        format_kwargs(config, uri=uri, user=user, password=password, api_key=api_key, type="neo4j")
+        super().__init__(**config)
         print_debug("Initialising Neo4j Knowledge Base...")
 
         self._local_init()
@@ -25,7 +26,7 @@ class neo4j(graph_database):
         self._api_key = api_key
         self._openai_client = OpenAI()
 
-        print_debug(f"Neo4j Knowledge Base {name} created.")
+        print_debug("Neo4j Knowledge Base created.")
 
     def _connected(self):
         try:
