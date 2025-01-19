@@ -26,7 +26,7 @@ class neo4j(graph_database):
         self._api_key = api_key
         self._openai_client = OpenAI()
 
-        print_debug(f"Neo4j Knowledge Base created.")
+        print_debug("Neo4j Knowledge Base created.")
 
     def _connected(self):
         try:

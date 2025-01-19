@@ -29,7 +29,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
                 "{context}"
             ).format(context=self._memory.data)
         else:
-            system_prompt = "You are a helpful assistant, answer the provided question, " "In 3 sentences or less. "
+            system_prompt = "You are a helpful assistant, answer the provided question, In 3 sentences or less. "
 
         prompt = ChatPromptTemplate.from_messages(
             [

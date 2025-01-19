@@ -32,7 +32,7 @@ class chroma(vector_database):
             chunk_overlap=200,  # Overlap between chunks (change to 200)
         )
 
-        print_debug(f"Chroma Knowledge Base created.")
+        print_debug("Chroma Knowledge Base created.")
 
     def query(self, query, n=3):
         pass

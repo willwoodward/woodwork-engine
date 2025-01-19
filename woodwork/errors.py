@@ -22,7 +22,7 @@ class WoodworkException(Exception):
         if self.line is not None and self.line_content is not None and self.column is not None:
             indicator = " " * (self.column - 1 + 7 + len(str(self.line))) + f"{Fore.CYAN}^{Style.RESET_ALL}"
             formatted_message += (
-                f"\nLine {Fore.YELLOW}{self.line}{Style.RESET_ALL}: {self.line_content.strip()}\n" f"{indicator}"
+                f"\nLine {Fore.YELLOW}{self.line}{Style.RESET_ALL}: {self.line_content.strip()}\n{indicator}"
             )
 
         return formatted_message

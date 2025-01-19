@@ -31,7 +31,7 @@ class decomposer(component, ABC):
                         "user": "neo4j",
                         "password": "testpassword",
                         "api_key": api_key,
-                        "name": "decomposer_cache"
+                        "name": "decomposer_cache",
                     },
                 )
                 self._cache.init_vector_index("embeddings", "Prompt", "embedding")

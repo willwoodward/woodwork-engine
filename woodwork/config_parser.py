@@ -95,7 +95,7 @@ def init_object(cls, **params):
 
     if len(required_args) > 1:
         raise MissingConfigKeyError(f"Keys {required_args} missing from {cls.__name__}.")
-    
+
     return cls(**params)
 
 
@@ -380,7 +380,7 @@ def validate_action_plan(workflow: dict[str, any], tools: list):
     # Check tools exist
     for action in workflow["plan"]:
         tool_names = list(map(lambda x: x.name, tools))
-        
+
         if action["tool"] not in tool_names:
             raise SyntaxError("Tool not found.")
     return
@@ -425,5 +425,5 @@ def find_action_plan(query: str):
             for i in range(num_results):
                 result = similar_prompts[i]
 
-                print(f"{result["value"]} {result["nodeID"]}")
+                print(f"{result['value']} {result['nodeID']}")
     return

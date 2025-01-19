@@ -1,4 +1,4 @@
-class component():
+class component:
     def __init__(self, name, component, type, **config):
         self.name = name
         self.component = component

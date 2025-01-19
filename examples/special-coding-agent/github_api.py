@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 GITHUB_TOKEN = os.environ.get("GITHUB_PAT")
 
+
 def get_issue_information(repo, issue_number):
     """
     Get all information about a GitHub issue, including its description and comments.
@@ -34,6 +35,7 @@ def get_issue_information(repo, issue_number):
 
     return {"issue": issue_data, "comments": comments_data}
 
+
 def comment(repo, issue_number, comment_text):
     """
     Add a comment to a GitHub issue.
@@ -54,6 +56,7 @@ def comment(repo, issue_number, comment_text):
     response.raise_for_status()
 
     return response.json()
+
 
 def get_unread_comments(repo, issue_number, last_read_time):
     """
@@ -78,6 +81,7 @@ def get_unread_comments(repo, issue_number, last_read_time):
 
     return unread_comments
 
+
 def create_branch(repo, branch_name, base_branch):
     """
     Create a new branch in the GitHub repository.
@@ -101,15 +105,13 @@ def create_branch(repo, branch_name, base_branch):
 
     # Create the new branch
     url = f"https://api.github.com/repos/{repo}/git/refs"
-    payload = {
-        "ref": f"refs/heads/{branch_name}",
-        "sha": base_branch_sha
-    }
+    payload = {"ref": f"refs/heads/{branch_name}", "sha": base_branch_sha}
 
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
 
     return response.json()
+
 
 def submit_pull_request(repo, branch_name, base_branch, issue_number, title):
     """
@@ -129,12 +131,7 @@ def submit_pull_request(repo, branch_name, base_branch, issue_number, title):
     url = f"https://api.github.com/repos/{repo}/pulls"
 
     body = f"Closes #{issue_number}"
-    payload = {
-        "title": title,
-        "head": branch_name,
-        "base": base_branch,
-        "body": body
-    }
+    payload = {"title": title, "head": branch_name, "base": base_branch, "body": body}
 
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
