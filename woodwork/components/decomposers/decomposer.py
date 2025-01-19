@@ -1,14 +1,15 @@
 from abc import ABC, abstractmethod
 import json
 
-from woodwork.helper_functions import print_debug, get_optional
+from woodwork.helper_functions import print_debug, get_optional, format_kwargs
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 
 
 class decomposer(component, ABC):
-    def __init__(self, name, tools, output, **config):
-        super().__init__(name, "decomposer")
+    def __init__(self, tools, output, **config):
+        format_kwargs(config, tools=tools, output=output, component="decomposer")
+        super().__init__(**config)
         print_debug("Creating the decomposer...")
 
         self._tools = tools
@@ -49,7 +50,7 @@ class decomposer(component, ABC):
         instructions = workflow["plan"]
 
         # Check to see if the action has been cached
-        if self._cache_search_actions(prompt)["score"] > 0.90:
+        if self._cache_search_actions(prompt)["score"] > 0.96:
             print_debug("Similar prompts have already been cached.")
             return
 

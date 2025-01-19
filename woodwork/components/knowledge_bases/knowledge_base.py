@@ -4,11 +4,13 @@ import shutil
 
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
+from woodwork.helper_functions import format_kwargs
 
 
 class knowledge_base(component, tool_interface, ABC):
-    def __init__(self, name, **config):
-        super().__init__(name, "knowledge_base")
+    def __init__(self, **config):
+        format_kwargs(config, component="knowledge_base")
+        super().__init__(**config)
 
     def embed_init(self):
         if self._file_to_embed is not None and os.path.exists(self._file_to_embed):

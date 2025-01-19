@@ -1,11 +1,12 @@
 from langchain_openai import ChatOpenAI
 
-from woodwork.helper_functions import print_debug, get_optional
+from woodwork.helper_functions import print_debug, get_optional, format_kwargs
 from woodwork.components.llms.llm import llm
 
 
 class openai(llm):
-    def __init__(self, name, api_key: str, model="gpt-4o-mini", **config):
+    def __init__(self, api_key: str, model="gpt-4o-mini", **config):
+        format_kwargs(config, api_key=api_key, model=model, type="openai")
         print_debug("Establishing connection with model...")
 
         self._llm_value = ChatOpenAI(
@@ -21,7 +22,7 @@ class openai(llm):
         if self._retriever is not None:
             self._retriever = self._retriever.retriever
 
-        super().__init__(name, **config)
+        super().__init__(**config)
 
         print_debug("Model initialised.")
 

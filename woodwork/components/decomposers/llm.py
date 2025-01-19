@@ -7,9 +7,9 @@ import json
 
 
 class llm(decomposer):
-    def __init__(self, name, api_key, **config):
-        format_kwargs(config, api_key=api_key)
-        super().__init__(name, **config)
+    def __init__(self, api_key: str, **config):
+        format_kwargs(config, api_key=api_key, type="llm")
+        super().__init__(**config)
         print_debug("Initialising decomposer...")
 
         self.__llm = ChatOpenAI(

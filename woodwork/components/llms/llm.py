@@ -1,13 +1,15 @@
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
+from woodwork.helper_functions import format_kwargs
 
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod
 
 
 class llm(component, tool_interface, ABC):
-    def __init__(self, name, **config):
-        super().__init__(name, "llm")
+    def __init__(self, **config):
+        format_kwargs(config, component="llm")
+        super().__init__(**config)
 
         self._memory = config.get("memory")
 
