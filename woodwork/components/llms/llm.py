@@ -91,7 +91,7 @@ class llm(component, tool_interface, ABC):
         # Substitute inputs
         prompt = query
         for key in inputs:
-            prompt = prompt.replace(key, inputs[key])
+            prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
         # If there is no retriever object, there is no connected Knowledge Base
         if self._retriever is None:

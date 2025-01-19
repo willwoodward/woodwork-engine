@@ -13,7 +13,7 @@ class llm(decomposer):
         print_debug("Initialising decomposer...")
 
         self.__llm = ChatOpenAI(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             temperature=0,
             max_tokens=None,
             timeout=None,
