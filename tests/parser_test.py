@@ -170,7 +170,7 @@ def test_dictionary_values():
     assert components["name1"]["config"] == {
         "key1": "value1",
         "key2": {"subkey1": "subvalue1", "subkey2": "subvalue2"},
-        "key3": "value3"
+        "key3": "value3",
     }
 
 
@@ -197,7 +197,7 @@ def test_nested_dictionary_values():
             "subkey2": {"subkey3": "subvalue3", "subkey4": "subvalue4"},
             "subkey5": "subvalue5",
         },
-        "key3": "value3"
+        "key3": "value3",
     }
 
 

@@ -122,7 +122,7 @@ def get_requirements(components: list, temp_requirements_file: str):
             parse_requirements_file(requirements_set, type_requirements)
         except subprocess.CalledProcessError:
             sys.exit(1)
-    
+
     # Write combined unique requirements to a temporary file
     with open(temp_requirements_file, "w") as f:
         for requirement in sorted(requirements_set):

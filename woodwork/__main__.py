@@ -1,4 +1,4 @@
-from woodwork.dependencies import init, activate_virtual_environment, init
+from woodwork.dependencies import activate_virtual_environment, init
 from woodwork.helper_functions import set_globals
 from woodwork.errors import WoodworkException
 
