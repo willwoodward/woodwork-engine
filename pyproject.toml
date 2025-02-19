@@ -2,6 +2,48 @@
 build-backend = "setuptools.build_meta"
 requires = ["setuptools", "wheel"]
 
+[project]
+name = "woodwork-engine"
+version = "0.2.2"
+description = "An AI Agent IaC tool that aims to make developing and deploying AI Agents easier."
+readme = "README.md"
+authors = [{ name = "Will Woodward" }]
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv",
+    "colorama",
+    "idna",
+    "distro",
+    "requests",
+    "pyyaml",
+    "jsonpointer"
+]
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13"
+]
+
+[project.optional-dependencies]
+all = [
+    "langchain",
+    "chromadb",
+    "langchain_chroma",
+    "langchain_community",
+    "sentence-transformers"
+]
+
+[project.scripts]
+woodwork = "woodwork.__main__:main"
+
+[tool.setuptools]
+packages = ["woodwork"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"*" = ["requirements/**/*.txt"]
+
 [tool.ruff]
 line-length = 120
 

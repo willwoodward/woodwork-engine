@@ -1,4 +1,4 @@
-from woodwork.dependencies import init, activate_virtual_environment, init_all
+from woodwork.dependencies import activate_virtual_environment, init
 from woodwork.helper_functions import set_globals
 from woodwork.errors import WoodworkException
 
@@ -40,7 +40,7 @@ def main():
             if sys.argv[2] == "--isolated":
                 init({"isolated": True})
             if sys.argv[2] == "--all":
-                init_all({"isolated": True})
+                init({"isolated": True, "all": True})
 
     # woodwork embed
     elif sys.argv[1] == "embed":

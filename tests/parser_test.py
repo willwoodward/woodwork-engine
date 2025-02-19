@@ -17,6 +17,7 @@ def test_parsing():
     }
     """
     components = parse(config)
+    print(components)
     assert "name1" in components
     assert components["name1"]["variable"] == "name1"
     assert components["name1"]["component"] == "keyword1"
