@@ -23,7 +23,7 @@ jobs:
         run: uv venv .venv
 
       - name: Install build tools
-        run: .venv/bin/uv pip install build twine
+        run: .venv/bin/python -m pip install build twine
 
       - name: Build package
         run: .venv/bin/python -m build
