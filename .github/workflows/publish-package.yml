@@ -20,7 +20,7 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH  # Ensure uv is in PATH
 
       - name: Install build tools
-        run: uv pip install build twine
+        run: uv pip install --system build twine
 
       - name: Build package
         run: python -m build
