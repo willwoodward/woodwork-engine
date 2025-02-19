@@ -19,16 +19,23 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH  # Ensure uv is in PATH
 
-      - name: Create virtual environment and install dependencies
+      - name: Create virtual environment
+        run: uv venv .venv
+
+      - name: Install build tools
         run: |
-          uv venv .venv
-          uv pip install --venv .venv build twine  # Install inside .venv
+          source .venv/bin/activate
+          uv pip install build twine
 
       - name: Build package
-        run: .venv/bin/python -m build
+        run: |
+          source .venv/bin/activate
+          python -m build
 
       - name: Publish package
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: .venv/bin/python -m twine upload dist/*
+        run: |
+          source .venv/bin/activate
+          python -m twine upload dist/*
