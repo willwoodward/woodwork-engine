@@ -1,10 +1,10 @@
 from woodwork.helper_functions import import_all_classes
-from woodwork.dependencies import init_all, activate_virtual_environment
+from woodwork.dependencies import init, activate_virtual_environment
 
 
 def test_venv_setup():
     try:
-        init_all({"isolated": True})
+        init({"isolated": True, "all": True})
         assert True
     except:
         assert False
