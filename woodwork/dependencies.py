@@ -137,7 +137,7 @@ def init(options={"isolated": False}):
 
     try:
         subprocess.check_call(
-            [f". {activate_script} && pip install -r {temp_requirements_file}"],
+            [f". {activate_script} && uv pip install -r {temp_requirements_file}"],
             shell=True,
         )
         print("Installed all combined dependencies.")
