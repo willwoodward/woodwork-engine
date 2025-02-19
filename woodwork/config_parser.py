@@ -103,7 +103,7 @@ def create_object(command):
     component = command["component"]
     type = command["type"]
     variable = command["variable"]
-    config = command["config"]
+    config = command["config"].copy()
 
     # Add metadata to the config
     config["name"] = variable
