@@ -2,6 +2,7 @@ import os
 import docker
 import io
 import time
+import socket
 
 from woodwork.helper_functions import print_debug
 
@@ -18,14 +19,12 @@ class Docker:
 
         # Add the volume if its location is specified
         if volume_location is not None:
-            self.container_args["volumes"] = (
-                {
-                    os.path.abspath(self.path): {
-                        "bind": f"/{self.path.split("/")[-1]}",
-                        "mode": "rw",
-                    }
-                },
-            )
+            self.container_args["volumes"] = {
+                os.path.abspath(self.path): {
+                    "bind": f"/{self.path.split("/")[-1]}",
+                    "mode": "rw",
+                }
+            }
 
         self.docker_client = docker.from_env()
 
@@ -39,8 +38,8 @@ class Docker:
 
     def _build_docker_image(self):
         """Build the Docker image."""
-        print_debug("Building Docker image...")
 
+        print_debug("Building Docker image...")
         self.docker_client.images.build(fileobj=io.BytesIO(self.dockerfile.encode("utf-8")), tag=self.image_name)
         print_debug(f"Successfully built image: {self.image_name}")
 
@@ -53,16 +52,26 @@ class Docker:
             container = self.docker_client.containers.get(self.container_name)
             print_debug(f"Container '{self.container_name}' already exists. Starting it...")
             container.start()
+            self.wait_for_container(container)
         except docker.errors.NotFound:
             print_debug(f"Container '{self.container_name}' not found. Creating a new one...")
-            self.docker_client.containers.run(
+            container = self.docker_client.containers.run(
                 self.image_name,
                 name=self.container_name,
                 detach=True,
                 **self.container_args,
             )
-            time.sleep(15)
+            self.wait_for_container(container)
         print_debug(f"Container '{self.container_name}' is running.")
+
+    def wait_for_container(self, container, timeout=30):
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            container.reload()  # Refresh container state
+            if container.status == "running":
+                return True
+            time.sleep(0.5)
+        raise TimeoutError(f"Timeout: Container {container.name} did not start in {timeout} seconds.")
 
     def init(self):
         if self.path is not None:
