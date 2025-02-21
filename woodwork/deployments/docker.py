@@ -48,6 +48,7 @@ class Docker:
         print_debug("Running Docker container...")
 
         # Check if the container already exists
+        container = None
         try:
             container = self.docker_client.containers.get(self.container_name)
             print_debug(f"Container '{self.container_name}' already exists. Starting it...")
@@ -63,6 +64,7 @@ class Docker:
             )
             self.wait_for_container(container)
         print_debug(f"Container '{self.container_name}' is running.")
+        return container
 
     def wait_for_container(self, container, timeout=30):
         start_time = time.time()
@@ -72,6 +74,9 @@ class Docker:
                 return True
             time.sleep(0.5)
         raise TimeoutError(f"Timeout: Container {container.name} did not start in {timeout} seconds.")
+    
+    def get_container(self):
+        return self._run_docker_container()
 
     def init(self):
         if self.path is not None:
