@@ -29,8 +29,6 @@ class Docker:
 
         self.docker_client = docker.from_env()
 
-        self._local_init()
-
     def _ensure_data_directory(self):
         """Ensure the data directory exists."""
         if not os.path.exists(self.path):
@@ -66,9 +64,9 @@ class Docker:
             time.sleep(15)
         print_debug(f"Container '{self.container_name}' is running.")
 
-    def _local_init(self):
+    def init(self):
         if self.path is not None:
             self._ensure_data_directory()
-        
+
         self._build_docker_image()
         self._run_docker_container()
