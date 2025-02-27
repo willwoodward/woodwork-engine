@@ -53,6 +53,7 @@ class Docker:
             container = self.docker_client.containers.get(self.container_name)
             print_debug(f"Container '{self.container_name}' already exists. Starting it...")
             container.start()
+            self.container = container
             self.wait_for_container(container)
         except docker.errors.NotFound:
             print_debug(f"Container '{self.container_name}' not found. Creating a new one...")
@@ -63,10 +64,11 @@ class Docker:
                 **self.container_args,
             )
             self.wait_for_container(container)
+            self.container = container
         print_debug(f"Container '{self.container_name}' is running.")
         return container
 
-    def wait_for_container(self, container, timeout=30):
+    def wait_for_container(self, container, timeout=60):
         start_time = time.time()
         while time.time() - start_time < timeout:
             container.reload()  # Refresh container state
@@ -76,7 +78,7 @@ class Docker:
         raise TimeoutError(f"Timeout: Container {container.name} did not start in {timeout} seconds.")
     
     def get_container(self):
-        return self._run_docker_container()
+        return self.container
 
     def init(self):
         if self.path is not None:

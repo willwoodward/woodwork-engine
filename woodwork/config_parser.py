@@ -161,6 +161,12 @@ def create_object(command):
 
             return init_object(llm, **config)
 
+    if component == "core":
+        if type == "command_line":
+            from woodwork.components.core.command_line import command_line
+
+            return init_object(command_line, **config)
+
 
 def command_checker(commands):
     terminals_remaining = 1

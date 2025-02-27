@@ -19,15 +19,19 @@ class command_line(core):
             dockerfile="""
             FROM ubuntu:latest
             RUN apt-get update && apt-get install -y bash
+            CMD ["tail", "-f", "/dev/null"]
             """,
             container_args={}
         )
+        self.docker.init()
 
         print_debug("Command line configured.")
     
 
     def run(self, input: str):
-        self.docker.exec_run(input)
+        container = self.docker.get_container()
+        out = container.exec_run(input)
+        return out.output.decode("utf-8").strip()
 
 
     def input(self, function_name: str, inputs: dict):

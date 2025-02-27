@@ -67,13 +67,14 @@ class decomposer(component, ABC):
         query += "\nRETURN elementId(p) as id"
 
         # Execute query
-        result = self._cache.run(query)[0]
+        # result = self._cache.run(query)[0]
 
         # Add the vector embedding for the prompt
-        self._cache.embed("Prompt", "value")
+        # self._cache.embed("Prompt", "value")
 
         # Return the ID of the prompt node
-        return result["id"]
+        # return result["id"]
+        return None
 
     def _cache_search_actions(self, prompt: str):
         similar_prompts = self._cache.similarity_search(prompt, "Prompt", "value")
