@@ -54,6 +54,7 @@ class Docker:
             print_debug(f"Container '{self.container_name}' already exists. Starting it...")
             container.start()
             self.container = container
+            time.sleep(10)
             self.wait_for_container(container)
         except docker.errors.NotFound:
             print_debug(f"Container '{self.container_name}' not found. Creating a new one...")
@@ -79,6 +80,10 @@ class Docker:
     
     def get_container(self):
         return self.container
+    
+    def close(self):
+        print_debug(f"Stopping container {self.container.name}...")
+        self.container.stop()
 
     def init(self):
         if self.path is not None:

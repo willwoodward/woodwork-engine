@@ -28,6 +28,10 @@ class command_line(core):
         print_debug("Command line configured.")
     
 
+    def close(self):
+        self.docker.close()
+    
+
     def run(self, input: str):
         container = self.docker.get_container()
         out = container.exec_run(input)

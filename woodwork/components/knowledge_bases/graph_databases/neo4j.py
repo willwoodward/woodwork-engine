@@ -50,6 +50,11 @@ class neo4j(graph_database):
         self._openai_client = OpenAI()
 
         print_debug("Neo4j Knowledge Base created.")
+    
+
+    def close(self):
+        print("closing neo4j container??")
+        self.docker.close()
 
     def _connected(self):
         try:

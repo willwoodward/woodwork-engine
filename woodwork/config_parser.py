@@ -142,6 +142,7 @@ def create_object(command):
         if type == "command_line":
             from woodwork.components.inputs.command_line import command_line
 
+            config["task_master"] = task_m
             return init_object(command_line, **config)
 
     if component == "api":

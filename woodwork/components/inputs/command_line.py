@@ -21,6 +21,7 @@ class command_line(inputs):
             x = input()
 
             if x == "exit" or x == ";":
+                self.stop()
                 break
 
             # Send the input to the component
