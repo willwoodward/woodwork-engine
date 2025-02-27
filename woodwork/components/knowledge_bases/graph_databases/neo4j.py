@@ -1,8 +1,5 @@
 from neo4j import GraphDatabase
 from openai import OpenAI
-import os
-import io
-import time
 
 from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.knowledge_bases.graph_databases.graph_database import (
@@ -50,11 +47,6 @@ class neo4j(graph_database):
         self._openai_client = OpenAI()
 
         print_debug("Neo4j Knowledge Base created.")
-    
-
-    def close(self):
-        print("closing neo4j container??")
-        self.docker.close()
 
     def _connected(self):
         try:
@@ -81,6 +73,7 @@ class neo4j(graph_database):
 
     def close(self):
         self._driver.close()
+        self.docker.close()
 
     def run(self, query, parameters=None):
         with self._driver.session() as session:

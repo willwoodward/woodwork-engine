@@ -2,7 +2,6 @@ import os
 import docker
 import io
 import time
-import socket
 
 from woodwork.helper_functions import print_debug
 
@@ -77,10 +76,10 @@ class Docker:
                 return True
             time.sleep(0.5)
         raise TimeoutError(f"Timeout: Container {container.name} did not start in {timeout} seconds.")
-    
+
     def get_container(self):
         return self.container
-    
+
     def close(self):
         print_debug(f"Stopping container {self.container.name}...")
         self.container.stop()

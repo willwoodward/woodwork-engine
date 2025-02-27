@@ -1,7 +1,3 @@
-import ast
-import importlib
-import os
-
 from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.deployments import Docker
 from woodwork.components.core.core import core
@@ -21,22 +17,19 @@ class command_line(core):
             RUN apt-get update && apt-get install -y bash
             CMD ["tail", "-f", "/dev/null"]
             """,
-            container_args={}
+            container_args={},
         )
         self.docker.init()
 
         print_debug("Command line configured.")
-    
 
     def close(self):
         self.docker.close()
-    
 
     def run(self, input: str):
         container = self.docker.get_container()
         out = container.exec_run(input)
         return out.output.decode("utf-8").strip()
-
 
     def input(self, function_name: str, inputs: dict):
         func = None

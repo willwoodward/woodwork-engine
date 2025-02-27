@@ -37,11 +37,10 @@ class decomposer(component, ABC):
                 self._cache.init_vector_index("embeddings", "Prompt", "embedding")
         else:
             self._cache_mode = False
-    
 
     def close(self):
         if self._cache_mode:
-            self._cache.docker.close()
+            self._cache.close()
 
     @abstractmethod
     def input(self, query):
