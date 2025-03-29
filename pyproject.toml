@@ -4,7 +4,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "woodwork-engine"
-version = "0.2.4"
+version = "0.2.5"
 description = "An AI Agent IaC tool that aims to make developing and deploying AI Agents easier."
 readme = "README.md"
 authors = [{ name = "Will Woodward" }]
@@ -38,8 +38,11 @@ all = [
 woodwork = "woodwork.__main__:main"
 
 [tool.setuptools]
-packages = ["woodwork"]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["woodwork*"]
 
 [tool.setuptools.package-data]
 "*" = ["requirements/**/*.txt"]
