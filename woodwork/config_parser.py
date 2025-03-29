@@ -142,6 +142,7 @@ def create_object(command):
         if type == "command_line":
             from woodwork.components.inputs.command_line import command_line
 
+            config["task_master"] = task_m
             return init_object(command_line, **config)
 
     if component == "api":
@@ -160,6 +161,12 @@ def create_object(command):
             from woodwork.components.decomposers.llm import llm
 
             return init_object(llm, **config)
+
+    if component == "core":
+        if type == "command_line":
+            from woodwork.components.core.command_line import command_line
+
+            return init_object(command_line, **config)
 
 
 def command_checker(commands):

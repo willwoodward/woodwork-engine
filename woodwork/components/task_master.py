@@ -53,3 +53,8 @@ class task_master(component):
         except:
             print("This instruction was not able to execute.")
             return
+
+    def close_all(self):
+        for tool in self._tools:
+            if hasattr(tool, "close"):
+                tool.close()
