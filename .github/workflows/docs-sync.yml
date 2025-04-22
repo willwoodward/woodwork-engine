@@ -1,0 +1,43 @@
+name: Sync Docs to Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout woodwork-engine repo
+      uses: actions/checkout@v3
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.WEBSITE_DEPLOY_KEY }}
+
+    - name: Clone website repo
+      run: |
+        git clone git@github.com:willwoodward/woodwork-website.git website-repo
+
+    - name: Sync docs
+      run: |
+        rm -rf website-repo/client/src/docs/*
+        cp -r docs/* website-repo/client/src/docs/
+
+    - name: Commit and push changes
+      run: |
+        cd website-repo
+        git config user.name "${{ secrets.GIT_USERNAME }}"
+        git config user.email "${{ secrets.GIT_EMAIL }}"
+        git add client/src/docs
+        if ! git diff --cached --quiet; then
+          git commit -m "Sync docs from woodwork-engine"
+          git push origin main
+        else
+          echo "No changes to commit"
+        fi
