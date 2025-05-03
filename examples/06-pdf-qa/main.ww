@@ -3,9 +3,12 @@ kb = knowledge_base chroma {
     api_key: $OPENAI_API_KEY
 }
 
+memory = memory short_term {}
+
 llm = llm openai  {
     api_key: $OPENAI_API_KEY
     knowledge_base: kb
+    memory: memory
 }
 
 in = input command_line {

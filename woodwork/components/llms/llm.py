@@ -19,15 +19,19 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
     def _llm(self):
         pass
 
-    def question_answer(self, query):
+    def _get_short_term_memory(self):
+        if self._memory:
+            return f"Here are the previous messages as context: \n{self._memory.data}"
+        return ""
+
+    def question_answer(self, query, short_term_memory=""):
         # Defining the system prompt
         if self._memory:
             system_prompt = (
                 "You are a helpful assistant, answer the provided question, "
                 "In 3 sentences or less. "
-                "Here are the previous messages as context: "
-                "{context}"
-            ).format(context=self._memory.data)
+                "{memory}"
+            ).format(memory=short_term_memory)
         else:
             system_prompt = "You are a helpful assistant, answer the provided question, In 3 sentences or less. "
 
@@ -45,15 +49,9 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
             response = response.content
         except:
             pass
-
-        # Adding to memory
-        if self._memory:
-            self._memory.add(f"[USER] {query}")
-            self._memory.add(f"[AI] {response}")
-
         return response
 
-    def context_answer(self, query):
+    def context_answer(self, query, short_term_memory=""):
         results = self._retriever.invoke(query)
         context = "\n".join([x.page_content.replace("{", "{{").replace("}", "}}") for x in results])
 
@@ -63,7 +61,8 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
             "Use three sentence maximum and keep the answer concise. "
             "Return only the answer to the question. "
             "Context: {context}"
-        ).format(context=context)
+            "{memory}"
+        ).format(context=context, memory=short_term_memory)
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -97,8 +96,16 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
-        # If there is no retriever object, there is no connected Knowledge Base
+        short_term_memory = self._get_short_term_memory()
+        answer = ""
         if self._retriever is None:
-            return self.question_answer(prompt)
+            answer = self.question_answer(prompt, short_term_memory)
         else:
-            return self.context_answer(prompt)
+            answer = self.context_answer(prompt, short_term_memory)
+        
+        # Adding to short-term memory
+        if self._memory:
+            self._memory.add(f"[USER] {query}")
+            self._memory.add(f"[AI] {answer}")
+        
+        return answer
