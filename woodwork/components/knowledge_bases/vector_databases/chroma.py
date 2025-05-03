@@ -1,6 +1,7 @@
 from langchain_chroma import Chroma
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
+
 
 from woodwork.helper_functions import print_debug, get_optional, format_kwargs
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
@@ -32,14 +33,21 @@ class chroma(vector_database):
             chunk_overlap=200,  # Overlap between chunks (change to 200)
         )
 
+        self._recursive_text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+        )
+
         print_debug("Chroma Knowledge Base created.")
 
     def query(self, query, n=3):
         pass
 
     def embed(self, document: str):
-        chunks = self._text_splitter.split_text(document)
+        # chunks = self._text_splitter.split_text(document)
+        chunks = self._recursive_text_splitter.split_text(document)
         self._db.add_texts(chunks)
+
         return
 
     @property

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import os
 import shutil
+from langchain_community.document_loaders import PyPDFLoader
+
 
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
@@ -14,8 +16,14 @@ class knowledge_base(component, tool_interface, ABC):
 
     def embed_init(self):
         if self._file_to_embed is not None and os.path.exists(self._file_to_embed):
-            with open(self._file_to_embed, "r") as file:
-                self.embed(file.read())
+            if self._file_to_embed.endswith(".pdf"):
+                loader = PyPDFLoader(self._file_to_embed)
+                documents = loader.load()
+                full_text = "\n".join([doc.page_content for doc in documents])
+                self.embed(full_text)
+            else:
+                with open(self._file_to_embed, "r") as file:
+                    self.embed(file.read())
 
     def clear_all(self):
         if os.path.exists(self._path):

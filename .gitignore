@@ -10,3 +10,4 @@ woodwork_engine.egg-info
 .ruff_cache
 dev-env
 test.py
+cv-lecture-3.pdf
