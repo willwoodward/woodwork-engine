@@ -55,6 +55,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
 
     def context_answer(self, query):
         results = self._retriever.invoke(query)
+        context = "\n".join([x.page_content.replace("{", "{{").replace("}", "}}") for x in results])
 
         system_prompt = (
             "Use the given context to answer the question. "
@@ -62,7 +63,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
             "Use three sentence maximum and keep the answer concise. "
             "Return only the answer to the question. "
             "Context: {context}"
-        ).format(context="\n".join(list(map(lambda x: x.page_content, results))))
+        ).format(context=context)
 
         prompt = ChatPromptTemplate.from_messages(
             [

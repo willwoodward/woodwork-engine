@@ -1,0 +1,13 @@
+kb = knowledge_base chroma {
+    file_to_embed: "lecture_slides"
+    api_key: $OPENAI_API_KEY
+}
+
+llm = llm openai  {
+    api_key: $OPENAI_API_KEY
+    knowledge_base: kb
+}
+
+in = input command_line {
+    to: llm
+}
