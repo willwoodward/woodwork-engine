@@ -1,5 +1,5 @@
 kb = knowledge_base chroma {
-    file_to_embed: "cv-lecture-3.pdf"
+    file_to_embed: "lecture_slides"
     api_key: $OPENAI_API_KEY
 }
 
