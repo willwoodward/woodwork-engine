@@ -128,6 +128,12 @@ def create_object(command):
 
             return init_object(short_term, **config)
 
+    if component == "model":
+        if type == "pytorch":
+            from woodwork.components.models.pytorch import pytorch
+
+            return init_object(pytorch, **config)
+
     if component == "llm":
         if type == "hugging_face":
             from woodwork.components.llms.hugging_face import hugging_face

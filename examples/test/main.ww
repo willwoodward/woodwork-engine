@@ -1,0 +1,10 @@
+classifier = model pytorch {}
+
+llm = decomposer llm {
+    api_key: $OPENAI_API_KEY
+    tools: [classifier]
+}
+
+in = input command_line {
+    to: llm
+}
