@@ -1,0 +1,8 @@
+input = input keyword_voice {
+    api_key: $OPENAI_API_KEY
+    to: llm
+}
+
+llm = llm openai {
+    api_key: $OPENAI_API_KEY
+}
