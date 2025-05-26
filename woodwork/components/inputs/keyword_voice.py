@@ -38,6 +38,13 @@ class keyword_voice(inputs):
             if self._keyword in partial_result.get("partial", "").lower():
                 print("Hotword detected!")
                 self._handle_voice_command()
+        
+        # Initialize the audio stream (for some reason it sometimes doesn't work the first time)
+        try:
+            sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
+                            channels=1, callback=callback_wrapper)
+        except:
+            pass
 
         with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
                             channels=1, callback=callback_wrapper):
