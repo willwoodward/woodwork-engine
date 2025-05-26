@@ -7,6 +7,7 @@ import numpy as np
 import wave
 import openai
 import tempfile
+import time
 
 from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.inputs.inputs import inputs
@@ -20,11 +21,14 @@ class keyword_voice(inputs):
 
         self._api_key = api_key
         self._keyword = keyword
-        self._model = Model("vosk-model-small-en-us-0.15")
+        self._model = Model(".woodwork/models/vosk-model-small-en-us-0.15")
         self._rec = KaldiRecognizer(self._model, 16000)
         print(f'Keyword voice input activated, listening for {keyword}')
-        thread = Thread(target=self._input_loop)
+        thread = Thread(target=self._hotword_listener, daemon=True)
         thread.start()
+
+        while True:
+            time.sleep(1)
 
     def _hotword_listener(self):
         def callback_wrapper(indata, frames, time_info, status):
@@ -50,7 +54,6 @@ class keyword_voice(inputs):
         recorded_frames = []
 
         print("Listening... Speak now.")
-
         def callback(indata, frames, time, status):
             nonlocal silence_duration, recorded_frames
 

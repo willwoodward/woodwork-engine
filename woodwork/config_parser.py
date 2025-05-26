@@ -139,6 +139,12 @@ def create_object(command):
             return init_object(openai, **config)
 
     if component == "input":
+        if type == "keyword_voice":
+            from woodwork.components.inputs.keyword_voice import keyword_voice
+
+            config["task_master"] = task_m
+            return init_object(keyword_voice, **config)
+        
         if type == "command_line":
             from woodwork.components.inputs.command_line import command_line
 
