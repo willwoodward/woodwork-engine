@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, Lock
 from vosk import Model, KaldiRecognizer
 import json
 import sounddevice as sd
@@ -8,9 +8,31 @@ import wave
 import openai
 import tempfile
 import time
+import os
+import sys
+import contextlib
 
 from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.inputs.inputs import inputs
+
+
+@contextlib.contextmanager
+def suppress_stderr():
+    """A context manager to suppress C++ library stderr (e.g., Vosk)."""
+    with open(os.devnull, 'w') as devnull:
+        stderr_fd = sys.stderr.fileno()
+
+        # Save current stderr file descriptor
+        saved_stderr_fd = os.dup(stderr_fd)
+
+        # Redirect stderr to /dev/null
+        os.dup2(devnull.fileno(), stderr_fd)
+        try:
+            yield
+        finally:
+            # Restore original stderr
+            os.dup2(saved_stderr_fd, stderr_fd)
+            os.close(saved_stderr_fd)
 
 
 class keyword_voice(inputs):
@@ -21,9 +43,10 @@ class keyword_voice(inputs):
 
         self._api_key = api_key
         self._keyword = keyword
-        self._model = Model(".woodwork/models/vosk-model-small-en-us-0.15")
+        self._listening_lock = Lock()
+        with suppress_stderr():
+            self._model = Model(".woodwork/models/vosk-model-small-en-us-0.15")
         self._rec = KaldiRecognizer(self._model, 16000)
-        print(f'Keyword voice input activated, listening for {keyword}')
         thread = Thread(target=self._hotword_listener, daemon=True)
         thread.start()
 
@@ -34,10 +57,12 @@ class keyword_voice(inputs):
         def callback_wrapper(indata, frames, time_info, status):
             self._rec.AcceptWaveform(bytes(indata))
             partial_result = json.loads(self._rec.PartialResult())
-            print(partial_result)
+            print_debug(partial_result)
             if self._keyword in partial_result.get("partial", "").lower():
                 print("Hotword detected!")
-                self._handle_voice_command()
+                with self._listening_lock:
+                    self._handle_voice_command()
+                    self._rec = KaldiRecognizer(self._model, 16000)
         
         # Initialize the audio stream (for some reason it sometimes doesn't work the first time)
         try:
@@ -48,7 +73,7 @@ class keyword_voice(inputs):
 
         with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16',
                             channels=1, callback=callback_wrapper):
-            print("Listening for hotword...")
+            print("Listening for keyword...")
             while True:
                 pass
 
@@ -96,13 +121,13 @@ class keyword_voice(inputs):
     def _transcribe_audio(self, filepath):
         client = openai.OpenAI(api_key=self._api_key)
 
-        print("Transcribing with Whisper...")
+        print_debug("Transcribing with Whisper...")
         with open(filepath, "rb") as f:
             transcript = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=f
             )
-        print(f"Transcribed: {transcript.text}")
+        print_debug(f"Transcribed: {transcript.text}")
         return transcript.text
 
     def _handle_voice_command(self):

@@ -1,7 +1,7 @@
 input = input keyword_voice {
     api_key: $OPENAI_API_KEY
     to: llm
-    keyword: "chicken"
+    keyword: "computer"
 }
 
 llm = llm openai {
