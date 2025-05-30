@@ -145,6 +145,12 @@ def create_object(command):
             config["task_master"] = task_m
             return init_object(keyword_voice, **config)
 
+        if type == "push_to_talk":
+            from woodwork.components.inputs.push_to_talk import push_to_talk
+
+            config["task_master"] = task_m
+            return init_object(push_to_talk, **config)
+
         if type == "command_line":
             from woodwork.components.inputs.command_line import command_line
 

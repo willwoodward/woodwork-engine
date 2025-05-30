@@ -1,7 +1,6 @@
-input = input keyword_voice {
+input = input push_to_talk {
     api_key: $OPENAI_API_KEY
     to: llm
-    keyword: "computer"
 }
 
 output = output voice {}
