@@ -21,7 +21,9 @@ class push_to_talk(inputs):
 
         # Initialize the audio stream (for some reason it sometimes doesn't work the first time)
         try:
-            sd.RawInputStream(samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=self._handle_voice_command)
+            sd.RawInputStream(
+                samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=self._handle_voice_command
+            )
         except:
             pass
 
