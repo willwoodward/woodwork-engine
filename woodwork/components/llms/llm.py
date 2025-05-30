@@ -13,6 +13,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
         super().__init__(**config)
 
         self._memory = config.get("memory")
+        self._output = config.get("to")
 
     @property
     @abstractmethod
@@ -28,9 +29,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
         # Defining the system prompt
         if self._memory:
             system_prompt = (
-                "You are a helpful assistant, answer the provided question, "
-                "In 3 sentences or less. "
-                "{memory}"
+                "You are a helpful assistant, answer the provided question, " "In 3 sentences or less. " "{memory}"
             ).format(memory=short_term_memory)
         else:
             system_prompt = "You are a helpful assistant, answer the provided question, In 3 sentences or less. "
@@ -102,10 +101,16 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
             answer = self.question_answer(prompt, short_term_memory)
         else:
             answer = self.context_answer(prompt, short_term_memory)
-        
+
         # Adding to short-term memory
         if self._memory:
             self._memory.add(f"[USER] {query}")
             self._memory.add(f"[AI] {answer}")
-        
-        return answer
+
+        # Output
+        if self._output:
+            self._output.input(answer)
+            return
+
+        # Else if no output, print the answer
+        print(answer)

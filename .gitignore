@@ -11,3 +11,4 @@ woodwork_engine.egg-info
 dev-env
 test.py
 examples/06-pdf-qa/lecture_slides/*
+# .mypy_cache/
