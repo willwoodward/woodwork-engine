@@ -12,13 +12,13 @@ class model(component, tool_interface, ABC):
 
     @property
     @abstractmethod
-    def input_dim(self):
+    def input_shape(self):
         """The input dimension of the model."""
         pass
 
     @property
     @abstractmethod
-    def output_dim(self):
+    def output_shape(self):
         """The output dimension of the model."""
         pass
 

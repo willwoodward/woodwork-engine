@@ -1,4 +1,7 @@
-classifier = model pytorch {}
+classifier = model pytorch {
+    model_weights: "model.pt"
+    model_code: "model.Classifier"
+}
 
 llm = decomposer llm {
     api_key: $OPENAI_API_KEY
