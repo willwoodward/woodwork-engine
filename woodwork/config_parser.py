@@ -144,7 +144,7 @@ def create_object(command):
 
             config["task_master"] = task_m
             return init_object(keyword_voice, **config)
-        
+
         if type == "command_line":
             from woodwork.components.inputs.command_line import command_line
 
@@ -177,6 +177,7 @@ def create_object(command):
     if component == "output":
         if type == "voice":
             from woodwork.components.outputs.voice import voice
+
             return init_object(voice, **config)
 
 

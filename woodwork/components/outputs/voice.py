@@ -16,11 +16,7 @@ class voice(outputs):
         self.speak(data)
 
     def speak(self, text):
-        response = openai.audio.speech.create(
-            model="tts-1",
-            voice="nova",
-            input=text
-        )
+        response = openai.audio.speech.create(model="tts-1", voice="nova", input=text)
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
             tmp.write(response.content)
             tmp.flush()

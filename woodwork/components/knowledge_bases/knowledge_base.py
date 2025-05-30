@@ -13,7 +13,7 @@ class knowledge_base(component, tool_interface, ABC):
     def __init__(self, **config):
         format_kwargs(config, component="knowledge_base")
         super().__init__(**config)
-    
+
     def embed_file(self, file_path: str):
         if file_path.endswith(".pdf"):
             loader = PyPDFLoader(file_path)
