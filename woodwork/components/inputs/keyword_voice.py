@@ -134,4 +134,4 @@ class keyword_voice(inputs):
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             audio_file = self._record_audio_vad(tmp.name)
             query = self._transcribe_audio(audio_file)
-            print(self._output.input(query))
+            self._output.input(query)
