@@ -4,6 +4,9 @@ input = input keyword_voice {
     keyword: "computer"
 }
 
+output = output voice {}
+
 llm = llm openai {
     api_key: $OPENAI_API_KEY
+    to: output
 }

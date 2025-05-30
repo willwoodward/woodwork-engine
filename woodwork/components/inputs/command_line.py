@@ -25,4 +25,4 @@ class command_line(inputs):
                 break
 
             # Send the input to the component
-            print(self._output.input(x))
+            self._output.input(x)

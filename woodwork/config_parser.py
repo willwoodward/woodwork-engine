@@ -174,6 +174,11 @@ def create_object(command):
 
             return init_object(command_line, **config)
 
+    if component == "output":
+        if type == "voice":
+            from woodwork.components.outputs.voice import voice
+            return init_object(voice, **config)
+
 
 def command_checker(commands):
     terminals_remaining = 1
