@@ -8,7 +8,13 @@ from woodwork.helper_functions import print_debug
 
 class Docker:
     def __init__(
-        self, image_name: str, container_name: str, dockerfile: str, container_args: dict, volume_location: str = None, docker_volume_location: str = None
+        self,
+        image_name: str,
+        container_name: str,
+        dockerfile: str,
+        container_args: dict,
+        volume_location: str = None,
+        docker_volume_location: str = None,
     ):
         self.image_name = image_name
         self.container_name = container_name

@@ -5,7 +5,6 @@ from langchain_community.document_loaders import PyPDFLoader
 import pathspec
 import json
 import hashlib
-import time
 
 
 from woodwork.components.component import component
@@ -66,7 +65,7 @@ class knowledge_base(component, tool_interface, ABC):
         if not should_embed:
             print(f"Skipping embed for {rel_path}, no changes detected")
             return
-        
+
         print(f"Embedding file: {rel_path}")
         if file_path.endswith(".pdf"):
             loader = PyPDFLoader(file_path)
@@ -84,18 +83,16 @@ class knowledge_base(component, tool_interface, ABC):
         self.save_cache()
 
     def load_gitignore(self, path: str):
-        gitignore_path = os.path.join(path, '.gitignore')
+        gitignore_path = os.path.join(path, ".gitignore")
         if os.path.exists(gitignore_path):
-            with open(gitignore_path, 'r') as f:
-                return pathspec.PathSpec.from_lines('gitwildmatch', f)
+            with open(gitignore_path, "r") as f:
+                return pathspec.PathSpec.from_lines("gitwildmatch", f)
         return None
 
     def embed_init(self):
         if self._file_to_embed is not None and os.path.exists(self._file_to_embed):
             base_dir = (
-                self._file_to_embed
-                if os.path.isdir(self._file_to_embed)
-                else os.path.dirname(self._file_to_embed)
+                self._file_to_embed if os.path.isdir(self._file_to_embed) else os.path.dirname(self._file_to_embed)
             )
             spec = self.load_gitignore(base_dir)
 
@@ -119,10 +116,7 @@ class knowledge_base(component, tool_interface, ABC):
             for file in files:
                 existing_files.add(os.path.relpath(os.path.join(root, file), base_dir))
 
-        deleted_files = [
-            path for path in self.embedded_files
-            if path not in existing_files
-        ]
+        deleted_files = [path for path in self.embedded_files if path not in existing_files]
 
         # Delete vector DB entries
         for path in deleted_files:
@@ -142,7 +136,7 @@ class knowledge_base(component, tool_interface, ABC):
     @abstractmethod
     def query(self, query):
         pass
-    
+
     @abstractmethod
     def delete_vectors(self, ids):
         """

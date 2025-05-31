@@ -46,7 +46,7 @@ class code(core):
         print_debug("Synced code to vector DB.")
 
     def chunk_code(self, text, max_length=500):
-        return [text[i:i + max_length] for i in range(0, len(text), max_length)]
+        return [text[i : i + max_length] for i in range(0, len(text), max_length)]
 
     def create_file(self, path: str):
         container = self.docker.get_container()
@@ -82,7 +82,7 @@ class code(core):
             "create_file": self.create_file,
             "write_file": self.write_file,
             "insert_code_at_line": self.insert_code_at_line,
-            "read_file": self.read_file
+            "read_file": self.read_file,
         }
 
         func = functions.get(function_name)

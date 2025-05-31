@@ -42,7 +42,19 @@ class chroma(vector_database):
         print_debug("Chroma Knowledge Base created.")
 
     def query(self, query, n=3):
-        pass
+        results = self._retriever.invoke(query)
+
+        context_parts = []
+        for x in results:
+            # Escape braces in content for formatting safety
+            content = x.page_content.replace("{", "{{").replace("}", "}}")
+            # Extract the file_path metadata (change key if yours is different)
+            file_path = x.metadata.get("file_path", "unknown file")
+
+            # Format how you want the metadata to appear — here just prefixing
+            context_parts.append(f"[File: {file_path}]\n{content}")
+
+        return "\n\n".join(context_parts)
 
     def embed(self, document: str, file_rel_path: str):
         # Split into chunks (assume self._recursive_text_splitter exists)

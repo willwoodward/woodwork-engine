@@ -102,7 +102,7 @@ class neo4j(graph_database):
         RETURN elementId(node) AS nodeID, node.{property} AS {property}, node.inputs AS inputs, score"""
 
         return self.run(query)
-    
+
     def delete_vectors(self, ids):
         raise NotImplementedError()
 
