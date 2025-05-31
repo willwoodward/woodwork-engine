@@ -59,7 +59,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
             content = x.page_content.replace("{", "{{").replace("}", "}}")
             # Extract the file_path metadata (change key if yours is different)
             file_path = x.metadata.get("file_path", "unknown file")
-            
+
             # Format how you want the metadata to appear — here just prefixing
             context_parts.append(f"[File: {file_path}]\n{content}")
 

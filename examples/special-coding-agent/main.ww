@@ -1,11 +1,11 @@
-planner = decomposer llm {
+agent = decomposer llm {
     api_key: $OPENAI_API_KEY
     cache: True
-    tools: [llm, github_api, line, code]
+    tools: [github_api, line, code, kb]
 }
 
 input = input command_line {
-    to: llm
+    to: agent
 }
 
 llm = llm openai {
@@ -14,7 +14,7 @@ llm = llm openai {
 }
 
 github_api = api functions {
-    path: "./github_api.py"
+    path: "github_api.py"
 }
 
 kb = knowledge_base chroma {
