@@ -50,29 +50,29 @@ class code(core):
 
     def create_file(self, path: str):
         container = self.docker.get_container()
-        command = f"touch {path}"
+        command = f"touch {self.local_path}/{path}"
         result = container.exec_run(f"/bin/sh -c '{command}'")
         return result.output.decode("utf-8")
 
     def write_file(self, path: str, content: str):
         container = self.docker.get_container()
         escaped_content = content.replace('"', '\\"')
-        command = f'echo "{escaped_content}" > {path}'
+        command = f'echo "{escaped_content}" > {self.local_path}/{path}'
         result = container.exec_run(f"/bin/sh -c '{command}'")
-        self.sync_to_vector_db()
+        # self.sync_to_vector_db()
         return result.output.decode("utf-8")
 
     def insert_code_at_line(self, path: str, line_number: int, code: str):
         container = self.docker.get_container()
         escaped_code = code.replace('"', '\\"')
-        command = f'sed -i "{line_number}i {escaped_code}" {path}'
+        command = f'sed -i "{line_number}i {escaped_code}" {self.local_path}/{path}'
         result = container.exec_run(f"/bin/sh -c '{command}'")
         self.sync_to_vector_db()
         return result.output.decode("utf-8")
 
     def read_file(self, path: str):
         container = self.docker.get_container()
-        command = f"cat {path}"
+        command = f"cat {self.local_path}/{path}"
         result = container.exec_run(f"/bin/sh -c '{command}'")
         return result.output.decode("utf-8")
 
@@ -93,6 +93,7 @@ class code(core):
     def description(self):
         return """
         The `code` component allows the agent to read, write, create, and modify code files inside a shared Docker container.
+        Note that the current working directory is set to the root of the repository, so all file paths should be relative to the repository root (/home/ubuntu/repo).
         Functions:
         - create_file(path)
         - write_file(path, content)
