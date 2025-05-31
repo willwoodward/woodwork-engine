@@ -1,7 +1,7 @@
 planner = decomposer llm {
     api_key: $OPENAI_API_KEY
     cache: True
-    tools: [llm, github_api, line]
+    tools: [llm, github_api, line, code]
 }
 
 input = input command_line {
@@ -16,8 +16,15 @@ github_api = api functions {
     path: "./github_api.py"
 }
 
+kb = knowledge_base chroma {
+    api_key: $OPENAI_API_KEY
+    file_to_embed: ".woodwork/vm"
+}
+
 line = core command_line {}
+
 code = core code {
     container: line
     repo_url: "willwoodward/woodwork-engine"
+    knowledge_base: kb
 }
