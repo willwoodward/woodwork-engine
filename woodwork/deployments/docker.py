@@ -11,24 +11,20 @@ log = logging.getLogger(__name__)
 
 class Docker:
     def __init__(
-        self,
-        image_name: str,
-        container_name: str,
-        dockerfile: str,
-        container_args: dict,
-        volume_location: str | None = None,
+        self, image_name: str, container_name: str, dockerfile: str, container_args: dict, volume_location: str = None, docker_volume_location: str = None
     ):
         self.image_name = image_name
         self.container_name = container_name
         self.dockerfile = dockerfile
         self.container_args = container_args
         self.path = volume_location
+        self.docker_volume_location = docker_volume_location
 
         # Add the volume if its location is specified
-        if volume_location is not None:
+        if volume_location is not None and docker_volume_location is not None:
             self.container_args["volumes"] = {
                 os.path.abspath(self.path): {
-                    "bind": f"/{self.path.split('/')[-1]}",
+                    "bind": docker_volume_location,
                     "mode": "rw",
                 }
             }

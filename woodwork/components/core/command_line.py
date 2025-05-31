@@ -20,11 +20,12 @@ class command_line(core):
             container_name="command-line",
             dockerfile="""
             FROM ubuntu:latest
-            RUN apt-get update && apt-get install -y bash
+            RUN apt-get update && apt-get install -y bash git
             CMD ["tail", "-f", "/dev/null"]
             """,
             container_args={},
             volume_location=".woodwork/vm",
+            docker_volume_location="/home/ubuntu/repo",
         )
         self.docker.init()
         self.current_directory = "/"

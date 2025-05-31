@@ -11,18 +11,17 @@ class code(core):
         # Required components
         self.docker = container.docker
         self.repo_url = repo_url
-        self.local_path = config.get("local_path", "/repo")
+        self.local_path = config.get("local_path", "/home/ubuntu/repo")
         self.vector_db = config.get("vector_db")
         self.embedding_model = config.get("embedding_model")
-
         self.clone_repo()
 
     def clone_repo(self):
         container = self.docker.get_container()
-        check_command = f"test -d {self.local_path}"
+        check_command = f"test -d {self.local_path}/.git"
         result = container.exec_run(f"/bin/sh -c '{check_command}'")
         if result.exit_code != 0:
-            clone_command = f"git clone {self.repo_url} {self.local_path}"
+            clone_command = f"git clone https://github.com/{self.repo_url}.git {self.local_path}"
             out = container.exec_run(f"/bin/sh -c '{clone_command}'")
             print_debug("Repo cloned: " + out.output.decode("utf-8"))
 
