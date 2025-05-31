@@ -5,10 +5,11 @@ planner = decomposer llm {
 }
 
 input = input command_line {
-    to: planner
+    to: llm
 }
 
 llm = llm openai {
+    knowledge_base: kb
     api_key: $OPENAI_API_KEY
 }
 
