@@ -207,6 +207,10 @@ def create_object(command):
             from woodwork.components.core.command_line import command_line
 
             return init_object(command_line, **config)
+        if type == "code":
+            from woodwork.components.core.code import code
+
+            return init_object(code, **config)
 
     if component == "output":
         if type == "voice":
