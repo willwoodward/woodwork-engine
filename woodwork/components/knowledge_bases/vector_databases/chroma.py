@@ -3,6 +3,7 @@ import logging
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
+import hashlib
 
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
     vector_database,
@@ -46,12 +47,31 @@ class chroma(vector_database):
     def query(self, query, n=3):
         pass
 
-    def embed(self, document: str):
-        # chunks = self._text_splitter.split_text(document)
+    def embed(self, document: str, file_rel_path: str):
+        # Split into chunks (assume self._recursive_text_splitter exists)
         chunks = self._recursive_text_splitter.split_text(document)
-        self._db.add_texts(chunks)
+        chunk_ids = []
+        metadatas = []
+        for idx, chunk in enumerate(chunks):
+            # Create deterministic ID: hash of file_rel_path + chunk + idx
+            chunk_id = hashlib.sha256(f"{file_rel_path}:{idx}:{chunk}".encode("utf-8")).hexdigest()
+            chunk_ids.append(chunk_id)
+            metadatas.append({"file_path": file_rel_path})
 
-        return
+        # Add texts with IDs to vector DB (assuming self._db.add_texts supports ids param)
+        self._db.add_texts(texts=chunks, ids=chunk_ids, metadatas=metadatas)
+
+        return chunk_ids
+
+    def delete_vectors(self, ids):
+        if not ids:
+            return
+
+        try:
+            self._db.delete(ids=ids)
+            print(f"Deleted {len(ids)} vectors from Chroma.")
+        except Exception as e:
+            print(f"Error deleting vectors from Chroma: {e}")
 
     @property
     def retriever(self):
