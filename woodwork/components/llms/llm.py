@@ -52,7 +52,18 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
 
     def context_answer(self, query, short_term_memory=""):
         results = self._retriever.invoke(query)
-        context = "\n".join([x.page_content.replace("{", "{{").replace("}", "}}") for x in results])
+
+        context_parts = []
+        for x in results:
+            # Escape braces in content for formatting safety
+            content = x.page_content.replace("{", "{{").replace("}", "}}")
+            # Extract the file_path metadata (change key if yours is different)
+            file_path = x.metadata.get("file_path", "unknown file")
+            
+            # Format how you want the metadata to appear — here just prefixing
+            context_parts.append(f"[File: {file_path}]\n{content}")
+
+        context = "\n\n".join(context_parts)
 
         system_prompt = (
             "Use the given context to answer the question. "
