@@ -20,6 +20,7 @@ class decomposer(component, ABC):
         self._tools = tools
         self._output = output
         self._cache = None
+        self._cache_mode = False
         api_key = get_optional(config, "api_key")
 
         if "cache" in config:

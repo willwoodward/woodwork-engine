@@ -68,7 +68,9 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
         system_prompt = (
             "Use the given context to answer the question. "
             "If you don't know the answer, say you don't know. "
-            "Use three sentence maximum and keep the answer concise. "
+            "Mention the relevant file names within a single, concise sentence or brief paragraph. "
+            "Do not list files or describe each file separately. "
+            "Instead, provide a smooth, natural summary that integrates the file names and their roles. "
             "Return only the answer to the question. "
             "Context: {context}"
             "{memory}"
