@@ -31,13 +31,7 @@ def main() -> None:
         logging.critical("ParseError: %s", e)
         return
 
-
-
     logging.debug(f"Arguments: {args}")
-
-    if args.workflow != "none" and args.target == "":
-        logging.critical("Workflow: %s - Target argument is required for workflow operations.")
-        raise ValueError("Target argument is required for workflow operations.")
 
     # Set globals based on flags before execution
     match args.mode:
