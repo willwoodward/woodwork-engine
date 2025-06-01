@@ -1,15 +1,18 @@
-from dataclasses import dataclass
-import os
-from dotenv import load_dotenv
-import re
+import argparse
 import inspect
 import json
-import argparse
-from typing import Optional, Sequence
+import logging
+import os
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from woodwork.helper_functions import print_debug
-from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
+from dotenv import load_dotenv
+
 from woodwork.components.task_master import task_master
+from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
+
+log = logging.getLogger(__name__)
 
 task_m = task_master(name="task_master")
 
@@ -29,7 +32,7 @@ def dependency_resolver(commands, component):
     # How do we get each variable? Dict of commands, key = name, value = component dictionary
     # Traverse the depends_on as DFS
 
-    print_debug(component)
+    log.debug(component)
     # Base case: no dependencies in the depends_on array
     if component["depends_on"] == []:
         # Initialise component, return object reference
@@ -54,7 +57,7 @@ def dependency_resolver(commands, component):
                 resolve_dict(value, dependency, component_object)
 
             if value == dependency:
-                print_debug(value, dependency)
+                log.debug("Value: %s; Dependency: %s", value, dependency)
                 component["config"][key] = component_object
 
     # Return component object
@@ -113,7 +116,9 @@ def create_object(command):
 
     if component == "knowledge_base":
         if type == "chroma":
-            from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
+            from woodwork.components.knowledge_bases.vector_databases.chroma import (
+                chroma,
+            )
 
             return init_object(chroma, **config)
         if type == "neo4j":
@@ -121,7 +126,9 @@ def create_object(command):
 
             return init_object(neo4j, **config)
         if type == "text_file":
-            from woodwork.components.knowledge_bases.text_files.text_file import text_file
+            from woodwork.components.knowledge_bases.text_files.text_file import (
+                text_file,
+            )
 
             return init_object(text_file, **config)
 
@@ -344,7 +351,7 @@ def parse(config: str) -> dict:
 
     # Get a list of all the component declarations
     entries = get_declarations(config)
-    print_debug(entries)
+    log.debug(entries)
 
     for entry, line_number in entries:
         command = {}
@@ -366,7 +373,7 @@ def parse(config: str) -> dict:
         # Parse config
         command["config"], command["depends_on"] = parse_config(entry)
 
-        print_debug("[COMMAND]", command)
+        log.debug("[COMMAND]", command)
         commands[command["variable"]] = command
 
     command_checker(commands)
@@ -457,7 +464,7 @@ def find_action_plan(query: str):
     return
 
 
-def parse_args(args: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
     """
     Parse command line arguments to configure Woodwork.
 
@@ -473,13 +480,8 @@ def parse_args(args: Optional[Sequence[str]] = None) -> argparse.Namespace:
         add_help=True,
     )
 
-    parser.add_argument(
-        "--log",
-        choices=["debug", "info", "warning", "error", "critical"],
-        default="error",
-        help="Set the logging level for the CLI. (default: error)",
-    )
-
+    # TODO: @willwoodward - Remove debug when appropriate in your release cycle.
+    # Currently defaults to run if debug is chosen.
     parser.add_argument(
         "--mode",
         choices=["run", "debug", "embed", "clear"],
@@ -492,14 +494,18 @@ def parse_args(args: Optional[Sequence[str]] = None) -> argparse.Namespace:
         type=str,
         choices=["none", "isolated", "all"],
         default="none",
-        help="Initialize Woodwork with options. Use 'isolated' to create an isolated environment, 'all' to initialize all components. (default: none)",
+        help=(
+            "Initialize Woodwork with options. Use 'isolated' to create an isolated environment,"
+            "'all' to initialize all components. (default: none)"
+            ),
     )
 
     parser.add_argument(
         "--workflow",
         choices=["none", "add", "remove", "find"],
         default="none",
-        help="Manage workflows. Use 'add' to add a workflow, 'remove' to remove a workflow, 'find' to search for a workflow. (default: none)",
+        help=("Manage workflows. Use 'add' to add a workflow, 'remove' to remove a workflow, "
+              "'find' to search for a workflow. (default: none)"),
     )
 
     parser.add_argument(
@@ -510,6 +516,14 @@ def parse_args(args: Optional[Sequence[str]] = None) -> argparse.Namespace:
             "For adding workflows, provide the file path to the workflow. "
             + "For finding workflows, provide a search query. "
             + "For removing workflows, provide the workflow ID. (default: empty string)"
+        ),
+    )
+
+    parser.add_argument(
+        "--logConfig",
+        default = None,
+        help = (
+            "A custom path to a JSON logging configuration file."
         ),
     )
 
@@ -538,7 +552,5 @@ def check_parse_conflicts(args: argparse.Namespace) -> None:
 
     if args.workflow != "none" and args.target == "":
         raise ParseError(
-            message="Target argument is required for workflow operations. See --help for more information."
+            message="Target argument is required for workflow operations. See --help for more information.",
         )
-
-    return

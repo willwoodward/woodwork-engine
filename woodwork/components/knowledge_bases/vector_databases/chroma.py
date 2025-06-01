@@ -1,19 +1,22 @@
-from langchain_chroma import Chroma
+import logging
+
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
+from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
-
-from woodwork.helper_functions import print_debug, get_optional, format_kwargs
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
     vector_database,
 )
+from woodwork.helper_functions import format_kwargs, get_optional
+
+log = logging.getLogger(__name__)
 
 
 class chroma(vector_database):
     def __init__(self, api_key: str, **config):
         format_kwargs(config, api_key=api_key, type="chroma")
         super().__init__(**config)
-        print_debug("Initialising Chroma Knowledge Base...")
+        log.debug("Initializing Chroma Knowledge Base...")
 
         self._path = get_optional(config, "path", ".woodwork/chroma")
         self._file_to_embed = get_optional(config, "file_to_embed")
@@ -38,7 +41,7 @@ class chroma(vector_database):
             chunk_overlap=200,
         )
 
-        print_debug("Chroma Knowledge Base created.")
+        log.debug("Chroma Knowledge Base created.")
 
     def query(self, query, n=3):
         pass

@@ -1,5 +1,9 @@
-from woodwork.helper_functions import print_debug, format_kwargs
+import logging
+
 from woodwork.components.component import component
+from woodwork.helper_functions import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 class task_master(component):
@@ -11,7 +15,7 @@ class task_master(component):
         self._tools = tools
 
     def execute(self, workflow: dict[str, any]):
-        print_debug("Executing instructions...")
+        log.debug("Executing instructions...")
         variables = {}
         prev_instructon = ""
 
@@ -36,9 +40,9 @@ class task_master(component):
 
             # Add the result to the variables
             variables[instruction["output"]] = result
-            prev_instructon = result
-            print_debug(f"instruction = {instruction}")
-            print_debug(f"result = {result}")
+            prev_instructon = result # TODO: @willwoodward fix spelling of variable if necessary
+            log.debug(f"instruction = {instruction}")
+            log.debug(f"result = {result}")
 
         return prev_instructon
 

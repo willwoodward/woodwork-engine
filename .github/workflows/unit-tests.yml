@@ -18,6 +18,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Install a specific version of uv.
+          version: "0.7.8"
+
       - name: Install dependencies
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -25,5 +31,4 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install pytest
-          woodwork init --all
-          pytest -s tests/
+          pytest --tb short -v tests/

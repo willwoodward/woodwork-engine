@@ -17,6 +17,7 @@ dependencies = [
     "requests",
     "pyyaml",
     "jsonpointer",
+    "deprecated",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.10",
@@ -31,11 +32,13 @@ all = [
     "chromadb",
     "langchain_chroma",
     "langchain_community",
-    "sentence-transformers"
+    "sentence-transformers",
+    "pytest",
+    "ruff",
 ]
 
 [project.scripts]
-woodwork = "woodwork.__main__:main"
+woodwork = "woodwork.__main__:run_as_standalone_app"
 
 [tool.setuptools]
 include-package-data = true
@@ -46,15 +49,10 @@ include = ["woodwork*"]
 
 [tool.setuptools.package-data]
 "*" = ["requirements/**/*.txt"]
+woodwork = ["config/log_config.json"]
 
 [tool.ruff]
 line-length = 120
 
 [tool.ruff.lint]
 ignore = ["E722"]
-
-[dependency-groups]
-dev = [
-    "pytest>=8.3.5",
-    "ruff>=0.11.12",
-]

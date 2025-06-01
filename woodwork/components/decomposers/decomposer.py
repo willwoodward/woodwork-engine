@@ -1,16 +1,18 @@
-from abc import ABC, abstractmethod
 import json
+import logging
+from abc import ABC, abstractmethod
 
-from woodwork.helper_functions import print_debug, get_optional, format_kwargs
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+from woodwork.helper_functions import format_kwargs, get_optional
 
+log = logging.getLogger(__name__)
 
 class decomposer(component, ABC):
     def __init__(self, tools, output, **config):
         format_kwargs(config, tools=tools, output=output, component="decomposer")
         super().__init__(**config)
-        print_debug("Creating the decomposer...")
+        log.debug("Creating the decomposer...")
 
         self._tools = tools
         self._output = output
@@ -55,7 +57,7 @@ class decomposer(component, ABC):
 
         # Check to see if the action has been cached
         if self._cache_search_actions(prompt)["score"] > 0.96:
-            print_debug("Similar prompts have already been cached.")
+            log.debug("Similar prompts have already been cached.")
             return
 
         # Instructions must have at least one instruction
@@ -86,7 +88,7 @@ class decomposer(component, ABC):
         if len(similar_prompts) == 0:
             return {"prompt": "", "actions": [], "score": 0}
 
-        print_debug(f"[SIMILAR PROMPTS] {similar_prompts}")
+        log.debug(f"[SIMILAR PROMPTS] {similar_prompts}")
 
         best_prompt = similar_prompts[0]["value"]
         best_inputs = similar_prompts[0]["inputs"]

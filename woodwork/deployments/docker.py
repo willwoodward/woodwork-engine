@@ -1,9 +1,11 @@
-import os
-import docker
 import io
+import logging
+import os
 import time
 
-from woodwork.helper_functions import print_debug
+import docker
+
+log = logging.getLogger(__name__)
 
 
 class Docker:
@@ -31,32 +33,32 @@ class Docker:
         """Ensure the data directory exists."""
         if not os.path.exists(self.path):
             os.makedirs(self.path)
-            print_debug(f"Created data directory at {self.path}")
+            log.debug(f"Created data directory at {self.path}")
         else:
-            print_debug(f"Data directory already exists at {self.path}")
+            log.debug(f"Data directory already exists at {self.path}")
 
     def _build_docker_image(self):
         """Build the Docker image."""
 
-        print_debug("Building Docker image...")
+        log.debug("Building Docker image...")
         self.docker_client.images.build(fileobj=io.BytesIO(self.dockerfile.encode("utf-8")), tag=self.image_name)
-        print_debug(f"Successfully built image: {self.image_name}")
+        log.debug(f"Successfully built image: {self.image_name}")
 
     def _run_docker_container(self):
         """Run the Docker container."""
-        print_debug("Running Docker container...")
+        log.debug("Running Docker container...")
 
         # Check if the container already exists
         container = None
         try:
             container = self.docker_client.containers.get(self.container_name)
-            print_debug(f"Container '{self.container_name}' already exists. Starting it...")
+            log.debug(f"Container '{self.container_name}' already exists. Starting it...")
             container.start()
             self.container = container
             time.sleep(10)
             self.wait_for_container(container)
         except docker.errors.NotFound:
-            print_debug(f"Container '{self.container_name}' not found. Creating a new one...")
+            log.debug(f"Container '{self.container_name}' not found. Creating a new one...")
             container = self.docker_client.containers.run(
                 self.image_name,
                 name=self.container_name,
@@ -65,7 +67,7 @@ class Docker:
             )
             self.wait_for_container(container)
             self.container = container
-        print_debug(f"Container '{self.container_name}' is running.")
+        log.debug(f"Container '{self.container_name}' is running.")
         return container
 
     def wait_for_container(self, container, timeout=60):
@@ -81,7 +83,7 @@ class Docker:
         return self.container
 
     def close(self):
-        print_debug(f"Stopping container {self.container.name}...")
+        log.debug(f"Stopping container {self.container.name}...")
         self.container.stop()
 
     def init(self):

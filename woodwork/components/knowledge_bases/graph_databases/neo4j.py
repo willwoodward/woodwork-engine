@@ -1,18 +1,22 @@
+import logging
+
 from neo4j import GraphDatabase
 from openai import OpenAI
 
-from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.knowledge_bases.graph_databases.graph_database import (
     graph_database,
 )
 from woodwork.deployments import Docker
+from woodwork.helper_functions import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 class neo4j(graph_database):
     def __init__(self, uri, user, password, api_key, **config):
         format_kwargs(config, uri=uri, user=user, password=password, api_key=api_key, type="neo4j")
         super().__init__(**config)
-        print_debug("Initialising Neo4j Knowledge Base...")
+        log.debug("Initializing Neo4j Knowledge Base...")
 
         self.docker = Docker(
             image_name="custom-neo4j",
@@ -46,7 +50,7 @@ class neo4j(graph_database):
         self._api_key = api_key
         self._openai_client = OpenAI()
 
-        print_debug("Neo4j Knowledge Base created.")
+        log.debug("Neo4j Knowledge Base created.")
 
     def _connected(self):
         try:
@@ -116,7 +120,7 @@ class neo4j(graph_database):
         return """
             A graph database that can be added to, queried and cleared. The query language is Cypher.
             The following functions can be used as actions, with inputs as a dictionary of kwargs:
-            similarity_search(prompt, label, proptery): returns nodes labelled label with similar text in the property property.
+            similarity_search(prompt, label, property): returns nodes labelled label with similar text in the property property.
             run(query): runs a cypher query on the graph.
         """
 

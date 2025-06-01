@@ -1,10 +1,11 @@
-import re
+import importlib.resources as pkg_resources
+import logging
 import os
+import re
 import subprocess
 import sys
-import importlib.resources as pkg_resources
 
-from woodwork.helper_functions import print_debug
+log = logging.getLogger(__name__)
 
 
 def setup_virtual_env(options):
@@ -12,7 +13,7 @@ def setup_virtual_env(options):
 
     # Create the virtual environment
     if not os.path.exists(".woodwork/env"):
-        print_debug("Setting up a virtual environment...")
+        log.debug("Setting up a virtual environment...")
 
         if isolated:
             subprocess.check_call([sys.executable, "-m", "venv", ".woodwork/env"])
@@ -58,7 +59,7 @@ def activate_virtual_environment():
 
     # Check if we're already in the virtual environment
     if sys.prefix == venv_path:
-        print_debug("Virtual environment is already active.")
+        log.debug("Virtual environment is already active.")
         return
 
     # Activate the venv
@@ -72,7 +73,7 @@ def activate_virtual_environment():
         "site-packages",
     )
     sys.path.insert(0, site_packages)
-    print_debug("Virtual environment activated.")
+    log.debug("Virtual environment activated.")
 
 
 def get_components() -> list[tuple[str, str]]:
