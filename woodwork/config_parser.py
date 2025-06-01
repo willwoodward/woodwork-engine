@@ -476,8 +476,8 @@ def parse_args(args: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--log",
         choices=["debug", "info", "warning", "error", "critical"],
-        default="info",
-        help="Set the logging level for the CLI. (default: info)",
+        default="error",
+        help="Set the logging level for the CLI. (default: error)",
     )
 
     parser.add_argument(
