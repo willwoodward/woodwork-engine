@@ -21,6 +21,8 @@ def main() -> None:
     try:
         args = config_parser.parse_args()
         logging.basicConfig(level=args.log.upper())
+        # Confirm that there are no known conflicts in the arguments before doing anything else
+        config_parser.check_parse_conflicts(args)
         # TODO: Create a custom logger that extends the root logger
         # Set a delineator for a new application run in log file
         logging.debug("\n" + "=" * 60 + " NEW LOG RUN " + "=" * 60 + "\n")
