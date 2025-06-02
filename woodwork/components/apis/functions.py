@@ -1,21 +1,22 @@
 import ast
 import importlib
 import os
+import logging
 
-from woodwork.helper_functions import print_debug, format_kwargs
+from woodwork.helper_functions import format_kwargs
 from woodwork.components.apis.api import api
 
-
+log = logging.getLogger(__name__)
 class functions(api):
     def __init__(self, path: str, **config):
         format_kwargs(config, path=path, type="functions")
         super().__init__(**config)
-        print_debug("Configuring API...")
+        log.debug("Configuring API with %s and path %s", config, path)
 
         self._path = path
         self._generate_docs(path)
 
-        print_debug("API configured.")
+        log.debug("API configured.")
 
     def _get_type_hint(self, annotation):
         """Helper function to convert AST annotation to a string."""
@@ -70,12 +71,12 @@ class functions(api):
             self._documentation += f"[DOCUMENTATION] {func['docstring']}\n"
 
         self._documentation += "Call the functions by specifying only the function name as the action, and the arguments as a dictionary of kwargs."
-        print_debug(self.description)
+        log.debug(self.description)
 
     def _dynamic_import(self):
         module_path = os.path.join(os.getcwd(), f"{self._path}")
 
-        print_debug(f"[MODULE_PATH] {module_path}")
+        log.debug(f"[MODULE_PATH] {module_path}")
         spec = importlib.util.spec_from_file_location(self._path, module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

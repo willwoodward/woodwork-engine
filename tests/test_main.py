@@ -7,14 +7,17 @@ from woodwork.config_parser import parse_args
 
 
 class TestCLIArgs(unittest.TestCase):
+    @pytest.mark.skip("Deprecated functionality. This test is no longer relevant.")
     def test_log_default(self):
         args = parse_args([])
         self.assertEqual(args.log, "info")
 
+    @pytest.mark.skip("Deprecated functionality. This test is no longer relevant.")
     def test_log_debug(self):
         args = parse_args(["--log", "debug"])
         self.assertEqual(args.log, "debug")
 
+    @pytest.mark.skip("Deprecated functionality. This test is no longer relevant.")
     def test_invalid_log_level(self):
         with pytest.raises(SystemExit):
             parse_args(["--log", "invalid"])

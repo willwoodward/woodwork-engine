@@ -1,16 +1,19 @@
-from woodwork.helper_functions import print_debug, format_kwargs
-from woodwork.components.decomposers.decomposer import decomposer
+import json
+import logging
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-import json
 
+from woodwork.components.decomposers.decomposer import decomposer
+from woodwork.helper_functions import format_kwargs
+
+log = logging.getLogger(__name__)
 
 class llm(decomposer):
     def __init__(self, api_key: str, **config):
         format_kwargs(config, api_key=api_key, type="llm")
         super().__init__(**config)
-        print_debug("Initialising decomposer...")
+        log.debug("Initializing decomposer...")
 
         self.__llm = ChatOpenAI(
             model="gpt-4o",
@@ -45,8 +48,8 @@ class llm(decomposer):
         try:
             return json.loads(x[start_index : end_index + 1 :])
         except:
-            print_debug("Couldn't load array as JSON")
-            print_debug(x[start_index : end_index + 1 :])
+            log.debug("Couldn't load array as JSON")
+            log.debug(x[start_index : end_index + 1 :])
             return x
 
     def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, any]:
@@ -86,14 +89,14 @@ class llm(decomposer):
         if self._cache_mode:
             closest_query = self._cache_search_actions(query)
             if closest_query["score"] > 0.90:
-                print_debug("Cache hit!")
+                log.debug("Cache hit!")
                 return self._output.execute(self._generate_workflow(query, closest_query))
 
         tool_documentation = ""
         for obj in self._tools:
             tool_documentation += f"tool name: {obj.name}\ntool type: {obj.type}\n{obj.description}\n\n\n"
 
-        print_debug(f"[DOCUMENTATION]:\n{tool_documentation}")
+        log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
         system_prompt = (
             "Given the following tools and their descriptions:\n"
             "{tools} "
@@ -130,12 +133,12 @@ class llm(decomposer):
         chain = prompt | self.__llm
         result = chain.invoke({"input": query}).content
 
-        print_debug(f"[RESULT] {result}")
+        log.debug(f"[RESULT] {result}")
 
         # Clean output as JSON
         result = self.__clean(result)
 
-        print_debug(f"[RESULT] {result}")
+        log.debug(f"[RESULT] {result}")
 
         if isinstance(result, str):
             return result

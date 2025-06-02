@@ -1,21 +1,25 @@
-from threading import Thread, Lock
-from vosk import Model, KaldiRecognizer
+import contextlib
 import json
-import sounddevice as sd
-import webrtcvad
-import numpy as np
-import wave
-import openai
-import tempfile
-import time
+import logging
 import os
 import sys
-import contextlib
+import tempfile
+import time
 import urllib.request
+import wave
 import zipfile
+from threading import Lock, Thread
 
-from woodwork.helper_functions import print_debug, format_kwargs
+import numpy as np
+import openai
+import sounddevice as sd
+import webrtcvad
+from vosk import KaldiRecognizer, Model
+
 from woodwork.components.inputs.inputs import inputs
+from woodwork.helper_functions import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
@@ -41,7 +45,7 @@ class keyword_voice(inputs):
     def __init__(self, api_key, keyword, **config):
         format_kwargs(config, type="keyword_voice")
         super().__init__(**config)
-        print_debug("Creating keyword voice input...")
+        log.debug("Creating keyword voice input...")
 
         self._api_key = api_key
         self._keyword = keyword
@@ -60,28 +64,28 @@ class keyword_voice(inputs):
 
     def _download_model(self):
         zip_path = os.path.join(".woodwork", "models", "vosk-model-small-en-us-0.15.zip")
-        print_debug("Downloading Vosk model...")
+        log.debug("Downloading Vosk model...")
         urllib.request.urlretrieve("https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip", zip_path)
-        print_debug("Download complete. Extracting...")
+        log.debug("Download complete. Extracting...")
 
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(".woodwork/models")
 
         os.remove(zip_path)
-        print_debug("Model ready.")
+        log.debug("Model ready.")
 
     def _ensure_model(self):
         if not os.path.isdir(".woodwork/models/vosk-model-small-en-us-0.15"):
             os.makedirs(".woodwork/models", exist_ok=True)
             self._download_model()
         else:
-            print_debug("Model already present.")
+            log.debug("Model already present.")
 
     def _hotword_listener(self):
         def callback_wrapper(indata, frames, time_info, status):
             self._rec.AcceptWaveform(bytes(indata))
             partial_result = json.loads(self._rec.PartialResult())
-            print_debug(partial_result)
+            log.debug(partial_result)
             if self._keyword in partial_result.get("partial", "").lower():
                 print("Hotword detected!")
                 with self._listening_lock:
@@ -146,10 +150,10 @@ class keyword_voice(inputs):
     def _transcribe_audio(self, filepath):
         client = openai.OpenAI(api_key=self._api_key)
 
-        print_debug("Transcribing with Whisper...")
+        log.debug("Transcribing with Whisper...")
         with open(filepath, "rb") as f:
             transcript = client.audio.transcriptions.create(model="whisper-1", file=f)
-        print_debug(f"Transcribed: {transcript.text}")
+        log.debug(f"Transcribed: {transcript.text}")
         return transcript.text
 
     def _handle_voice_command(self):

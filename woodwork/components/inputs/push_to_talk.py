@@ -1,21 +1,25 @@
-from threading import Thread
-import sounddevice as sd
-import webrtcvad
-import numpy as np
-import wave
-import openai
+import logging
 import tempfile
 import time
+import wave
+from threading import Thread
 
-from woodwork.helper_functions import print_debug, format_kwargs
+import numpy as np
+import openai
+import sounddevice as sd
+import webrtcvad
+
 from woodwork.components.inputs.inputs import inputs
+from woodwork.helper_functions import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 class push_to_talk(inputs):
     def __init__(self, api_key, **config):
         format_kwargs(config, type="push_to_talk")
         super().__init__(**config)
-        print_debug("Creating a push to talk input...")
+        log.debug("Creating a push to talk input...")
 
         self._api_key = api_key
 
@@ -85,10 +89,10 @@ class push_to_talk(inputs):
     def _transcribe_audio(self, filepath):
         client = openai.OpenAI(api_key=self._api_key)
 
-        print_debug("Transcribing with Whisper...")
+        log.debug("Transcribing with Whisper...")
         with open(filepath, "rb") as f:
             transcript = client.audio.transcriptions.create(model="whisper-1", file=f)
-        print_debug(f"Transcribed: {transcript.text}")
+        log.debug(f"Transcribed: {transcript.text}")
         return transcript.text
 
     def _handle_voice_command(self):

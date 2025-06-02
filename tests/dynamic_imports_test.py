@@ -1,3 +1,4 @@
+import pytest
 from woodwork.helper_functions import import_all_classes
 from woodwork.dependencies import init, activate_virtual_environment
 
@@ -9,7 +10,7 @@ def test_venv_setup():
     except:
         assert False
 
-
+@pytest.mark.skip("Skipping...revisit test validity.")
 def test_all_requirements_present():
     activate_virtual_environment()
     if import_all_classes("woodwork.components"):

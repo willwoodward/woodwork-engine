@@ -1,16 +1,19 @@
+import logging
 import os
 import re
 
-from woodwork.helper_functions import print_debug, format_kwargs
-from woodwork.deployments import Docker
 from woodwork.components.core.core import core
+from woodwork.deployments import Docker
+from woodwork.helper_functions import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 class command_line(core):
     def __init__(self, **config):
         format_kwargs(config, type="command_line")
         super().__init__(**config)
-        print_debug("Configuring Command line...")
+        log.debug("Configuring Command line...")
 
         self.docker = Docker(
             image_name="command-line",
@@ -26,7 +29,7 @@ class command_line(core):
         self.docker.init()
         self.current_directory = "/"
 
-        print_debug("Command line configured.")
+        log.debug("Command line configured.")
 
     def change_directory(self, new_path):
         if not new_path:
@@ -67,7 +70,7 @@ class command_line(core):
     def description(self):
         return """
         A command line isolated inside a docker container for use by the agent.
-        This also comes with a file system that can be maniupulated using the command line.
+        This also comes with a file system that can be manipulated using the command line.
         If you change directory using `cd`, it will keep track of the current directory, as long as the command does nothing else.
         The function provided is run(input: str), where it executes the command passed as input in a bash terminal.
         To use this, the action is the function name and the inputs are a dictionary of key word arguments for the run function."""

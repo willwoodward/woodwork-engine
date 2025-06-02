@@ -1,14 +1,18 @@
+import logging
+
 from langchain_community.llms import HuggingFaceEndpoint
 
-from woodwork.helper_functions import print_debug, format_kwargs
 from woodwork.components.llms.llm import llm
+from woodwork.helper_functions import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 class hugging_face(llm):
     def __init__(self, api_key: str, model="mistralai/Mixtral-8x7B-Instruct-v0.1", **config):
         format_kwargs(config, api_key=api_key, model=model, type="hugging_face")
         super().__init__(**config)
-        print_debug("Establishing connection with model...")
+        log.debug("Establishing connection with model...")
 
         self._llm_value = HuggingFaceEndpoint(
             repo_id=model,
@@ -21,7 +25,7 @@ class hugging_face(llm):
         if self._retriever:
             self._retriever = self._retriever.retriever
 
-        print_debug("Model initialised.")
+        log.debug("Model initialized.")
 
     @property
     def _llm(self):

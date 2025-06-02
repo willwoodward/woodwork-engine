@@ -31,9 +31,44 @@ A [roadmap](https://github.com/willwoodward/woodwork-meta/blob/main/ROADMAP.md) 
 2. **Install the Woodwork extension on VSCode if relevant**: This provides syntax highlighting and intellisense for code in .ww files
 
 ## Usage
+
+There are two ways to run `woodwork`: A standalone application, or used as a dependency.
+
+### Standalone Application
+
 1. **Create a main.ww file and write some code**: This file is where component declarations are read from. For some inspiration, consult the examples
-2. **Run `woodwork init`**: This installs the necessary dependencies to run your components
-3. **Run `woodwork`**: This activates the components
+1. **Create a `./config` directory**: This is where the logging configuration will live.
+1. **Copy the [`log_config_example.json`](./config/log_config_example.json) into your `./config` directory and remove `_example`**: This configures your logger
+1. **Run `woodwork init`**: This installs the necessary dependencies to run your components
+1. **Run `woodwork`**: This activates the components and initializes a logger
+
+### As A Dependency
+
+When using `woodwork` as a dependency, you will need to build your own logger implementation. Not building your own logger will result in no logs being generated but the application will still run.
+
+1. (Optional) **Create a `./config` directory**: This is where the logging configuration will live.
+1. (Optional) **Copy the [`log_config_example.json`](./config/log_config_example.json) into your `./config` directory and remove `_example`**: This configures your logger
+1. In your file you'd like to utilize `woodwork` in, add `from woodwork import __main__ as m`
+1. See [`dev-main.py`](./dev-main.py) for how to build your logger and configure calling `woodwork`
+
+## Available Arguments
+
+You can pass arguments to `woodwork`. For more details, see `woodwork --help`.
+
+|Argument|Options|Default|Notes|
+|-|-|-|-|
+|`--mode`|`run`, `debug`, `embed`, `clear`|`run`|Debug is deprecated, use Run instead. If using a workflow, you must use `embed` or `clear`.|
+|`--init`|`none`, `isolated`, `all`|`none`||
+|`--workflow`|`none`, `add`, `remove`, `find`|`none`|If specifying a workflow, you must provide a target.|
+|`--target`|String|`""`|Defines the target for the workflow. For add workflows, specify the file path to the workflow. For `remove` workflows, specify the workflow ID. For `find` workflows, specify the search query.|
+
+When calling your script, you can pass argument to the script as long as they do not conflict with `woodworks` arguments.
+
+## Logging
+
+In `log_config.json`, you can set the desired logging levels for stdout and the generated log file. Do this by editing the respective `level` property in the json for the respective handler. Options include the standard logging levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+You can monitor the log file during execution by opening a terminal and entering `tail -f logs/debug_log.log` (or your custom log file name if modified in the `log_config.json`)
 
 ## Examples
 For some examples, consult the examples folder. ENV variables are denotes by a '$', place a .env file in the same directory as the main.ww file and populate it with the necessary variables.
