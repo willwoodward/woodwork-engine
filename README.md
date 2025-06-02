@@ -37,8 +37,6 @@ There are two ways to run `woodwork`: A standalone application, or used as a dep
 ### Standalone Application
 
 1. **Create a main.ww file and write some code**: This file is where component declarations are read from. For some inspiration, consult the examples
-1. **Create a `./config` directory**: This is where the logging configuration will live.
-1. **Copy the [`log_config_example.json`](./config/log_config_example.json) into your `./config` directory and remove `_example`**: This configures your logger
 1. **Run `woodwork init`**: This installs the necessary dependencies to run your components
 1. **Run `woodwork`**: This activates the components and initializes a logger
 
@@ -47,7 +45,7 @@ There are two ways to run `woodwork`: A standalone application, or used as a dep
 When using `woodwork` as a dependency, you will need to build your own logger implementation. Not building your own logger will result in no logs being generated but the application will still run.
 
 1. (Optional) **Create a `./config` directory**: This is where the logging configuration will live.
-1. (Optional) **Copy the [`log_config_example.json`](./config/log_config_example.json) into your `./config` directory and remove `_example`**: This configures your logger
+1. (Optional) **Copy the [`log_config.json`](./woodwork/config/log_config.json) into your `./config` directory**: This configures your logger
 1. In your file you'd like to utilize `woodwork` in, add `from woodwork import __main__ as m`
 1. See [`dev-main.py`](./dev-main.py) for how to build your logger and configure calling `woodwork`
 
