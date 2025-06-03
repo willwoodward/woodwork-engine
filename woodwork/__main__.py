@@ -5,7 +5,7 @@ import pathlib
 import sys
 
 from woodwork import config_parser, dependencies
-from woodwork.errors import WoodworkException
+from woodwork.errors import WoodworkError
 from woodwork.helper_functions import set_globals
 
 from . import globals
@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, WoodworkException):
+    if issubclass(exc_type, WoodworkError):
         print(f"{exc_value}")
     else:
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
@@ -47,7 +47,7 @@ def main(args) -> None:
                 "Mode is set to 'debug'. This mode has been deprecated and will be removed in a future release. "
                 "You can access debug information by setting the logging level to DEBUG in your logging configuration. "
                 "Please use 'run' mode instead. Defaulting to 'run' mode.",
-                )
+            )
         case "embed":
             set_globals(mode="embed", inputs_activated=False)
             log.debug("Mode set to 'embed'. Inputs activated: False")
@@ -60,8 +60,9 @@ def main(args) -> None:
 
     log.debug(
         "Globals set: Mode = %s, Inputs activated = %s",
-        globals.global_config["mode"], globals.global_config["inputs_activated"],
-        )
+        globals.global_config["mode"],
+        globals.global_config["inputs_activated"],
+    )
 
     if args.init != "none":
         options = {}
@@ -78,9 +79,15 @@ def main(args) -> None:
 
     if args.workflow != "none":
         if args.mode in {"run", "debug"}:
-            log.debug("Workflow is set to %s, which isn't compatible with %s Mode.", args.workflow, args.mode)
+            log.debug(
+                "Workflow is set to %s, which isn't compatible with %s Mode.",
+                args.workflow,
+                args.mode,
+            )
             log.warning(
-                "Possible conflict: Mode is %s which conflicts with %s Workflow.", args.mode, args.workflow,
+                "Possible conflict: Mode is %s which conflicts with %s Workflow.",
+                args.mode,
+                args.workflow,
             )  # TODO: @willwoodward Make more specific regarding what `inputs_activated` means
         set_globals(inputs_activated=False)
 

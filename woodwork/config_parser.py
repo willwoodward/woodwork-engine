@@ -5,12 +5,15 @@ import logging
 import os
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
 from woodwork.components.task_master import task_master
-from woodwork.errors import ForbiddenVariableNameError, MissingConfigKeyError
+from woodwork.errors import (
+    ForbiddenVariableNameError,
+    MissingConfigKeyError,
+    ParseError,
+)
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +84,11 @@ def get_required_args(cls):
         for name, param in constructor.parameters.items():
             if (
                 param.default is inspect.Parameter.empty
-                and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+                and param.kind
+                in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
                 and name != "self"
             ):
                 required_args.append(name)
@@ -97,10 +104,14 @@ def init_object(cls, **params):
             required_args.remove(param)
 
     if len(required_args) == 1:
-        raise MissingConfigKeyError(f'Key "{required_args[0]}" missing from {cls.__name__}.')
+        raise MissingConfigKeyError(
+            f'Key "{required_args[0]}" missing from {cls.__name__}.',
+        )
 
     if len(required_args) > 1:
-        raise MissingConfigKeyError(f"Keys {required_args} missing from {cls.__name__}.")
+        raise MissingConfigKeyError(
+            f"Keys {required_args} missing from {cls.__name__}.",
+        )
 
     return cls(**params)
 
@@ -271,7 +282,7 @@ def parse_config(entry: str) -> dict:
         map(
             lambda x: x.replace("\n", "").strip(),
             re.findall(r"\n[^\n]+", entry),
-        )
+        ),
     )
     config_items = [x for x in config_items if x != ""]
 
@@ -321,21 +332,22 @@ def parse_config(entry: str) -> dict:
             for i in range(len(value)):
                 depends_on.append(value[i])
 
-        elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
+        elif (value[0] == '"' and value[-1] == '"') or (
+            value[0] == "'" and value[-1] == "'"
+        ):
             value = value[1:-1:]
 
         # If the value is not a string, it references a variable
         # We replace this variable with a reference to the object
-        else:
-            # Could be a boolean
-            if value.lower() == "true":
-                value = True
-            elif value.lower() == "false":
-                value = False
+        # Could be a boolean
+        elif value.lower() == "true":
+            value = True
+        elif value.lower() == "false":
+            value = False
 
-            else:
-                # Add variable to depends_on
-                depends_on.append(value)
+        else:
+            # Add variable to depends_on
+            depends_on.append(value)
 
         config[key] = value
 
@@ -358,16 +370,27 @@ def parse(config: str) -> dict:
         # Replace these with some fancy regex
         command["variable"] = entry.split("=")[0].strip()
         command["component"] = entry.split("=")[1].split(" ")[1].strip()
-        command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
+        command["type"] = (
+            entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
+        )
 
-        if command["variable"].lower() == "true" or command["variable"].lower() == "false":
+        if (
+            command["variable"].lower() == "true"
+            or command["variable"].lower() == "false"
+        ):
             raise ForbiddenVariableNameError(
-                "A boolean cannot be used as a variable name.", line_number, 1, entry.split("\n", 1)[0]
+                "A boolean cannot be used as a variable name.",
+                line_number,
+                1,
+                entry.split("\n", 1)[0],
             )
 
         if command["variable"] in commands:
             raise ForbiddenVariableNameError(
-                "The same variable name cannot be used.", line_number, 1, entry.split("\n", 1)[0]
+                "The same variable name cannot be used.",
+                line_number,
+                1,
+                entry.split("\n", 1)[0],
             )
 
         # Parse config
@@ -379,7 +402,7 @@ def parse(config: str) -> dict:
     command_checker(commands)
 
     tools = []
-    for name in commands.keys():
+    for name in commands:
         dependency_resolver(commands, commands[name])
         tools.append(commands[name]["object"])
 
@@ -390,7 +413,7 @@ def parse(config: str) -> dict:
 
 def main_function():
     current_directory = os.getcwd()
-    with open(current_directory + "/main.ww", "r") as f:
+    with open(current_directory + "/main.ww") as f:
         lines = f.read()
         parse(lines)
 
@@ -418,7 +441,6 @@ def validate_action_plan(workflow: dict[str, any], tools: list):
 
         if action["tool"] not in tool_names:
             raise SyntaxError("Tool not found.")
-    return
 
 
 def add_action_plan(file_path: str):
@@ -431,7 +453,6 @@ def add_action_plan(file_path: str):
                 validate_action_plan(plan, task_m._tools)
                 id = tool._cache_actions(plan)
                 print(f"Successfully added a new workflow with ID: {id}")
-    return
 
 
 def delete_action_plan(id: str):
@@ -445,7 +466,6 @@ def delete_action_plan(id: str):
                 DETACH DELETE m""")
 
     print(f"Successfully removed a new workflow with ID: {id}")
-    return
 
 
 def find_action_plan(query: str):
@@ -461,7 +481,6 @@ def find_action_plan(query: str):
                 result = similar_prompts[i]
 
                 print(f"{result['value']} {result['nodeID']}")
-    return
 
 
 def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
@@ -497,15 +516,17 @@ def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
         help=(
             "Initialize Woodwork with options. Use 'isolated' to create an isolated environment,"
             "'all' to initialize all components. (default: none)"
-            ),
+        ),
     )
 
     parser.add_argument(
         "--workflow",
         choices=["none", "add", "remove", "find"],
         default="none",
-        help=("Manage workflows. Use 'add' to add a workflow, 'remove' to remove a workflow, "
-              "'find' to search for a workflow. (default: none)"),
+        help=(
+            "Manage workflows. Use 'add' to add a workflow, 'remove' to remove a workflow, "
+            "'find' to search for a workflow. (default: none)"
+        ),
     )
 
     parser.add_argument(
@@ -521,22 +542,11 @@ def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
 
     parser.add_argument(
         "--logConfig",
-        default = None,
-        help = (
-            "A custom path to a JSON logging configuration file."
-        ),
+        default=None,
+        help=("A custom path to a JSON logging configuration file."),
     )
 
     return parser.parse_args(args)
-
-
-@dataclass
-class ParseError(Exception):
-    """
-    Custom exception for handling parsing errors.
-    """
-
-    message: str
 
 
 def check_parse_conflicts(args: argparse.Namespace) -> None:
