@@ -53,8 +53,6 @@ class TestCLIArgs(unittest.TestCase):
         with pytest.raises(config_parser.ParseError):
             config_parser.check_parse_conflicts(args)
 
-
-
     def test_valid_add_workflow_target(self):
         args = parse_args(["--workflow", "add", "--target", "/tmp/foo.yaml"])
         config_parser.check_parse_conflicts(args)
