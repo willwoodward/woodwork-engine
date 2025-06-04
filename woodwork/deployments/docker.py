@@ -22,7 +22,7 @@ class Docker:
         if volume_location is not None:
             self.container_args["volumes"] = {
                 os.path.abspath(self.path): {
-                    "bind": f"/{self.path.split("/")[-1]}",
+                    "bind": f"/{self.path.split('/')[-1]}",
                     "mode": "rw",
                 }
             }

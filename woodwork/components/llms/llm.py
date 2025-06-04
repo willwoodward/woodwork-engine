@@ -29,7 +29,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
         # Defining the system prompt
         if self._memory:
             system_prompt = (
-                "You are a helpful assistant, answer the provided question, " "In 3 sentences or less. " "{memory}"
+                "You are a helpful assistant, answer the provided question, In 3 sentences or less. {memory}"
             ).format(memory=short_term_memory)
         else:
             system_prompt = "You are a helpful assistant, answer the provided question, In 3 sentences or less. "

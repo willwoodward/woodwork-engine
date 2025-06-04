@@ -7,6 +7,8 @@ from woodwork.helper_functions import format_kwargs
 from woodwork.components.apis.api import api
 
 log = logging.getLogger(__name__)
+
+
 class functions(api):
     def __init__(self, path: str, **config):
         format_kwargs(config, path=path, type="functions")

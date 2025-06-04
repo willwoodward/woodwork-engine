@@ -9,6 +9,7 @@ from woodwork.helper_functions import format_kwargs
 
 log = logging.getLogger(__name__)
 
+
 class llm(decomposer):
     def __init__(self, api_key: str, **config):
         format_kwargs(config, api_key=api_key, type="llm")

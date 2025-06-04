@@ -1,4 +1,4 @@
-#from woodwork.dependencies import activate_virtual_environment
+# from woodwork.dependencies import activate_virtual_environment
 from woodwork.config_parser import parse
 from woodwork.errors import ForbiddenVariableNameError
 
@@ -6,9 +6,10 @@ import pytest
 import os
 from dotenv import load_dotenv
 
+
 @pytest.skip("Skipping...revisit test validity.", allow_module_level=True)
 
-#activate_virtual_environment()
+# activate_virtual_environment()
 
 
 # Testing component name declaration
@@ -108,6 +109,7 @@ def test_string_values():
     components = parse(config)
     assert components["name1"]["config"] == {"key1": "value1"}
 
+
 @pytest.mark.skip("Skipping...revisit test validity.")
 def test_variable_values():
     from woodwork.components.llms.openai import openai
@@ -133,6 +135,7 @@ def test_variable_values():
 #     """
 #     components = parse(config)
 #     assert components["name1"]["config"] == {"key1": ["value1", "value2", "value3"]}
+
 
 @pytest.mark.skip("Skipping...revisit test validity.")
 def test_list_variable_values():
@@ -243,6 +246,7 @@ def test_nested_special_values():
         "key3": "value3",
     }
 
+
 @pytest.mark.skip("Skipping...revisit test validity.")
 def test_nested_variable_references():
     from woodwork.components.llms.openai import openai
@@ -262,6 +266,7 @@ def test_nested_variable_references():
     """
     components = parse(config)
     assert isinstance(components["name1"]["config"]["key1"]["subkey1"]["subkey2"], openai)
+
 
 @pytest.mark.skip("Skipping...revisit test validity. Typically don't want to test environment variables in unit tests.")
 def test_environment_values():

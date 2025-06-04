@@ -40,7 +40,7 @@ class task_master(component):
 
             # Add the result to the variables
             variables[instruction["output"]] = result
-            prev_instructon = result # TODO: @willwoodward fix spelling of variable if necessary
+            prev_instructon = result  # TODO: @willwoodward fix spelling of variable if necessary
             log.debug(f"instruction = {instruction}")
             log.debug(f"result = {result}")
 

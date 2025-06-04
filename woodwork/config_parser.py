@@ -332,9 +332,7 @@ def parse_config(entry: str) -> dict:
             for i in range(len(value)):
                 depends_on.append(value[i])
 
-        elif (value[0] == '"' and value[-1] == '"') or (
-            value[0] == "'" and value[-1] == "'"
-        ):
+        elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
             value = value[1:-1:]
 
         # If the value is not a string, it references a variable
@@ -370,14 +368,9 @@ def parse(config: str) -> dict:
         # Replace these with some fancy regex
         command["variable"] = entry.split("=")[0].strip()
         command["component"] = entry.split("=")[1].split(" ")[1].strip()
-        command["type"] = (
-            entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
-        )
+        command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
 
-        if (
-            command["variable"].lower() == "true"
-            or command["variable"].lower() == "false"
-        ):
+        if command["variable"].lower() == "true" or command["variable"].lower() == "false":
             raise ForbiddenVariableNameError(
                 "A boolean cannot be used as a variable name.",
                 line_number,

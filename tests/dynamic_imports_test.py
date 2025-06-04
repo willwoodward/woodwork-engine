@@ -10,6 +10,7 @@ def test_venv_setup():
     except:
         assert False
 
+
 @pytest.mark.skip("Skipping...revisit test validity.")
 def test_all_requirements_present():
     activate_virtual_environment()

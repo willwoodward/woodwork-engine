@@ -8,6 +8,7 @@ from woodwork.helper_functions import format_kwargs
 
 log = logging.getLogger(__name__)
 
+
 class web(api):
     def __init__(self, url: str, **config):
         format_kwargs(config, url=url, type="web")
