@@ -8,6 +8,7 @@ from woodwork.helper_functions import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
+
 class decomposer(component, ABC):
     def __init__(self, tools, output, **config):
         format_kwargs(config, tools=tools, output=output, component="decomposer")

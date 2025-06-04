@@ -49,6 +49,12 @@ When using `woodwork` as a dependency, you will need to build your own logger im
 1. In your file you'd like to utilize `woodwork` in, add `from woodwork import __main__ as m`
 1. See [`dev-main.py`](./dev-main.py) for how to build your logger and configure calling `woodwork`
 
+## Developer Setup
+If you are interested in contributing, the following steps are used to activate a developer environment.
+
+1. Install `pre-commit` if needed via `pip install pre-commit`
+1. Run `pre-commit install [--hook-type pre-push]` to run linting and formatting before commiting or pushing
+
 ## Available Arguments
 
 You can pass arguments to `woodwork`. For more details, see `woodwork --help`.
