@@ -48,8 +48,11 @@ where = ["."]
 include = ["woodwork*"]
 
 [tool.setuptools.package-data]
-"*" = ["requirements/**/*.txt"]
-woodwork = ["config/log_config.json"]
+"*" = [
+    "requirements/**/*.txt",
+    "config/log_config.json",
+    "config/.env.example",
+    ]
 
 [tool.ruff]
 line-length = 120

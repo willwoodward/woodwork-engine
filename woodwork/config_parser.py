@@ -389,7 +389,7 @@ def parse(config: str) -> dict:
         # Parse config
         command["config"], command["depends_on"] = parse_config(entry)
 
-        log.debug("[COMMAND]", command)
+        log.debug("[COMMAND] %s", command)
         commands[command["variable"]] = command
 
     command_checker(commands)

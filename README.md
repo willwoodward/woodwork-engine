@@ -32,7 +32,13 @@ A [roadmap](https://github.com/willwoodward/woodwork-meta/blob/main/ROADMAP.md) 
 
 ## Usage
 
-There are two ways to run `woodwork`: A standalone application, or used as a dependency.
+1. Begin by duplicating the [`.env.example`](./woodwork/config/) file and placing it in your project's root directory
+1. Rename the file to `.env` (ensure this is part of your project's `.gitignore` so that it isn't committed)
+1. Depending on the `.ww` configuration file, populate the `.env` file with your corresponding keys
+
+See the `.env.example` file for further details.
+
+Once you've configured your `.ww` config file and your `.env` file, there are two ways to run `woodwork`: A standalone application, or used as a dependency.
 
 ### Standalone Application
 
