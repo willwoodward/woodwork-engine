@@ -45,3 +45,12 @@ class ParseError(WoodworkError):
     def __init__(self, message, line=None, column=None, line_content=None):
         super().__init__(message, line, column, line_content)
         self.message = f"Parse error: {message}"
+
+class RuntimeError(WoodworkError):
+    """
+    Custom exception for handling runtime errors.
+    """
+
+    def __init__(self, message, line=None, column=None, line_content=None):
+        super().__init__(message, line, column, line_content)
+        self.message = f"Runtime error: {message}"

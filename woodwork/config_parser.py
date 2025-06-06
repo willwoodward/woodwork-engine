@@ -155,6 +155,10 @@ def create_object(command):
             from woodwork.components.llms.openai import openai
 
             return init_object(openai, **config)
+        if type == "ollama":
+            from woodwork.components.llms.ollama import ollama
+
+            return init_object(ollama, **config)
 
     if component == "input":
         if type == "keyword_voice":

@@ -1,11 +1,6 @@
-input = input push_to_talk {
-    api_key: $OPENAI_API_KEY
+input = input command_line {
     to: llm
 }
 
-output = output voice {}
-
-llm = llm openai {
-    api_key: $OPENAI_API_KEY
-    to: output
+llm = llm ollama {
 }
