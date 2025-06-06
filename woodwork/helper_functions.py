@@ -1,7 +1,6 @@
 import importlib
 import os
 import logging
-from deprecated import deprecated
 import tomli  # tomli since we support P3.10 and tomllib is not available until P3.11
 
 from woodwork.globals import global_config as config
