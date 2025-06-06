@@ -3,4 +3,5 @@ input = input command_line {
 }
 
 llm = llm ollama {
+    model: "mistral:7b-instruct-q4_0"
 }

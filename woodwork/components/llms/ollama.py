@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 class ollama(llm):
-    def __init__(self, model="mistral:7b-instruct-q4_0", **config):
+    def __init__(self, model, **config):
         format_kwargs(config, model=model, type="ollama")
         log.debug("Establishing connection with model...")
 
