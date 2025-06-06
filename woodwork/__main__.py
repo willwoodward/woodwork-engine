@@ -4,8 +4,9 @@ import logging.config
 import pathlib
 import sys
 
-from woodwork import config_parser, dependencies
-from woodwork.errors import WoodworkError
+from woodwork import config_parser, dependencies, argument_parser
+from woodwork import helper_functions
+from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
 
 from . import globals
@@ -28,9 +29,16 @@ def main(args) -> None:
 
     try:
         # Confirm that there are no known conflicts in the arguments before doing anything else
-        config_parser.check_parse_conflicts(args)
-    except config_parser.ParseError as e:
+        argument_parser.check_parse_conflicts(args)
+    except ParseError as e:
         log.critical("ParseError: %s", e)
+        return
+
+    if args.version:
+        version_from_toml = helper_functions.get_version_from_pyproject(
+            str(pathlib.Path(__file__).parent.parent / "pyproject.toml")
+        )
+        print(f"Woodwork version: {version_from_toml}")
         return
 
     log.debug("Arguments: %s", args)
@@ -132,7 +140,7 @@ def run_as_standalone_app() -> None:
     Do not use this function if you have configured your own logger. Simply call `main()` directly.
     """
 
-    args = config_parser.parse_args()
+    args = argument_parser.parse_args()
 
     if args.logConfig is not None:
         # If a custom logging configuration file is specified, use it

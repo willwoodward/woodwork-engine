@@ -10,14 +10,15 @@ readme = "README.md"
 authors = [{ name = "Will Woodward" }]
 requires-python = ">=3.10"
 dependencies = [
-    "python-dotenv",
-    "colorama",
-    "idna",
-    "distro",
-    "requests",
-    "pyyaml",
-    "jsonpointer",
-    "deprecated",
+    "colorama>=0.4.6",
+    "deprecated>=1.2.18",
+    "distro>=1.9.0",
+    "idna>=3.10",
+    "jsonpointer>=3.0.0",
+    "python-dotenv>=1.1.0",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.3",
+    "tomli>=2.2.1",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.10",
@@ -28,13 +29,13 @@ classifiers = [
 
 [project.optional-dependencies]
 all = [
-    "langchain",
-    "chromadb",
-    "langchain_chroma",
-    "langchain_community",
-    "sentence-transformers",
-    "pytest",
-    "ruff",
+    "chromadb>=1.0.12",
+    "langchain>=0.3.25",
+    "langchain-chroma>=0.2.4",
+    "langchain-community>=0.3.24",
+    "pytest>=8.3.5",
+    "ruff>=0.11.12",
+    "sentence-transformers>=4.1.0",
 ]
 
 [project.scripts]
