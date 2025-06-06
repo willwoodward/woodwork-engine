@@ -2,6 +2,7 @@ import importlib
 import os
 import logging
 from deprecated import deprecated
+import tomli  # tomli since we support P3.10 and tomllib is not available until P3.11
 
 from woodwork.globals import global_config as config
 
@@ -82,3 +83,13 @@ def format_kwargs(kwarg_dict, **kwargs) -> None:
     for kwarg in kwargs:
         kwarg_dict[kwarg] = kwargs[kwarg]
     return
+
+
+def get_version_from_pyproject(pyproject_path="pyproject.toml") -> str:
+    """
+    Get the version from the pyproject.toml file.
+    """
+    with open(pyproject_path, "rb") as f:
+        data = tomli.load(f)
+
+    return data["project"]["version"]
