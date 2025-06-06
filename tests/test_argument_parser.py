@@ -2,8 +2,8 @@ import unittest
 
 import pytest
 
-from woodwork import config_parser
-from woodwork.config_parser import parse_args
+from woodwork.errors import ParseError
+from woodwork.argument_parser import parse_args, check_parse_conflicts
 
 
 class TestCLIArgs(unittest.TestCase):
@@ -38,23 +38,23 @@ class TestCLIArgs(unittest.TestCase):
     def test_missing_add_workflow_target(self):
         args = parse_args(["--workflow", "add"])
 
-        with pytest.raises(config_parser.ParseError):
-            config_parser.check_parse_conflicts(args)
+        with pytest.raises(ParseError):
+            check_parse_conflicts(args)
 
     def test_missing_remove_workflow_target(self):
         args = parse_args(["--workflow", "remove"])
 
-        with pytest.raises(config_parser.ParseError):
-            config_parser.check_parse_conflicts(args)
+        with pytest.raises(ParseError):
+            check_parse_conflicts(args)
 
     def test_missing_find_workflow_target(self):
         args = parse_args(["--workflow", "find"])
 
-        with pytest.raises(config_parser.ParseError):
-            config_parser.check_parse_conflicts(args)
+        with pytest.raises(ParseError):
+            check_parse_conflicts(args)
 
     def test_valid_add_workflow_target(self):
         args = parse_args(["--workflow", "add", "--target", "/tmp/foo.yaml"])
-        config_parser.check_parse_conflicts(args)
+        check_parse_conflicts(args)
         assert args.target == "/tmp/foo.yaml"
         assert args.workflow == "add"
