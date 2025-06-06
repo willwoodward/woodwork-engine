@@ -14,16 +14,6 @@ def set_globals(**kwargs) -> None:
         config[key] = value
 
 
-# If you ever support >=3.13 at minimum, you can switch this for the built in @deprecated decorator from warnings.
-# This will give you intellisense anytime someone uses the function. @dakotatokad think's they've got all
-# usages of this function, but will leave it in as deprecated just in case its called somewhere they didn't find.
-# Ideally, this function should just be removed when all usages are updated to use the logger directly.
-@deprecated(reason="Use log.debug() instead.", category=DeprecationWarning, extra_stacklevel=2)
-def print_debug(*args: object) -> None:
-    if config["mode"] == "debug":
-        print(*args)
-
-
 def import_all_classes(package_name: str) -> bool:
     # Get the package path
     package = importlib.import_module(package_name)
