@@ -174,4 +174,7 @@ def init(options={"isolated": False, "all": False}):
         # Clean up temporary requirements file
         if os.path.exists(temp_requirements_file):
             os.remove(temp_requirements_file)
+    
+    # Now run init() methods on all components
+    
     print("Initialization complete.")

@@ -4,23 +4,18 @@ import subprocess
 import shutil
 
 from woodwork.components.llms.llm import llm
-from woodwork.helper_functions import format_kwargs, get_optional
 from woodwork.errors import RuntimeError
+from woodwork.helper_functions import format_kwargs, get_optional
+from woodwork.interfaces.intializable import initializable
 
 log = logging.getLogger(__name__)
 
 
-class ollama(llm):
+class ollama(llm, initializable):
     def __init__(self, model, **config):
         format_kwargs(config, model=model, type="ollama")
         log.debug("Establishing connection with model...")
 
-        if not self.is_ollama_installed():
-            raise RuntimeError(
-                "Ollama is not installed. Please install it from https://ollama.com."
-            )
-        
-        self.pull_ollama_model(model)
         self._llm_value = Ollama(
             model=model,
         )
@@ -40,11 +35,19 @@ class ollama(llm):
     @property
     def retriever(self):
         return self._retriever
+    
+    def init(self, config: dict) -> None:
+        """Initialize the Ollama model."""
+        if not self._is_ollama_installed():
+            raise RuntimeError("Ollama is not installed. Please install it from https://ollama.com.")
 
-    def is_ollama_installed(self) -> bool:
+        # Pulling the model, does not redownload if already present
+        self._pull_ollama_model(config.get("model"))
+
+    def _is_ollama_installed(self) -> bool:
         return shutil.which("ollama") is not None
 
-    def pull_ollama_model(self, model: str) -> None:
+    def _pull_ollama_model(self, model: str) -> None:
         """Pull the model using `ollama pull`."""
         try:
             log.debug(f"Pulling model: {model}")

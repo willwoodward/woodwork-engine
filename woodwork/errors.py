@@ -46,6 +46,7 @@ class ParseError(WoodworkError):
         super().__init__(message, line, column, line_content)
         self.message = f"Parse error: {message}"
 
+
 class RuntimeError(WoodworkError):
     """
     Custom exception for handling runtime errors.
