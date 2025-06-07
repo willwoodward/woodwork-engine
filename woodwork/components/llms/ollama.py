@@ -1,5 +1,5 @@
 import logging
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM as Ollama
 import subprocess
 import shutil
 
@@ -16,6 +16,7 @@ class ollama(llm, initializable):
         format_kwargs(config, model=model, type="ollama")
         log.debug("Establishing connection with model...")
 
+        self.init(config)
         self._llm_value = Ollama(
             model=model,
         )
@@ -35,7 +36,7 @@ class ollama(llm, initializable):
     @property
     def retriever(self):
         return self._retriever
-    
+
     def init(self, config: dict) -> None:
         """Initialize the Ollama model."""
         if not self._is_ollama_installed():
