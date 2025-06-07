@@ -155,6 +155,10 @@ def create_object(command):
             from woodwork.components.llms.openai import openai
 
             return init_object(openai, **config)
+        if type == "ollama":
+            from woodwork.components.llms.ollama import ollama
+
+            return init_object(ollama, **config)
 
     if component == "input":
         if type == "keyword_voice":
@@ -308,8 +312,8 @@ def parse_config(entry: str) -> dict:
     # Make to a set
     depends_on = []
     for item in config_items:
-        key = item.split(":")[0].strip()
-        value = item.split(":")[1].strip()
+        key = item.split(":", 1)[0].strip()
+        value = item.split(":", 1)[1].strip()
 
         # Dealing with nested dictionaries:
         if value[0] == "{":

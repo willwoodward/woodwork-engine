@@ -1,11 +1,10 @@
-input = input push_to_talk {
-    api_key: $OPENAI_API_KEY
+input = input command_line {
     to: llm
 }
 
-output = output voice {}
+mem = memory short_term {}
 
-llm = llm openai {
-    api_key: $OPENAI_API_KEY
-    to: output
+llm = llm ollama {
+    model: "mistral:7b-instruct-q4_0"
+    memory: mem
 }
