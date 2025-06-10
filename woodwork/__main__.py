@@ -8,6 +8,8 @@ from woodwork import config_parser, dependencies, argument_parser
 from woodwork import helper_functions
 from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
+from woodwork.interfaces.intializable import Initializable
+from woodwork.interfaces.startable import Startable
 
 from . import globals
 
@@ -72,8 +74,8 @@ def main(args) -> None:
         globals.global_config["inputs_activated"],
     )
 
-    if args.init != "none":
-        options = {}
+    if args.init is not None:
+        options = {"isolated": False, "all": False}
         if args.init == "isolated":
             options["isolated"] = True
             log.debug("Initialization mode set to 'isolated'.")
@@ -82,8 +84,14 @@ def main(args) -> None:
             options["all"] = True
             log.debug("Initialization mode set to 'all'.")
         dependencies.init(options)
-    else:
-        dependencies.init()
+
+        # Run the initialization methods
+        set_globals(inputs_activated=False)
+        config_parser.main_function()
+        for component in config_parser.task_m._tools:
+            if isinstance(component, Initializable):
+                component.init()
+        return
 
     if args.workflow != "none":
         if args.mode in {"run", "debug"}:
@@ -103,6 +111,12 @@ def main(args) -> None:
     dependencies.activate_virtual_environment()
 
     config_parser.main_function()
+
+    # Start all components that implement the Startable interface
+    for component in config_parser.task_m._tools:
+        if isinstance(component, Startable):
+            component.start()
+            log.debug("Started component: %s", component.__class__.__name__)
 
     # Clean up after execution
     match args.mode:

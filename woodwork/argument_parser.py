@@ -32,11 +32,14 @@ def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--init",
         type=str,
+        nargs="?",
         choices=["none", "isolated", "all"],
-        default="none",
+        const="none",
+        default=None,
         help=(
             "Initialize Woodwork with options. Use 'isolated' to create an isolated environment,"
-            "'all' to initialize all components. (default: none)"
+            "'all' to initialize all components. Default is none when no argument is provided. "
+            "If no argument is provided, initialisation will not be carried out. "
         ),
     )
 
