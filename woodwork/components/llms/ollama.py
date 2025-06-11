@@ -6,8 +6,7 @@ import shutil
 from woodwork.components.llms.llm import llm
 from woodwork.errors import RuntimeError
 from woodwork.helper_functions import format_kwargs, get_optional
-from woodwork.interfaces.intializable import Initializable
-from woodwork.interfaces.startable import Startable
+from woodwork.interfaces import Initializable, Startable
 
 log = logging.getLogger(__name__)
 
