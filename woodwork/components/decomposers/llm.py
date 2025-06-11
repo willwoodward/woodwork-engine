@@ -3,6 +3,7 @@ import logging
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from typing import Any
 
 from woodwork.components.decomposers.decomposer import decomposer
 from woodwork.helper_functions import format_kwargs
@@ -53,7 +54,7 @@ class llm(decomposer):
             log.debug(x[start_index : end_index + 1 :])
             return x
 
-    def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, any]:
+    def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, Any]:
         """Given a prompt and the inputs to be extracted, return the input dictionary."""
         system_prompt = (
             "Given the following prompt from the user, and a list of inputs:"
@@ -80,7 +81,7 @@ class llm(decomposer):
         result = self.__clean(result)
         return result
 
-    def _generate_workflow(self, query: str, partial_workflow: dict[str, any]):
+    def _generate_workflow(self, query: str, partial_workflow: dict[str, Any]):
         input_dict = self._find_inputs(query, partial_workflow["inputs"])
         workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
         return workflow

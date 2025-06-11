@@ -1,3 +1,6 @@
+from typing import Any
+
+
 def generate_random_word():
     """A function that returns a string of random characters excluding whitespaces."""
 
@@ -10,7 +13,7 @@ def word_length(word: str):
     return len(word)
 
 
-def sort_list(list: list[any]):
+def sort_list(list: list[Any]):
     """A function that takes a list and returns the sorted list."""
 
     return sorted(list)

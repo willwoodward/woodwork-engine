@@ -44,7 +44,7 @@ class knowledge_base(component, tool_interface, ABC):
 
     @property
     @abstractmethod
-    def retriever():
+    def retriever(self):
         # Each knowledge base should come with a default retriever. For use with LLMs.
         pass
 

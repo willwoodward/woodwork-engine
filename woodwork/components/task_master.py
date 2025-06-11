@@ -1,5 +1,7 @@
 import logging
 
+from typing import Any
+
 from woodwork.components.component import component
 from woodwork.helper_functions import format_kwargs
 
@@ -14,7 +16,7 @@ class task_master(component):
     def add_tools(self, tools):
         self._tools = tools
 
-    def execute(self, workflow: dict[str, any]):
+    def execute(self, workflow: dict[str, Any]):
         log.debug("Executing instructions...")
         variables = {}
         prev_instructon = ""

@@ -4,13 +4,19 @@ import os
 import time
 
 import docker
+from docker.errors import NotFound
 
 log = logging.getLogger(__name__)
 
 
 class Docker:
     def __init__(
-        self, image_name: str, container_name: str, dockerfile: str, container_args: dict, volume_location: str = None
+        self,
+        image_name: str,
+        container_name: str,
+        dockerfile: str,
+        container_args: dict,
+        volume_location: str | None = None,
     ):
         self.image_name = image_name
         self.container_name = container_name
@@ -57,7 +63,7 @@ class Docker:
             self.container = container
             time.sleep(10)
             self.wait_for_container(container)
-        except docker.errors.NotFound:
+        except NotFound:
             log.debug(f"Container '{self.container_name}' not found. Creating a new one...")
             container = self.docker_client.containers.run(
                 self.image_name,

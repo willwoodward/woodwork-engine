@@ -1,6 +1,8 @@
 import json
 import logging
+
 from abc import ABC, abstractmethod
+from typing import Any
 
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
@@ -29,13 +31,11 @@ class decomposer(component, ABC):
                     exit()
 
                 self._cache = neo4j(
-                    **{
-                        "uri": "bolt://localhost:7687",
-                        "user": "neo4j",
-                        "password": "testpassword",
-                        "api_key": api_key,
-                        "name": "decomposer_cache",
-                    },
+                    uri="bolt://localhost:7687",
+                    user="neo4j",
+                    password="testpassword",
+                    api_key=api_key,
+                    name="decomposer_cache",
                 )
                 self._cache.init_vector_index("embeddings", "Prompt", "embedding")
         else:
@@ -50,7 +50,7 @@ class decomposer(component, ABC):
         """Given a query, return the JSON array denoting the actions to take, passed to the task master."""
         pass
 
-    def _cache_actions(self, workflow: dict[str, any]):
+    def _cache_actions(self, workflow: dict[str, Any]):
         """Add the actions to the graph if they aren't already present, as a chain."""
         prompt = workflow["name"]
         workflow_inputs = str(list(workflow["inputs"].keys()))
