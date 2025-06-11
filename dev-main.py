@@ -5,8 +5,6 @@
 
 import logging
 
-from woodwork import __main__ as m
-
 
 import json
 import logging.config
@@ -38,4 +36,4 @@ def create_custom_logger(config_path: str) -> None:
 
 if __name__ == "__main__":
     create_custom_logger("./config/log_config.json")
-    m.main()
+    # m.main()

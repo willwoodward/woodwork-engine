@@ -47,13 +47,13 @@ class push_to_talk(inputs):
         vad = webrtcvad.Vad(aggressiveness)
         frame_duration = 30  # ms
         frame_size = int(fs * frame_duration / 1000)  # number of samples per frame
-        silence_duration = 0
+        silence_duration = [0]
         recorded_frames = []
 
         print("Listening... Speak now.")
 
         def callback(indata, frames, time, status):
-            nonlocal silence_duration, recorded_frames
+            nonlocal recorded_frames
 
             if status:
                 print(status)
@@ -65,13 +65,14 @@ class push_to_talk(inputs):
             recorded_frames.append(pcm_bytes)
 
             if is_speech:
-                silence_duration = 0
+                silence_duration[0] = 0
             else:
-                silence_duration += frame_duration / 1000
+                silence_duration[0] += frame_duration / 1000
 
         with sd.InputStream(samplerate=fs, channels=1, dtype="int16", blocksize=frame_size, callback=callback):
             while (
-                silence_duration < silence_threshold and (len(recorded_frames) * frame_duration / 1000) < max_duration
+                silence_duration[0] < silence_threshold
+                and (len(recorded_frames) * frame_duration / 1000) < max_duration
             ):
                 sd.sleep(frame_duration)
 

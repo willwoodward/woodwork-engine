@@ -68,7 +68,7 @@ class chroma(vector_database):
             query(query, n=3) - returns the n (defaults to 3) most similar text embeddings to the supplied query string 
         """
 
-    def input(self, function_name, inputs) -> str:
+    def input(self, function_name, inputs) -> str | None:
         func = None
         if function_name == "query":
             func = self.query

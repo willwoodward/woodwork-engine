@@ -41,7 +41,7 @@ class text_file(knowledge_base):
             write(content) - replaces the text file's contents with content.
         """
 
-    def input(self, function_name, inputs) -> str:
+    def input(self, function_name, inputs) -> str | None:
         func = None
         if function_name == "query":
             func = self.query

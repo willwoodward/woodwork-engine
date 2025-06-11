@@ -1,7 +1,7 @@
 import ast
-import importlib
 import os
 import logging
+from importlib import util
 
 from woodwork.helper_functions import format_kwargs
 from woodwork.components.apis.api import api
@@ -79,9 +79,11 @@ class functions(api):
         module_path = os.path.join(os.getcwd(), f"{self._path}")
 
         log.debug(f"[MODULE_PATH] {module_path}")
-        spec = importlib.util.spec_from_file_location(self._path, module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        spec = util.spec_from_file_location(self._path, module_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load module from {module_path}")
+        module = util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # ty:ignore[possibly-unbound-attribute]
         return module
 
     def input(self, function_name: str, inputs: dict):

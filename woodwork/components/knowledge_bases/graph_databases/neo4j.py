@@ -2,6 +2,7 @@ import logging
 
 from neo4j import GraphDatabase
 from openai import OpenAI
+from typing import Callable
 
 from woodwork.components.knowledge_bases.graph_databases.graph_database import (
     graph_database,
@@ -124,12 +125,14 @@ class neo4j(graph_database):
             run(query): runs a cypher query on the graph.
         """
 
-    def input(self, function_name: str, inputs: dict) -> str:
-        func = None
+    def input(self, function_name: str, inputs: dict) -> str | None:
+        func: Callable | None = None
 
         if function_name == "similarity_search":
             func = self.similarity_search
         if function_name == "run":
             func = self.run
+        if func is None:
+            return None
 
         return str(func(**inputs))

@@ -5,6 +5,7 @@ import os
 import re
 
 from dotenv import load_dotenv
+from typing import Any
 
 from woodwork.components.task_master import task_master
 from woodwork.errors import (
@@ -278,7 +279,7 @@ def extract_nested_dict(key: str, text: str) -> str:
     return ""  # Return empty string if no complete dictionary is found
 
 
-def parse_config(entry: str) -> dict:
+def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
     config_items = list(
         map(
             lambda x: x.replace("\n", "").strip(),
@@ -428,7 +429,7 @@ def clear_all():
             tool.clear_all()
 
 
-def validate_action_plan(workflow: dict[str, any], tools: list):
+def validate_action_plan(workflow: dict[str, Any], tools: list):
     # Check tools exist
     for action in workflow["plan"]:
         tool_names = list(map(lambda x: x.name, tools))
