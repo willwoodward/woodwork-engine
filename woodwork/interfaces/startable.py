@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class Initializable(ABC):
+class Startable(ABC):
     @abstractmethod
     def init(self, config: dict):
         pass
