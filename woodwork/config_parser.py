@@ -12,6 +12,7 @@ from woodwork.errors import (
     ForbiddenVariableNameError,
     MissingConfigKeyError,
 )
+from woodwork.components.component import component
 
 log = logging.getLogger(__name__)
 
@@ -69,15 +70,16 @@ def dependency_resolver(commands, component):
 
 def get_required_args(cls):
     """
-    Gets the required arguments for the class constructor and all parent classes,
-    excluding the class named 'component'.
+    Gets the required arguments for the class constructor and all parent classes.
     """
     required_args = []
 
-    # Traverse the MRO and skip the class named 'Component'
+    # Traverse the MRO
     for base in inspect.getmro(cls):
         if base.__name__ == "component":
             continue  # Skip 'Component' class
+        elif base.__name__ == "Infrastructure":
+            continue  # Skip 'Insfrastructure' class
         constructor = inspect.signature(base.__init__)
         for name, param in constructor.parameters.items():
             if (
@@ -208,6 +210,13 @@ def create_object(command):
             from woodwork.components.outputs.voice import voice
 
             return init_object(voice, **config)
+
+    # Now handle infrastructure components
+    if component == "deployment":
+        if type == "docker":
+            from woodwork.infra.deployments.docker import DockerDeployment
+
+            return init_object(DockerDeployment, **config)
 
 
 def command_checker(commands):
@@ -399,7 +408,8 @@ def parse(config: str) -> dict:
     tools = []
     for name in commands:
         dependency_resolver(commands, commands[name])
-        tools.append(commands[name]["object"])
+        if isinstance(commands[name]["object"], component):
+            tools.append(commands[name]["object"])
 
     task_m.add_tools(tools)
 

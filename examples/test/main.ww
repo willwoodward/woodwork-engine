@@ -2,9 +2,8 @@ input = input command_line {
     to: llm
 }
 
-mem = memory short_term {}
-
 llm = llm ollama {
     model: "mistral:7b-instruct-q4_0"
-    memory: mem
 }
+
+container1 = deployment docker {}
