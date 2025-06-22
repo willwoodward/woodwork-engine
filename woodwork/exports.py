@@ -9,7 +9,7 @@ from woodwork.config_parser import main_function
 main_function()
 registry = get_registry()
 
-llm: openai | None = registry.get('llm')
-kb: chroma | None = registry.get('kb')
+llm: openai = registry.get("llm")
+kb: chroma = registry.get("kb")
 
-__all__ = ['llm', 'kb']
+__all__ = ["llm", "kb"]

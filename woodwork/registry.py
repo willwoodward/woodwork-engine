@@ -1,5 +1,6 @@
 from woodwork.components.component import component
 
+
 class Registry:
     """
     A simple registry to hold references to various components.
@@ -21,7 +22,9 @@ class Registry:
         """Check if a component is registered under the given name."""
         return name in self._registry
 
+
 _registry = None
+
 
 def get_registry():
     global _registry
