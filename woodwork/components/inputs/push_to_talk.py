@@ -1,8 +1,6 @@
 import logging
 import tempfile
-import time
 import wave
-from threading import Thread
 
 import numpy as np
 import openai

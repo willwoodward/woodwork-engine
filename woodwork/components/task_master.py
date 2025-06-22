@@ -84,7 +84,7 @@ class task_master(component):
                 while hasattr(obj, "_output") and obj._output is not None:
                     x = obj._output.input(x)
                     obj = obj._output
-                
+
                 # If the last object is not an output, print the result
                 if not isinstance(obj, outputs):
                     print(x)

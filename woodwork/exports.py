@@ -9,7 +9,7 @@ from woodwork.config_parser import main_function
 main_function()
 registry = get_registry()
 
-llm: openai = registry.get('llm')
-inp: push_to_talk = registry.get('inp')
+llm: openai = registry.get("llm")
+inp: push_to_talk = registry.get("inp")
 
-__all__ = ['llm', 'inp']
+__all__ = ["llm", "inp"]

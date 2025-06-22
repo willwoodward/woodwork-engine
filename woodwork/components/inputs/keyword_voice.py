@@ -4,11 +4,10 @@ import logging
 import os
 import sys
 import tempfile
-import time
 import urllib.request
 import wave
 import zipfile
-from threading import Lock, Thread
+from threading import Lock
 
 import numpy as np
 import openai
