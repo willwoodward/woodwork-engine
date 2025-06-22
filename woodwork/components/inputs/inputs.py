@@ -12,12 +12,6 @@ class inputs(component):
 
         self._task_master = task_master
         self._output = to
-        self._is_running = global_config["inputs_activated"]
-
-    @abstractmethod
-    def __input_handler(self):
-        """Starts a thread which runs this function, sending the input to the task manager and returning the result."""
-        pass
 
     def stop(self):
         self._task_master.close_all()

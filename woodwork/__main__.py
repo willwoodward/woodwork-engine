@@ -51,30 +51,25 @@ def main(args) -> None:
     # Set globals based on flags before execution
     match args.mode:
         case "run":
-            set_globals(mode="run", inputs_activated=True)
-            log.debug("Mode set to 'run'. Inputs activated: True")
+            log.debug("Mode set to 'run'.")
         case "debug":
-            set_globals(mode="run", inputs_activated=True)
-            log.debug("Mode set to 'debug'. Inputs activated: True")
+            log.debug("Mode set to 'debug'.")
             log.warning(
                 "Mode is set to 'debug'. This mode has been deprecated and will be removed in a future release. "
                 "You can access debug information by setting the logging level to DEBUG in your logging configuration. "
                 "Please use 'run' mode instead. Defaulting to 'run' mode.",
             )
         case "embed":
-            set_globals(mode="embed", inputs_activated=False)
-            log.debug("Mode set to 'embed'. Inputs activated: False")
+            log.debug("Mode set to 'embed'.")
         case "clear":
-            set_globals(mode="clear", inputs_activated=False)
-            log.debug("Mode set to 'clear'. Inputs activated: False")
+            log.debug("Mode set to 'clear'.")
         case _:
             # ArgParse will SysExit if choice not in list
             pass
 
     log.debug(
-        "Globals set: Mode = %s, Inputs activated = %s",
+        "Globals set: Mode = %s",
         globals.global_config["mode"],
-        globals.global_config["inputs_activated"],
     )
 
     if args.init is not None:
@@ -89,7 +84,6 @@ def main(args) -> None:
         dependencies.init(options)
 
         # Run the initialization methods
-        set_globals(inputs_activated=False)
         config_parser.main_function(registry=registry)
         for component in config_parser.task_m._tools:
             if isinstance(component, Initializable):

@@ -3,6 +3,6 @@ llm = llm openai {
     model: "gpt-4o-mini"
 }
 
-kb = knowledge_base chroma {
-    api_key: $OPENAI_API_KEY
+inp = input command_line {
+    to: llm
 }
