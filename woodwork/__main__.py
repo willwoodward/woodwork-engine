@@ -10,6 +10,7 @@ from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
 from woodwork.interfaces.intializable import Initializable
 from woodwork.interfaces.startable import Startable
+from woodwork.registry import Registry
 
 from . import globals
 
