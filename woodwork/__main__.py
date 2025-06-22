@@ -10,7 +10,8 @@ from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
 from woodwork.interfaces.intializable import Initializable
 from woodwork.interfaces.startable import Startable
-from woodwork.registry import Registry
+from woodwork.registry import get_registry
+from woodwork.generate_exports import generate_exported_objects_file
 
 from . import globals
 
@@ -26,6 +27,7 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 def main(args) -> None:
     sys.excepthook = custom_excepthook
+    registry = get_registry()
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
@@ -88,10 +90,11 @@ def main(args) -> None:
 
         # Run the initialization methods
         set_globals(inputs_activated=False)
-        config_parser.main_function()
+        config_parser.main_function(registry=registry)
         for component in config_parser.task_m._tools:
             if isinstance(component, Initializable):
                 component.init()
+        generate_exported_objects_file(registry=registry)
         return
 
     if args.workflow != "none":
@@ -105,13 +108,13 @@ def main(args) -> None:
                 "Possible conflict: Mode is %s which conflicts with %s Workflow.",
                 args.mode,
                 args.workflow,
-            )  # TODO: @willwoodward Make more specific regarding what `inputs_activated` means
+            )
         set_globals(inputs_activated=False)
 
     # Execute the main functionality
     dependencies.activate_virtual_environment()
-
     config_parser.main_function()
+    generate_exported_objects_file(registry=registry)
 
     # Start all components that implement the Startable interface
     for component in config_parser.task_m._tools:

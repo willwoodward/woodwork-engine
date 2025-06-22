@@ -1,7 +1,4 @@
-from woodwork.registry import get_registry
-from woodwork.config_parser import main_function
+import woodwork.exports as registry
 
-main_function()
-registry = get_registry()
-
-model = registry.get("llm")
+model = registry.llm
+model.input("What is the capital of France?")

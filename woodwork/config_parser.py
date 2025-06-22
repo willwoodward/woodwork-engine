@@ -409,11 +409,11 @@ def parse(config: str, registry=None) -> dict:
     return commands
 
 
-def main_function():
+def main_function(registry=None):
     current_directory = os.getcwd()
     with open(current_directory + "/main.ww") as f:
         lines = f.read()
-        parse(lines)
+        parse(lines, registry)
 
 
 def embed_all():

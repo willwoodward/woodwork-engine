@@ -2,3 +2,7 @@ llm = llm openai {
     api_key: $OPENAI_API_KEY
     model: "gpt-4o-mini"
 }
+
+kb = knowledge_base chroma {
+    api_key: $OPENAI_API_KEY
+}
