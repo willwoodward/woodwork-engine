@@ -57,7 +57,7 @@ class keyword_voice(inputs):
             self._model = Model(".woodwork/models/vosk-model-small-en-us-0.15")
         self._rec = KaldiRecognizer(self._model, 16000)
 
-        thread = Thread(target=self._hotword_listener, daemon=True)
+        thread = Thread(target=self.input_function, daemon=True)
         thread.start()
         while True:
             time.sleep(1)
@@ -81,7 +81,7 @@ class keyword_voice(inputs):
         else:
             log.debug("Model already present.")
 
-    def _hotword_listener(self):
+    def input_function(self):
         def callback_wrapper(indata, frames, time_info, status):
             self._rec.AcceptWaveform(bytes(indata))
             partial_result = json.loads(self._rec.PartialResult())

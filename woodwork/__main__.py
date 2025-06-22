@@ -140,6 +140,7 @@ def main(args) -> None:
             # ArgParse will SysExit if choice not in list
             pass
 
+    config_parser.task_m.start()
     return
 
 

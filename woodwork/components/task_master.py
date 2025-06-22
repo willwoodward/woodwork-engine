@@ -1,9 +1,12 @@
 import logging
+from threading import Thread
 
 from typing import Any
 
 from woodwork.components.component import component
 from woodwork.helper_functions import format_kwargs
+from woodwork.components.inputs.inputs import inputs
+from woodwork.components.outputs.outputs import outputs
 
 log = logging.getLogger(__name__)
 
@@ -15,6 +18,8 @@ class task_master(component):
 
     def add_tools(self, tools):
         self._tools = tools
+        self._inputs = [component for component in tools if isinstance(component, inputs)]
+        self._outputs = [component for component in tools if isinstance(component, outputs)]
 
     def execute(self, workflow: dict[str, Any]):
         log.debug("Executing instructions...")
@@ -64,3 +69,29 @@ class task_master(component):
         for tool in self._tools:
             if hasattr(tool, "close"):
                 tool.close()
+
+    def _loop(self, input_object: inputs):
+        while True:
+            x = input_object.input_function()
+
+            if x == "exit" or x == ";":
+                self.close_all()
+                break
+
+            # Traverse through outputs like a linked list
+            obj = input_object
+            if hasattr(obj, "_output") and obj._output is not None:
+                while hasattr(obj, "_output") and obj._output is not None:
+                    x = obj._output.input(x)
+                    obj = obj._output
+                
+                # If the last object is not an output, print the result
+                if not isinstance(obj, outputs):
+                    print(x)
+
+    def start(self):
+        """Starts the input and output loops and orchestrates the execution of tasks."""
+        # Currently only supports one input and output
+        print('Input initialized, type ";" to exit.')
+        thread = Thread(target=self._loop, args=(self._inputs[0],))
+        thread.start()

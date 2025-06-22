@@ -107,10 +107,4 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
             self._memory.add(f"[USER] {query}")
             self._memory.add(f"[AI] {answer}")
 
-        # Output
-        if self._output:
-            self._output.input(answer)
-            return
-
-        # Else if no output, print the answer
-        print(answer)
+        return answer
