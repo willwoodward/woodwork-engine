@@ -3,6 +3,7 @@ llm = llm openai {
     model: "gpt-4o-mini"
 }
 
-kb = knowledge_base chroma {
+inp = input push_to_talk {
     api_key: $OPENAI_API_KEY
+    to: llm
 }

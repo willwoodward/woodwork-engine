@@ -1,7 +1,6 @@
 from abc import abstractmethod
 
 from woodwork.components.component import component
-from woodwork.globals import global_config
 from woodwork.helper_functions import format_kwargs
 
 
@@ -12,12 +11,11 @@ class inputs(component):
 
         self._task_master = task_master
         self._output = to
-        self._is_running = global_config["inputs_activated"]
-
-    @abstractmethod
-    def __input_handler(self):
-        """Starts a thread which runs this function, sending the input to the task manager and returning the result."""
-        pass
 
     def stop(self):
         self._task_master.close_all()
+
+    @abstractmethod
+    def input_function(self):
+        """The function that will be run in a separate thread to handle input."""
+        pass

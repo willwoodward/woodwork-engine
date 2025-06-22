@@ -3,5 +3,5 @@ from abc import ABC, abstractmethod
 
 class Startable(ABC):
     @abstractmethod
-    def init(self, config: dict):
+    def start(self, config: dict):
         pass

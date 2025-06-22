@@ -4,11 +4,10 @@ import logging
 import os
 import sys
 import tempfile
-import time
 import urllib.request
 import wave
 import zipfile
-from threading import Lock, Thread
+from threading import Lock
 
 import numpy as np
 import openai
@@ -57,11 +56,6 @@ class keyword_voice(inputs):
             self._model = Model(".woodwork/models/vosk-model-small-en-us-0.15")
         self._rec = KaldiRecognizer(self._model, 16000)
 
-        thread = Thread(target=self._hotword_listener, daemon=True)
-        thread.start()
-        while True:
-            time.sleep(1)
-
     def _download_model(self):
         zip_path = os.path.join(".woodwork", "models", "vosk-model-small-en-us-0.15.zip")
         log.debug("Downloading Vosk model...")
@@ -81,7 +75,7 @@ class keyword_voice(inputs):
         else:
             log.debug("Model already present.")
 
-    def _hotword_listener(self):
+    def input_function(self):
         def callback_wrapper(indata, frames, time_info, status):
             self._rec.AcceptWaveform(bytes(indata))
             partial_result = json.loads(self._rec.PartialResult())
@@ -89,8 +83,9 @@ class keyword_voice(inputs):
             if self._keyword in partial_result.get("partial", "").lower():
                 print("Hotword detected!")
                 with self._listening_lock:
-                    self._handle_voice_command()
+                    output = self._handle_voice_command()
                     self._rec = KaldiRecognizer(self._model, 16000)
+                    return output
 
         # Initialize the audio stream (for some reason it sometimes doesn't work the first time)
         try:
@@ -161,4 +156,4 @@ class keyword_voice(inputs):
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             audio_file = self._record_audio_vad(tmp.name)
             query = self._transcribe_audio(audio_file)
-            self._output.input(query)
+            return query
