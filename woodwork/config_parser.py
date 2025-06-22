@@ -12,6 +12,7 @@ from woodwork.errors import (
     ForbiddenVariableNameError,
     MissingConfigKeyError,
 )
+from woodwork.registry import get_registry
 
 log = logging.getLogger(__name__)
 
@@ -354,8 +355,10 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
     return config, depends_on
 
 
-def parse(config: str) -> dict:
+def parse(config: str, registry=None) -> dict:
     commands = {}
+    if registry is None:
+        registry = get_registry()
 
     # Load environment variables to be substituted in later
     current_directory = os.getcwd()
@@ -400,17 +403,18 @@ def parse(config: str) -> dict:
     for name in commands:
         dependency_resolver(commands, commands[name])
         tools.append(commands[name]["object"])
+        registry.register(name, commands[name]["object"])
 
     task_m.add_tools(tools)
 
     return commands
 
 
-def main_function():
+def main_function(registry=None):
     current_directory = os.getcwd()
     with open(current_directory + "/main.ww") as f:
         lines = f.read()
-        parse(lines)
+        parse(lines, registry)
 
 
 def embed_all():

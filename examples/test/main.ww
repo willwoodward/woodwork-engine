@@ -1,10 +1,8 @@
-input = input command_line {
-    to: llm
+llm = llm openai {
+    api_key: $OPENAI_API_KEY
+    model: "gpt-4o-mini"
 }
 
-mem = memory short_term {}
-
-llm = llm ollama {
-    model: "mistral:7b-instruct-q4_0"
-    memory: mem
+kb = knowledge_base chroma {
+    api_key: $OPENAI_API_KEY
 }
