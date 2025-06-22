@@ -31,16 +31,9 @@ class push_to_talk(inputs):
         except:
             pass
 
-        thread = Thread(target=self._push_to_talk_listener, daemon=True)
-        thread.start()
-        while True:
-            time.sleep(1)
-
-    def _push_to_talk_listener(self):
-        print("Press ENTER to start recording. (Ctrl+C to exit)")
-        while True:
-            input()  # Wait for the user to press Enter
-            self._handle_voice_command()
+    def input_function(self):
+        input()
+        return self._handle_voice_command()
 
     def _record_audio_vad(self, filename="temp.wav", max_duration=30, aggressiveness=2, silence_threshold=2.0):
         fs = 16000  # Sampling rate
@@ -100,4 +93,4 @@ class push_to_talk(inputs):
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             audio_file = self._record_audio_vad(tmp.name)
             query = self._transcribe_audio(audio_file)
-            self._output.input(query)
+            return query

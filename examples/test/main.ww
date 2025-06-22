@@ -3,6 +3,7 @@ llm = llm openai {
     model: "gpt-4o-mini"
 }
 
-inp = input command_line {
+inp = input push_to_talk {
+    api_key: $OPENAI_API_KEY
     to: llm
 }
