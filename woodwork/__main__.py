@@ -3,6 +3,7 @@ import logging
 import logging.config
 import pathlib
 import sys
+import multiprocessing
 
 from woodwork import config_parser, dependencies, argument_parser
 from woodwork import helper_functions
@@ -23,6 +24,13 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
         print(f"{exc_value}")
     else:
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+
+def start_component(component: Startable):
+    component.start()
+
+def init_component(component: Initializable):
+    component.init()
 
 
 def main(args) -> None:
@@ -85,6 +93,11 @@ def main(args) -> None:
 
         # Run the initialization methods
         config_parser.main_function(registry=registry)
+
+        initializable_components = list(filter(lambda x: isinstance(x, Initializable), config_parser.task_m._tools))
+        with multiprocessing.Pool() as pool:
+            pool.map(init_component, initializable_components)
+        
         for component in config_parser.task_m._tools:
             if isinstance(component, Initializable):
                 component.init()
@@ -111,10 +124,10 @@ def main(args) -> None:
     generate_exported_objects_file(registry=registry)
 
     # Start all components that implement the Startable interface
-    for component in config_parser.task_m._tools:
-        if isinstance(component, Startable):
-            component.start()
-            log.debug("Started component: %s", component.__class__.__name__)
+    startable_components = list(filter(lambda x: isinstance(x, Startable), config_parser.task_m._tools))
+    print(startable_components)
+    with multiprocessing.Pool() as pool:
+        pool.map(start_component, startable_components)
 
     # Clean up after execution
     match args.mode:
