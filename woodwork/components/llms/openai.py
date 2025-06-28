@@ -28,7 +28,7 @@ class openai(llm, Startable):
     @property
     def retriever(self):
         return self._retriever
-    
+
     def start(self, config: dict = {}):
         self._llm_value = ChatOpenAI(
             model=self._model,

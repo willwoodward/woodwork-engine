@@ -27,10 +27,11 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 
 def start_component(component: Startable):
-    component.start()
+    component.start(config={})
+
 
 def init_component(component: Initializable):
-    component.init()
+    component.init(config={})
 
 
 def main(args) -> None:
@@ -97,7 +98,7 @@ def main(args) -> None:
         initializable_components = list(filter(lambda x: isinstance(x, Initializable), config_parser.task_m._tools))
         with multiprocessing.Pool() as pool:
             pool.map(init_component, initializable_components)
-        
+
         for component in config_parser.task_m._tools:
             if isinstance(component, Initializable):
                 component.init()
