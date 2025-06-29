@@ -49,10 +49,10 @@ def start_component(c: component, queue: multiprocessing.Queue):
     queue.put(Update(progress=100, component_name=c.name))
 
 
-def init_component(c: Initializable, queue: multiprocessing.Queue):
-    if isinstance(c, component):
+def init_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, Initializable):
         c.init(queue=queue, config={})
-        queue.put(Update(progress=100, component_name=c.name))
+    queue.put(Update(progress=100, component_name=c.name))
 
 
 def worker(component, queue, component_func: Callable):
@@ -125,7 +125,15 @@ def component_progression_display(
                     break
                 if update.progress >= 100:
                     done_count += 1
-                    progress.update(task_id, component_name=f"[green]{update.component_name}[/green]")
+                    elapsed_seconds = int(time.time() - start_times[update.component_name])
+                    elapsed_str = str(timedelta(seconds=elapsed_seconds))
+                    progress.update(
+                        task_id,
+                        completed=100,
+                        component_name=f"[green]{update.component_name}[/green]",
+                        elapsed=elapsed_str 
+                    )
+
                 progress.update(task_id, completed=update.progress)
 
             except:
@@ -133,9 +141,11 @@ def component_progression_display(
 
             # Update elapsed time
             for component_name, task_id in tasks.items():
-                elapsed_seconds = int(time.time() - start_times[component_name])
-                elapsed_str = str(timedelta(seconds=elapsed_seconds))
-                progress.update(task_id, elapsed=elapsed_str)
+                task = progress.tasks[task_id]
+                if not task.finished:
+                    elapsed_seconds = int(time.time() - start_times[component_name])
+                    elapsed_str = str(timedelta(seconds=elapsed_seconds))
+                    progress.update(task_id, elapsed=elapsed_str)
     return completed
 
 
@@ -223,8 +233,8 @@ def main(args) -> None:
         # Run the initialization methods
         config_parser.main_function(registry=registry)
 
-        initializable_components = list(filter(lambda x: isinstance(x, Initializable), config_parser.task_m._tools))
-        parallel_func_apply(initializable_components, init_component, "initialized", "initializing")
+        components = config_parser.task_m._tools
+        parallel_func_apply(components, init_component, "initialized", "initializing")
         generate_exported_objects_file(registry=registry)
         return
 
