@@ -1,8 +1,28 @@
-llm = llm openai {
+llm1 = llm openai {
+    api_key: $OPENAI_API_KEY
+    model: "gpt-4o-mini"
+}
+
+llm2 = llm openai {
+    api_key: $OPENAI_API_KEY
+    model: "gpt-4o-mini"
+}
+
+llm3 = llm openai {
+    api_key: $OPENAI_API_KEY
+    model: "gpt-4o-mini"
+}
+
+llm4 = llm openai {
+    api_key: $OPENAI_API_KEY
+    model: "gpt-4o-mini"
+}
+
+llm5 = llm openai {
     api_key: $OPENAI_API_KEY
     model: "gpt-4o-mini"
 }
 
 inp = input command_line {
-    to: llm
+    to: llm1
 }
