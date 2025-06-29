@@ -1,4 +1,5 @@
 from typing import AsyncGenerator, Generic, TypeVar, List
+from dataclasses import dataclass
 
 
 class Data:
@@ -38,3 +39,16 @@ class Stream(Generic[T]):
                 yield item
 
         return self(gen())
+
+
+@dataclass
+class Update:
+    """
+    Represents an update in progress.
+
+    :param progress: Progress as a number between 0 and 100.
+    :param component: Reference to the component being updated.
+    """
+
+    progress: float
+    component_name: str

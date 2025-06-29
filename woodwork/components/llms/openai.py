@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import time
 
 from langchain_openai import ChatOpenAI
@@ -30,7 +31,7 @@ class openai(llm, Startable):
     def retriever(self):
         return self._retriever
 
-    def start(self, config: dict = {}):
+    def start(self, queue: multiprocessing.Queue, config: dict = {}):
         self._llm_value = ChatOpenAI(
             model=self._model,
             temperature=0,
@@ -39,5 +40,5 @@ class openai(llm, Startable):
             max_retries=2,
             api_key=self._api_key,
         )
-        time.sleep(2)
+        time.sleep(1)
         log.debug("Model initialized.")

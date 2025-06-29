@@ -4,13 +4,11 @@ import logging.config
 import pathlib
 import sys
 import multiprocessing
-from dataclasses import dataclass
 from rich.console import Console, Group
 from rich.progress import (
     Progress,
     BarColumn,
     TextColumn,
-    TimeElapsedColumn,
     ProgressColumn,
     SpinnerColumn,
     Task,
@@ -18,31 +16,25 @@ from rich.progress import (
 from rich.text import Text
 from rich.table import Column
 from rich.live import Live
+import time
+from datetime import timedelta
+from typing import Dict, List, Callable
 
 from woodwork import config_parser, dependencies, argument_parser
 from woodwork import helper_functions
+from woodwork.components.component import component
 from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
 from woodwork.interfaces.intializable import Initializable
 from woodwork.interfaces.startable import Startable
 from woodwork.registry import get_registry
+from woodwork.types import Update
 from woodwork.generate_exports import generate_exported_objects_file
 
 from . import globals
 
 log = logging.getLogger(__name__)
 
-@dataclass
-@dataclass
-class Update:
-    """
-    Represents an update in progress.
-
-    :param progress: Progress as a number between 0 and 100.
-    :param component: Reference to the component being updated.
-    """
-    progress: float
-    component_name: str
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, WoodworkError):
@@ -51,24 +43,21 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
-def start_component(component: Startable, queue):
-    queue.put(Update(progress=0, component_name=component.name))
-    component.start(config={})
-    queue.put(Update(progress=100, component_name=component.name))
+def start_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, Startable):
+        c.start(queue=queue, config={})
+    queue.put(Update(progress=100, component_name=c.name))
 
-def worker(component, queue):
-    start_component(component, queue)
 
-def monitor_progress(queue, total_components):
-    finished = 0
-    while finished < total_components:
-        msg: Update = queue.get()
-        if msg.progress == 100:
-            finished += 1
+def init_component(c: Initializable, queue: multiprocessing.Queue):
+    if isinstance(c, component):
+        c.init(queue=queue, config={})
+        queue.put(Update(progress=100, component_name=c.name))
 
-# Animated spinner or check
-from typing import Dict
-import time
+
+def worker(component, queue, component_func: Callable):
+    component_func(component, queue)
+
 
 class SpinnerOrCheckColumn(ProgressColumn):
     def __init__(self):
@@ -79,7 +68,7 @@ class SpinnerOrCheckColumn(ProgressColumn):
     def render(self, task: Task) -> Text:
         # Use caching to avoid flickering
         current_time = time.time()
-        last_time, last_renderable = self._renderable_cache.get(task.id, (0.0, None))
+        last_time, _ = self._renderable_cache.get(task.id, (0.0, None))
 
         # Only update spinner frame if enough time passed
         if current_time - last_time >= 0.1 or task.finished:
@@ -95,8 +84,82 @@ class SpinnerOrCheckColumn(ProgressColumn):
         return Column(no_wrap=True, width=2)
 
 
-def init_component(component: Initializable):
-    component.init(config={})
+def component_progression_display(
+    console, components: List[component], queue: multiprocessing.Queue, present_verb: str
+):
+    progress = Progress(
+        TextColumn("[grey23]|-", justify="right"),
+        SpinnerOrCheckColumn(),
+        TextColumn("[bold blue]{task.fields[component_name]}", justify="left"),
+        BarColumn(bar_width=None, complete_style="grey50", finished_style="grey50", style="grey23"),
+        TextColumn("[grey23]{task.percentage:>3.0f}%"),
+        TextColumn("[grey23]{task.fields[elapsed]}"),
+        expand=True,
+    )
+
+    # Register tasks alphabetically
+    start_times = {}
+    tasks = {}
+    for name in sorted(list(map(lambda x: x.name, components))):
+        task_id = progress.add_task(
+            "",
+            component_name=name,
+            elapsed="0:00:00",
+            total=100.0,
+        )
+        tasks[name] = task_id
+        tasks[name] = task_id
+        start_times[name] = time.time()
+
+    done_count = 0
+
+    layout = Group(Text(f"Components {present_verb}...", style="bold white"), progress)
+    completed = True
+    with Live(layout, console=console, refresh_per_second=10):
+        while done_count < len(components):
+            try:
+                update: Update = queue.get(timeout=0.1)  # small timeout to keep loop alive
+                task_id = tasks[update.component_name]
+                if update.component_name == "_error":
+                    completed = False
+                    break
+                if update.progress >= 100:
+                    done_count += 1
+                    progress.update(task_id, component_name=f"[green]{update.component_name}[/green]")
+                progress.update(task_id, completed=update.progress)
+
+            except:
+                pass
+
+            # Update elapsed time
+            for component_name, task_id in tasks.items():
+                elapsed_seconds = int(time.time() - start_times[component_name])
+                elapsed_str = str(timedelta(seconds=elapsed_seconds))
+                progress.update(task_id, elapsed=elapsed_str)
+    return completed
+
+
+def parallel_func_apply(components: List[component], component_func: Callable, past_verb: str, present_verb: str):
+    queue = multiprocessing.Queue()
+
+    # Start processes
+    processes = []
+    for name in components:
+        p = multiprocessing.Process(target=worker, args=(name, queue, component_func))
+        p.start()
+        processes.append(p)
+
+    console = Console()
+
+    completed = component_progression_display(console, components, queue, present_verb)
+
+    for p in processes:
+        p.join()
+
+    if completed:
+        console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
+    else:
+        console.print(f"[bold red]Components {past_verb} successfully![/bold red]")
 
 
 def main(args) -> None:
@@ -161,12 +224,7 @@ def main(args) -> None:
         config_parser.main_function(registry=registry)
 
         initializable_components = list(filter(lambda x: isinstance(x, Initializable), config_parser.task_m._tools))
-        with multiprocessing.Pool() as pool:
-            pool.map(init_component, initializable_components)
-
-        for component in config_parser.task_m._tools:
-            if isinstance(component, Initializable):
-                component.init()
+        parallel_func_apply(initializable_components, init_component, "initialized", "initializing")
         generate_exported_objects_file(registry=registry)
         return
 
@@ -190,58 +248,8 @@ def main(args) -> None:
     generate_exported_objects_file(registry=registry)
 
     # Start all components that implement the Startable interface
-    startable_components = list(filter(lambda x: isinstance(x, Startable), config_parser.task_m._tools))
-    queue = multiprocessing.Queue()
-
-    # Start processes
-    processes = []
-    for name in startable_components:
-        p = multiprocessing.Process(target=worker, args=(name, queue))
-        p.start()
-        processes.append(p)
-
-    console = Console()
-
-    progress = Progress(
-        TextColumn("|-", justify="right"),
-        SpinnerOrCheckColumn(),
-        TextColumn("[bold blue]{task.fields[component_name]}", justify="left"),
-        BarColumn(bar_width=None),
-        TextColumn("[grey58]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        expand=True,
-    )
-
-    # Register tasks alphabetically
-    tasks = {}
-    for name in sorted(list(map(lambda x: x.name, startable_components))):
-        task_id = progress.add_task(
-            "",
-            component_name=name,
-            total=100.0,
-        )
-        tasks[name] = task_id
-
-    done_count = 0
-
-    layout = Group(
-        Text("Components Starting…", style="bold white"),
-        progress
-    )
-
-    with Live(layout, console=console, refresh_per_second=10):
-        while done_count < len(startable_components):
-            update: Update = queue.get()
-            if update.progress == 100:
-                done_count += 1
-
-            task_id = tasks[update.component_name]
-            progress.update(task_id, completed=update.progress)
-
-    for p in processes:
-        p.join()
-
-    console.print("[bold green]All components started successfully![/bold green]")
+    components = config_parser.task_m._tools
+    parallel_func_apply(components, start_component, "started", "starting")
 
     # Clean up after execution
     match args.mode:
