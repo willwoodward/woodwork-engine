@@ -39,5 +39,4 @@ class openai(llm, Startable):
             max_retries=2,
             api_key=self._api_key,
         )
-        time.sleep(1)
         log.debug("Model initialized.")

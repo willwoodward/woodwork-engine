@@ -50,11 +50,11 @@ class DeploymentWrapper:
         self.component = component
 
     async def input(self, data):
-        if isinstance(self.component, ServerDeployment):
+        if isinstance(self.deployment, ServerDeployment):
             async with aiohttp.ClientSession() as session:
-                async with session.post(f"http://0.0.0.0:{self.component.name}/{self.component.port}/input", json={"value": str(data)}) as response:
-                    print("SERVER")
-                    return await response.text()
+                async with session.post(f"http://0.0.0.0:{self.deployment.port}/{self.component.name}/input", json={"value": str(data)}) as response:
+                    resp = await response.text()
+                    return resp[1:-1]
         else:
             return self.component.input(data)
 
@@ -70,3 +70,11 @@ class Router:
             self.components[component.name] = DeploymentWrapper(deployment, component)
             return
         self.components[component.name] = DeploymentWrapper(LocalDeployment([component]), component)
+
+_router = None
+
+def get_router():
+    global _router
+    if _router is None:
+        _router = Router()
+    return _router

@@ -29,7 +29,7 @@ from woodwork.interfaces.intializable import Initializable
 from woodwork.interfaces.startable import ParallelStartable, Startable
 from woodwork.registry import get_registry
 from woodwork.types import Update
-from woodwork.deployments.router import Router
+from woodwork.deployments.router import get_router
 from woodwork.generate_exports import generate_exported_objects_file
 
 from . import globals
@@ -193,7 +193,7 @@ async def deploy_components(deployments: dict):
 def main(args) -> None:
     sys.excepthook = custom_excepthook
     registry = get_registry()
-    router = Router()
+    router = get_router()
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
@@ -286,7 +286,7 @@ def main(args) -> None:
 
     deployments = {
         "llm1": LocalDeployment(list(filter(lambda x: x.name == "llm1", config_parser.task_m._tools))),
-        "llm2": ServerDeployment(list(filter(lambda x: x.name == "llm2", config_parser.task_m._tools))),
+        "llm2": ServerDeployment(list(filter(lambda x: x.name == "llm2", config_parser.task_m._tools)), port=43000),
         "inp": LocalDeployment(list(filter(lambda x: x.name == "inp", config_parser.task_m._tools))),
     }
 

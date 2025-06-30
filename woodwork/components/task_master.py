@@ -8,6 +8,7 @@ from woodwork.helper_functions import format_kwargs
 from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
 from woodwork.components.component import component
+from woodwork.deployments.router import get_router
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +72,8 @@ class task_master(component):
             if hasattr(tool, "close"):
                 tool.close()
 
-    def _loop(self, input_object: inputs):
+    async def _loop(self, input_object: inputs):
+        router = get_router()
         while True:
             x = input_object.input_function()
 
@@ -80,19 +82,25 @@ class task_master(component):
                 break
 
             # Traverse through outputs like a linked list
-            obj = input_object
-            if hasattr(obj, "_output") and obj._output is not None:
-                while hasattr(obj, "_output") and obj._output is not None:
-                    x = obj._output.input(x)
-                    obj = obj._output
+            component = input_object
+            if hasattr(component, "_output") and component._output is not None:
+                while hasattr(component, "_output") and component._output is not None:
+                    deployment = router.get(component._output.name)
+                    x = await deployment.input(x)
+                    component = component._output
 
                 # If the last object is not an output, print the result
-                if not isinstance(obj, outputs):
+                if not isinstance(component, outputs):
                     print(x)
 
     def start(self):
         """Starts the input and output loops and orchestrates the execution of tasks."""
         # Currently only supports one input and output
         print('Input initialized, type ";" to exit.')
-        thread = Thread(target=self._loop, args=(self._inputs[0],))
+
+        def run():
+            import asyncio
+            asyncio.run(self._loop(self._inputs[0]))
+        
+        thread = Thread(target=run)
         thread.start()
