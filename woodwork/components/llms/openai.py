@@ -1,8 +1,7 @@
 import logging
 import multiprocessing
-import time
-
 from langchain_openai import ChatOpenAI
+import time
 
 from woodwork.components.llms.llm import llm
 from woodwork.interfaces import Startable

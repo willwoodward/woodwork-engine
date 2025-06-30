@@ -26,9 +26,10 @@ from woodwork.components.component import component
 from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
 from woodwork.interfaces.intializable import Initializable
-from woodwork.interfaces.startable import Startable
+from woodwork.interfaces.startable import ParallelStartable, Startable
 from woodwork.registry import get_registry
 from woodwork.types import Update
+from woodwork.deployments.router import Router
 from woodwork.generate_exports import generate_exported_objects_file
 
 from . import globals
@@ -42,6 +43,15 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
     else:
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
+
+def parallel_start_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, ParallelStartable):
+        c.parallel_start(queue=queue, config={})
+    
+    if isinstance(c, Startable):
+        queue.put(Update(progress=50, component_name=c.name))
+    else:
+        queue.put(Update(progress=100, component_name=c.name))
 
 def start_component(c: component, queue: multiprocessing.Queue):
     if isinstance(c, Startable):
@@ -123,7 +133,7 @@ def component_progression_display(
                 if update.component_name == "_error":
                     completed = False
                     break
-                if update.progress >= 100:
+                if update.progress >= 50:
                     done_count += 1
                     elapsed_seconds = int(time.time() - start_times[update.component_name])
                     elapsed_str = str(timedelta(seconds=elapsed_seconds))
@@ -131,7 +141,7 @@ def component_progression_display(
                         task_id,
                         completed=100,
                         component_name=f"[green]{update.component_name}[/green]",
-                        elapsed=elapsed_str 
+                        elapsed=elapsed_str,
                     )
 
                 progress.update(task_id, completed=update.progress)
@@ -149,13 +159,13 @@ def component_progression_display(
     return completed
 
 
-def parallel_func_apply(components: List[component], component_func: Callable, past_verb: str, present_verb: str):
+def parallel_func_apply(components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str):
     queue = multiprocessing.Queue()
 
     # Start processes
     processes = []
     for name in components:
-        p = multiprocessing.Process(target=worker, args=(name, queue, component_func))
+        p = multiprocessing.Process(target=worker, args=(name, queue, parallel_func))
         p.start()
         processes.append(p)
 
@@ -165,6 +175,9 @@ def parallel_func_apply(components: List[component], component_func: Callable, p
 
     for p in processes:
         p.join()
+    
+    for component in components:
+        component_func(component, queue)
 
     if completed:
         console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
@@ -172,9 +185,15 @@ def parallel_func_apply(components: List[component], component_func: Callable, p
         console.print(f"[bold red]Components {past_verb} successfully![/bold red]")
 
 
+async def deploy_components(deployments: dict):
+    for deployment in deployments.values():
+        await deployment.deploy()
+
+
 def main(args) -> None:
     sys.excepthook = custom_excepthook
     registry = get_registry()
+    router = Router()
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
@@ -257,9 +276,35 @@ def main(args) -> None:
     config_parser.main_function()
     generate_exported_objects_file(registry=registry)
 
+    # Mock deployments
+    import asyncio
+    import threading
+    from woodwork.deployments.router import LocalDeployment, ServerDeployment
+
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+
+    deployments = {
+        "llm1": LocalDeployment(list(filter(lambda x: x.name == "llm1", config_parser.task_m._tools))),
+        "llm2": ServerDeployment(list(filter(lambda x: x.name == "llm2", config_parser.task_m._tools))),
+        "inp": LocalDeployment(list(filter(lambda x: x.name == "inp", config_parser.task_m._tools))),
+    }
+
+    # Add the components to the router
+    for c in config_parser.task_m._tools:
+        if isinstance(c, component):
+            router.add(c, deployments[c.name])
+    
+    for deployment in deployments.values():
+        asyncio.run_coroutine_threadsafe(deployment.deploy(), loop)
+
+    # Optionally block for a while to let them start
+    import time
+    time.sleep(1)
+
     # Start all components that implement the Startable interface
     components = config_parser.task_m._tools
-    parallel_func_apply(components, start_component, "started", "starting")
+    parallel_func_apply(components, parallel_start_component, start_component, "started", "starting")
 
     # Clean up after execution
     match args.mode:

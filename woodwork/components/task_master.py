@@ -7,6 +7,7 @@ from woodwork.components.component import component
 from woodwork.helper_functions import format_kwargs
 from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
+from woodwork.components.component import component
 
 log = logging.getLogger(__name__)
 
