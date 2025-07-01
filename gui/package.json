@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build-and-copy": "npm run build && rm -rf ../woodwork/gui/dist && cp -r dist ../woodwork/gui/dist",
     "lint": "eslint .",
     "preview": "vite preview"
   },
