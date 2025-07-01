@@ -29,7 +29,7 @@ from woodwork.interfaces.intializable import ParallelInitializable, Initializabl
 from woodwork.interfaces.startable import ParallelStartable, Startable
 from woodwork.registry import get_registry
 from woodwork.types import Update
-from woodwork.deployments.router import get_router
+from woodwork.deployments import Deployer
 from woodwork.generate_exports import generate_exported_objects_file
 
 from . import globals
@@ -206,7 +206,6 @@ async def deploy_components(deployments: dict):
 def main(args) -> None:
     sys.excepthook = custom_excepthook
     registry = get_registry()
-    router = get_router()
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
@@ -298,20 +297,8 @@ def main(args) -> None:
     config_parser.main_function()
     generate_exported_objects_file(registry=registry)
 
-    # Mock deployments
-    import asyncio
-    import threading
-    from woodwork.deployments.router import LocalDeployment, ServerDeployment
-    
-    loop = asyncio.new_event_loop()
-    threading.Thread(target=loop.run_forever, daemon=True).start()
-
-    for deployment in router.deployments.values():
-        asyncio.run_coroutine_threadsafe(deployment.deploy(), loop)
-
-    # Optionally block for a while to let them start
-    import time
-    time.sleep(1)
+    deployer = Deployer()
+    deployer.main()
 
     # Start all components that implement the Startable interface
     components = config_parser.task_m._tools

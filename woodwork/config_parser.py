@@ -213,7 +213,7 @@ def create_object(command):
             from woodwork.components.outputs.voice import voice
 
             return init_object(voice, **config)
-    
+
     # Deployment components
     if component == "vm":
         if type == "server":

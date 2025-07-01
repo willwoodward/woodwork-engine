@@ -1,3 +1,9 @@
-from woodwork.deployments.docker import Docker
+from .main import Deployer
+from .deployment import Deployment
+from .router import Router
+from .vms import LocalDeployment, ServerDeployment
 
-__all__ = ["Docker"]
+# Should deprecate this in future
+from .docker import Docker
+
+__all__ = ["Deployer", "Deployment", "Router", "LocalDeployment", "ServerDeployment", "Docker"]

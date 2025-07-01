@@ -1,56 +1,9 @@
-import inspect
 import aiohttp
-from fastapi import FastAPI, Request
-from uvicorn import Config, Server
-from typing import List, Optional
+from typing import Optional
 
 from woodwork.components.component import component
-from woodwork.helper_functions import format_kwargs
-
-
-class Deployment:
-    def __init__(self, name: str, components: List[component], **config):
-        self.name = name
-        self.components = components
-
-
-class LocalDeployment(Deployment):
-    def __init__(self, components: List[component], **config):
-        format_kwargs(config, components=components)
-        super().__init__(**config)
-
-    async def deploy(self):
-        return
-
-
-class ServerDeployment(Deployment):
-    def __init__(self, components: List[component], port=43001, **config):
-        format_kwargs(config, components=components, port=port)
-        super().__init__(**config)
-        self.app = FastAPI()
-        self.port = port
-        self._register_routes()
-
-    def _register_routes(self):
-        for comp in self.components:
-
-            @self.app.post(f"/{comp.name}/input")
-            async def input(request: Request):
-                data = await request.json()
-                return await self._maybe_async(comp.input, data["value"])
-
-    async def _maybe_async(self, func, *args, **kwargs):
-        if inspect.iscoroutinefunction(func):
-            return await func(*args, **kwargs)
-        else:
-            return func(*args, **kwargs)
-
-    async def deploy(self):
-        config = Config(
-            app=self.app, host="0.0.0.0", port=self.port, loop="asyncio", log_level="critical", access_log=True
-        )
-        server = Server(config)
-        await server.serve()
+from woodwork.deployments.deployment import Deployment
+from woodwork.deployments.vms import LocalDeployment, ServerDeployment
 
 
 class DeploymentWrapper:
@@ -81,7 +34,7 @@ class Router:
     def add(self, component: component, deployment=None):
         if deployment is None:
             deployment = LocalDeployment([component], name=str(hash(component)))
-        
+
         self.components[component.name] = DeploymentWrapper(deployment, component)
         if deployment.name not in self.deployments:
             self.deployments[deployment.name] = deployment

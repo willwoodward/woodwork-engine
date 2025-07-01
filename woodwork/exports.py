@@ -9,8 +9,8 @@ from woodwork.config_parser import main_function
 main_function()
 registry = get_registry()
 
-llm1: openai = registry.get('llm1')
-llm2: openai = registry.get('llm2')
-inp: command_line = registry.get('inp')
+llm1: openai = registry.get("llm1")
+llm2: openai = registry.get("llm2")
+inp: command_line = registry.get("inp")
 
-__all__ = ['llm1', 'llm2', 'inp']
+__all__ = ["llm1", "llm2", "inp"]

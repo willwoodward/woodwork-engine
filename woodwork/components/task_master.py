@@ -1,5 +1,6 @@
 import logging
 from threading import Thread
+import asyncio
 
 from typing import Any
 
@@ -98,8 +99,6 @@ class task_master(component):
         print('Input initialized, type ";" to exit.')
 
         def run():
-            import asyncio
-
             asyncio.run(self._loop(self._inputs[0]))
 
         thread = Thread(target=run)
