@@ -7,7 +7,6 @@ from woodwork.components.component import component
 from woodwork.helper_functions import format_kwargs
 from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
-from woodwork.components.component import component
 from woodwork.deployments.router import get_router
 
 log = logging.getLogger(__name__)
@@ -100,7 +99,8 @@ class task_master(component):
 
         def run():
             import asyncio
+
             asyncio.run(self._loop(self._inputs[0]))
-        
+
         thread = Thread(target=run)
         thread.start()

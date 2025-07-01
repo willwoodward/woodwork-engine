@@ -25,7 +25,7 @@ from woodwork import helper_functions
 from woodwork.components.component import component
 from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
-from woodwork.interfaces.intializable import Initializable
+from woodwork.interfaces.intializable import ParallelInitializable, Initializable
 from woodwork.interfaces.startable import ParallelStartable, Startable
 from woodwork.registry import get_registry
 from woodwork.types import Update
@@ -47,16 +47,27 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 def parallel_start_component(c: component, queue: multiprocessing.Queue):
     if isinstance(c, ParallelStartable):
         c.parallel_start(queue=queue, config={})
-    
+
     if isinstance(c, Startable):
         queue.put(Update(progress=50, component_name=c.name))
     else:
         queue.put(Update(progress=100, component_name=c.name))
 
+
 def start_component(c: component, queue: multiprocessing.Queue):
     if isinstance(c, Startable):
         c.start(queue=queue, config={})
     queue.put(Update(progress=100, component_name=c.name))
+
+
+def parallel_init_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, ParallelInitializable):
+        c.parallel_init(queue=queue, config={})
+
+    if isinstance(c, Initializable):
+        queue.put(Update(progress=50, component_name=c.name))
+    else:
+        queue.put(Update(progress=100, component_name=c.name))
 
 
 def init_component(c: component, queue: multiprocessing.Queue):
@@ -159,7 +170,9 @@ def component_progression_display(
     return completed
 
 
-def parallel_func_apply(components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str):
+def parallel_func_apply(
+    components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str
+):
     queue = multiprocessing.Queue()
 
     # Start processes
@@ -175,9 +188,9 @@ def parallel_func_apply(components: List[component], parallel_func: Callable, co
 
     for p in processes:
         p.join()
-    
-    for component in components:
-        component_func(component, queue)
+
+    for comp in components:
+        component_func(comp, queue)
 
     if completed:
         console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
@@ -253,7 +266,7 @@ def main(args) -> None:
         config_parser.main_function(registry=registry)
 
         components = config_parser.task_m._tools
-        parallel_func_apply(components, init_component, "initialized", "initializing")
+        parallel_func_apply(components, parallel_init_component, init_component, "initialized", "initializing")
         generate_exported_objects_file(registry=registry)
         return
 
@@ -294,12 +307,13 @@ def main(args) -> None:
     for c in config_parser.task_m._tools:
         if isinstance(c, component):
             router.add(c, deployments[c.name])
-    
+
     for deployment in deployments.values():
         asyncio.run_coroutine_threadsafe(deployment.deploy(), loop)
 
     # Optionally block for a while to let them start
     import time
+
     time.sleep(1)
 
     # Start all components that implement the Startable interface
