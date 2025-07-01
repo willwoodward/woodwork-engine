@@ -13,6 +13,8 @@ from woodwork.errors import (
     MissingConfigKeyError,
 )
 from woodwork.registry import get_registry
+from woodwork.components.component import component
+from woodwork.deployments.router import get_router, Deployment
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +81,8 @@ def get_required_args(cls):
     for base in inspect.getmro(cls):
         if base.__name__ == "component":
             continue  # Skip 'Component' class
+        if base.__name__ == "Deployment":
+            continue
         constructor = inspect.signature(base.__init__)
         for name, param in constructor.parameters.items():
             if (
@@ -209,6 +213,13 @@ def create_object(command):
             from woodwork.components.outputs.voice import voice
 
             return init_object(voice, **config)
+    
+    # Deployment components
+    if component == "vm":
+        if type == "server":
+            from woodwork.deployments.router import ServerDeployment
+
+            return init_object(ServerDeployment, **config)
 
 
 def command_checker(commands):
@@ -399,11 +410,23 @@ def parse(config: str, registry=None) -> dict:
 
     command_checker(commands)
 
-    tools = []
+    tools: list[component] = []
+    router = get_router()
     for name in commands:
         dependency_resolver(commands, commands[name])
-        tools.append(commands[name]["object"])
-        registry.register(name, commands[name]["object"])
+        obj = commands[name]["object"]
+        if isinstance(obj, component):
+            tools.append(commands[name]["object"])
+            registry.register(name, commands[name]["object"])
+        if isinstance(obj, Deployment):
+            # Add each component to the router
+            for comp in obj.components:
+                router.add(comp, obj)
+
+    # Add local deployments
+    for comp in tools:
+        if comp.name not in router.components:
+            router.add(comp)
 
     task_m.add_tools(tools)
 

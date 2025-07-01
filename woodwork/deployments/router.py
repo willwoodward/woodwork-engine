@@ -5,26 +5,30 @@ from uvicorn import Config, Server
 from typing import List, Optional
 
 from woodwork.components.component import component
+from woodwork.helper_functions import format_kwargs
 
 
 class Deployment:
-    def __init__(self, components: List[component]):
+    def __init__(self, name: str, components: List[component], **config):
+        self.name = name
         self.components = components
 
 
 class LocalDeployment(Deployment):
-    def __init__(self, components: List[component]):
-        super().__init__(components)
+    def __init__(self, components: List[component], **config):
+        format_kwargs(config, components=components)
+        super().__init__(**config)
 
     async def deploy(self):
         return
 
 
 class ServerDeployment(Deployment):
-    def __init__(self, components: List[component], port=None):
+    def __init__(self, components: List[component], port=43001, **config):
+        format_kwargs(config, components=components, port=port)
+        super().__init__(**config)
         self.app = FastAPI()
         self.port = port
-        super().__init__(components)
         self._register_routes()
 
     def _register_routes(self):
@@ -69,15 +73,18 @@ class DeploymentWrapper:
 class Router:
     def __init__(self):
         self.components: dict[str, DeploymentWrapper] = {}
+        self.deployments: dict[str, Deployment] = {}
 
     def get(self, name) -> Optional[DeploymentWrapper]:
         return self.components.get(name)
 
     def add(self, component: component, deployment=None):
-        if isinstance(deployment, ServerDeployment):
-            self.components[component.name] = DeploymentWrapper(deployment, component)
-            return
-        self.components[component.name] = DeploymentWrapper(LocalDeployment([component]), component)
+        if deployment is None:
+            deployment = LocalDeployment([component], name=str(hash(component)))
+        
+        self.components[component.name] = DeploymentWrapper(deployment, component)
+        if deployment.name not in self.deployments:
+            self.deployments[deployment.name] = deployment
 
 
 _router = None

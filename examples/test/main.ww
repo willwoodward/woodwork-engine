@@ -11,3 +11,9 @@ llm2 = llm openai {
 inp = input command_line {
     to: llm2
 }
+
+
+
+server1 = vm server {
+    components: [llm2]
+}
