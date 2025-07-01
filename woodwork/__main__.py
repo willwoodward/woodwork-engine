@@ -3,14 +3,33 @@ import logging
 import logging.config
 import pathlib
 import sys
+import multiprocessing
+from rich.console import Console, Group
+from rich.progress import (
+    Progress,
+    BarColumn,
+    TextColumn,
+    ProgressColumn,
+    SpinnerColumn,
+    Task,
+)
+from rich.text import Text
+from rich.table import Column
+from rich.live import Live
+import time
+from datetime import timedelta
+from typing import Dict, List, Callable
 
 from woodwork import config_parser, dependencies, argument_parser
 from woodwork import helper_functions
+from woodwork.components.component import component
 from woodwork.errors import WoodworkError, ParseError
 from woodwork.helper_functions import set_globals
-from woodwork.interfaces.intializable import Initializable
-from woodwork.interfaces.startable import Startable
+from woodwork.interfaces.intializable import ParallelInitializable, Initializable
+from woodwork.interfaces.startable import ParallelStartable, Startable
 from woodwork.registry import get_registry
+from woodwork.types import Update
+from woodwork.deployments.router import get_router
 from woodwork.generate_exports import generate_exported_objects_file
 
 from . import globals
@@ -25,9 +44,169 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
+def parallel_start_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, ParallelStartable):
+        c.parallel_start(queue=queue, config={})
+
+    if isinstance(c, Startable):
+        queue.put(Update(progress=50, component_name=c.name))
+    else:
+        queue.put(Update(progress=100, component_name=c.name))
+
+
+def start_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, Startable):
+        c.start(queue=queue, config={})
+    queue.put(Update(progress=100, component_name=c.name))
+
+
+def parallel_init_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, ParallelInitializable):
+        c.parallel_init(queue=queue, config={})
+
+    if isinstance(c, Initializable):
+        queue.put(Update(progress=50, component_name=c.name))
+    else:
+        queue.put(Update(progress=100, component_name=c.name))
+
+
+def init_component(c: component, queue: multiprocessing.Queue):
+    if isinstance(c, Initializable):
+        c.init(queue=queue, config={})
+    queue.put(Update(progress=100, component_name=c.name))
+
+
+def worker(component, queue, component_func: Callable):
+    component_func(component, queue)
+
+
+class SpinnerOrCheckColumn(ProgressColumn):
+    def __init__(self):
+        super().__init__()
+        self.spinner = SpinnerColumn(style="cyan")
+        self._renderable_cache: Dict[int, tuple[float, Text]] = {}
+
+    def render(self, task: Task) -> Text:
+        # Use caching to avoid flickering
+        current_time = time.time()
+        last_time, _ = self._renderable_cache.get(task.id, (0.0, None))
+
+        # Only update spinner frame if enough time passed
+        if current_time - last_time >= 0.1 or task.finished:
+            if task.finished:
+                renderable = Text("✅", style="green")
+            else:
+                renderable = self.spinner.render(task)
+            self._renderable_cache[task.id] = (current_time, renderable)
+
+        return self._renderable_cache[task.id][1]
+
+    def get_table_column(self) -> Column:
+        return Column(no_wrap=True, width=2)
+
+
+def component_progression_display(
+    console, components: List[component], queue: multiprocessing.Queue, present_verb: str
+):
+    progress = Progress(
+        TextColumn("[grey23]|-", justify="right"),
+        SpinnerOrCheckColumn(),
+        TextColumn("[bold blue]{task.fields[component_name]}", justify="left"),
+        BarColumn(bar_width=None, complete_style="grey50", finished_style="grey50", style="grey23"),
+        TextColumn("[grey23]{task.percentage:>3.0f}%"),
+        TextColumn("[grey23]{task.fields[elapsed]}"),
+        expand=True,
+    )
+
+    # Register tasks alphabetically
+    start_times = {}
+    tasks = {}
+    for name in sorted(list(map(lambda x: x.name, components))):
+        task_id = progress.add_task(
+            "",
+            component_name=name,
+            elapsed="0:00:00",
+            total=100.0,
+        )
+        tasks[name] = task_id
+        tasks[name] = task_id
+        start_times[name] = time.time()
+
+    done_count = 0
+
+    layout = Group(Text(f"Components {present_verb}...", style="bold white"), progress)
+    completed = True
+    with Live(layout, console=console, refresh_per_second=10):
+        while done_count < len(components):
+            try:
+                update: Update = queue.get(timeout=0.1)  # small timeout to keep loop alive
+                task_id = tasks[update.component_name]
+                if update.component_name == "_error":
+                    completed = False
+                    break
+                if update.progress >= 50:
+                    done_count += 1
+                    elapsed_seconds = int(time.time() - start_times[update.component_name])
+                    elapsed_str = str(timedelta(seconds=elapsed_seconds))
+                    progress.update(
+                        task_id,
+                        completed=100,
+                        component_name=f"[green]{update.component_name}[/green]",
+                        elapsed=elapsed_str,
+                    )
+
+                progress.update(task_id, completed=update.progress)
+
+            except:
+                pass
+
+            # Update elapsed time
+            for component_name, task_id in tasks.items():
+                task = progress.tasks[task_id]
+                if not task.finished:
+                    elapsed_seconds = int(time.time() - start_times[component_name])
+                    elapsed_str = str(timedelta(seconds=elapsed_seconds))
+                    progress.update(task_id, elapsed=elapsed_str)
+    return completed
+
+
+def parallel_func_apply(
+    components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str
+):
+    queue = multiprocessing.Queue()
+
+    # Start processes
+    processes = []
+    for name in components:
+        p = multiprocessing.Process(target=worker, args=(name, queue, parallel_func))
+        p.start()
+        processes.append(p)
+
+    console = Console()
+
+    completed = component_progression_display(console, components, queue, present_verb)
+
+    for p in processes:
+        p.join()
+
+    for comp in components:
+        component_func(comp, queue)
+
+    if completed:
+        console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
+    else:
+        console.print(f"[bold red]Components {past_verb} successfully![/bold red]")
+
+
+async def deploy_components(deployments: dict):
+    for deployment in deployments.values():
+        await deployment.deploy()
+
+
 def main(args) -> None:
     sys.excepthook = custom_excepthook
     registry = get_registry()
+    router = get_router()
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
@@ -85,9 +264,9 @@ def main(args) -> None:
 
         # Run the initialization methods
         config_parser.main_function(registry=registry)
-        for component in config_parser.task_m._tools:
-            if isinstance(component, Initializable):
-                component.init()
+
+        components = config_parser.task_m._tools
+        parallel_func_apply(components, parallel_init_component, init_component, "initialized", "initializing")
         generate_exported_objects_file(registry=registry)
         return
 
@@ -110,11 +289,36 @@ def main(args) -> None:
     config_parser.main_function()
     generate_exported_objects_file(registry=registry)
 
+    # Mock deployments
+    import asyncio
+    import threading
+    from woodwork.deployments.router import LocalDeployment, ServerDeployment
+
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+
+    deployments = {
+        "llm1": LocalDeployment(list(filter(lambda x: x.name == "llm1", config_parser.task_m._tools))),
+        "llm2": ServerDeployment(list(filter(lambda x: x.name == "llm2", config_parser.task_m._tools)), port=43000),
+        "inp": LocalDeployment(list(filter(lambda x: x.name == "inp", config_parser.task_m._tools))),
+    }
+
+    # Add the components to the router
+    for c in config_parser.task_m._tools:
+        if isinstance(c, component):
+            router.add(c, deployments[c.name])
+
+    for deployment in deployments.values():
+        asyncio.run_coroutine_threadsafe(deployment.deploy(), loop)
+
+    # Optionally block for a while to let them start
+    import time
+
+    time.sleep(1)
+
     # Start all components that implement the Startable interface
-    for component in config_parser.task_m._tools:
-        if isinstance(component, Startable):
-            component.start()
-            log.debug("Started component: %s", component.__class__.__name__)
+    components = config_parser.task_m._tools
+    parallel_func_apply(components, parallel_start_component, start_component, "started", "starting")
 
     # Clean up after execution
     match args.mode:

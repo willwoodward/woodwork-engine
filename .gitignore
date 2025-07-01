@@ -4,6 +4,7 @@ local_data
 dev-env
 test.py
 examples/06-pdf-qa/lecture_slides/*
+logs/
 
 ## Example logging config for developers
 /config/log_config.json

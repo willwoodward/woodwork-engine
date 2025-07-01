@@ -1,9 +1,13 @@
-llm = llm openai {
+llm1 = llm openai {
     api_key: $OPENAI_API_KEY
     model: "gpt-4o-mini"
 }
 
-inp = input push_to_talk {
+llm2 = llm openai {
     api_key: $OPENAI_API_KEY
-    to: llm
+    model: "gpt-4o-mini"
+}
+
+inp = input command_line {
+    to: llm2
 }
