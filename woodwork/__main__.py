@@ -19,6 +19,8 @@ from rich.live import Live
 import time
 from datetime import timedelta
 from typing import Dict, List, Callable
+import threading
+import warnings
 
 from woodwork import config_parser, dependencies, argument_parser
 from woodwork import helper_functions
@@ -106,67 +108,102 @@ class SpinnerOrCheckColumn(ProgressColumn):
 
 
 def component_progression_display(
-    console, components: List[component], queue: multiprocessing.Queue, present_verb: str
+    console: Console,
+    components: List,
+    queue: multiprocessing.Queue,
+    present_verb: str,
+    component_func: Callable,
 ):
     progress = Progress(
         TextColumn("[grey23]|-", justify="right"),
         SpinnerOrCheckColumn(),
-        TextColumn("[bold blue]{task.fields[component_name]}", justify="left"),
+        TextColumn("[bold blue]{task.fields[display_name]}", justify="left"),
         BarColumn(bar_width=None, complete_style="grey50", finished_style="grey50", style="grey23"),
         TextColumn("[grey23]{task.percentage:>3.0f}%"),
         TextColumn("[grey23]{task.fields[elapsed]}"),
         expand=True,
     )
 
-    # Register tasks alphabetically
     start_times = {}
+    finished_times = {}
+    finished_flags = {}
     tasks = {}
-    for name in sorted(list(map(lambda x: x.name, components))):
+
+    # Create progress tasks in sorted order by component name
+    for comp in sorted(components, key=lambda c: c.name):
+        name = comp.name
         task_id = progress.add_task(
             "",
             component_name=name,
+            display_name=name,
             elapsed="0:00:00",
             total=100.0,
         )
         tasks[name] = task_id
-        tasks[name] = task_id
         start_times[name] = time.time()
-
-    done_count = 0
+        finished_flags[name] = False
 
     layout = Group(Text(f"Components {present_verb}...", style="bold white"), progress)
     completed = True
-    with Live(layout, console=console, refresh_per_second=10):
-        while done_count < len(components):
-            try:
-                update: Update = queue.get(timeout=0.1)  # small timeout to keep loop alive
-                task_id = tasks[update.component_name]
-                if update.component_name == "_error":
-                    completed = False
-                    break
-                if update.progress >= 50:
-                    done_count += 1
-                    elapsed_seconds = int(time.time() - start_times[update.component_name])
-                    elapsed_str = str(timedelta(seconds=elapsed_seconds))
-                    progress.update(
-                        task_id,
-                        completed=100,
-                        component_name=f"[green]{update.component_name}[/green]",
-                        elapsed=elapsed_str,
-                    )
 
-                progress.update(task_id, completed=update.progress)
+    # Start all component threads concurrently
+    threads = []
+    for comp in components:
+        thread = threading.Thread(target=component_func, args=(comp, queue), daemon=True)
+        thread.start()
+        threads.append((comp, thread))
+
+    with Live(layout, console=console, refresh_per_second=10):
+        while True:
+            # Exit when all threads are finished
+            if all(not thread.is_alive() for _, thread in threads):
+                break
+
+            # Process all available updates in the queue
+            try:
+                while True:
+                    update = queue.get(timeout=0.1)
+                    if update.component_name == "_error":
+                        completed = False
+                        return completed
+
+                    task_id = tasks[update.component_name]
+                    progress.update(task_id, completed=update.progress)
+
+                    # Immediately finalize finished components
+                    if update.progress >= 100 and not finished_flags[update.component_name]:
+                        finished_flags[update.component_name] = True
+                        finished_times[update.component_name] = time.time()
+
+                        elapsed_seconds = int(
+                            finished_times[update.component_name] - start_times[update.component_name]
+                        )
+                        elapsed_str = str(timedelta(seconds=elapsed_seconds))
+
+                        progress.update(
+                            task_id,
+                            completed=100,
+                            display_name=f"[green]{update.component_name}[/green]",
+                            elapsed=elapsed_str,
+                            refresh=True,
+                        )
 
             except:
+                # No more updates currently in the queue
                 pass
 
-            # Update elapsed time
-            for component_name, task_id in tasks.items():
-                task = progress.tasks[task_id]
-                if not task.finished:
-                    elapsed_seconds = int(time.time() - start_times[component_name])
-                    elapsed_str = str(timedelta(seconds=elapsed_seconds))
-                    progress.update(task_id, elapsed=elapsed_str)
+            # Update elapsed time only for unfinished components
+            for cname, tid in tasks.items():
+                if finished_flags[cname]:
+                    continue
+                elapsed_seconds = int(time.time() - start_times[cname])
+                elapsed_str = str(timedelta(seconds=elapsed_seconds))
+                progress.update(tid, elapsed=elapsed_str)
+
+    # Join all threads after finishing
+    for _, thread in threads:
+        thread.join()
+
     return completed
 
 
@@ -183,14 +220,13 @@ def parallel_func_apply(
         processes.append(p)
 
     console = Console()
-
-    completed = component_progression_display(console, components, queue, present_verb)
+    completed = component_progression_display(console, components, queue, present_verb, component_func)
 
     for p in processes:
         p.join()
 
-    for comp in components:
-        component_func(comp, queue)
+    # for comp in components:
+    #     component_func(comp, queue)
 
     if completed:
         console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
@@ -209,6 +245,14 @@ def main(args) -> None:
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
+
+    # Langchain library has deprecated verbose import from root module
+    # and it causes a warning to be printed to the console.
+    warnings.filterwarnings(
+        "ignore",
+        message="Importing verbose from langchain root module is no longer supported"
+    )
+
 
     try:
         # Confirm that there are no known conflicts in the arguments before doing anything else
