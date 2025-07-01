@@ -112,17 +112,21 @@ def component_progression_display(
     components: List,
     queue: multiprocessing.Queue,
     present_verb: str,
-    component_func: Callable,
+    component_func: Optional[Callable],
+    finish_value: float = 100.0,
+    progress: Optional[Progress] = None
 ):
-    progress = Progress(
-        TextColumn("[grey23]|-", justify="right"),
-        SpinnerOrCheckColumn(),
-        TextColumn("[bold blue]{task.fields[display_name]}", justify="left"),
-        BarColumn(bar_width=None, complete_style="grey50", finished_style="grey50", style="grey23"),
-        TextColumn("[grey23]{task.percentage:>3.0f}%"),
-        TextColumn("[grey23]{task.fields[elapsed]}"),
-        expand=True,
-    )
+    if progress is None:
+        # Create a new Progress instance if not provided
+        progress = Progress(
+            TextColumn("[grey23]|-", justify="right"),
+            SpinnerOrCheckColumn(),
+            TextColumn("[bold blue]{task.fields[display_name]}", justify="left"),
+            BarColumn(bar_width=None, complete_style="grey50", finished_style="grey50", style="grey23"),
+            TextColumn("[grey23]{task.percentage:>3.0f}%"),
+            TextColumn("[grey23]{task.fields[elapsed]}"),
+            expand=True,
+        )
 
     start_times = {}
     finished_times = {}
@@ -149,10 +153,12 @@ def component_progression_display(
     # Start all component threads concurrently
     threads = []
     for comp in components:
-        thread = threading.Thread(target=component_func, args=(comp, queue), daemon=True)
-        thread.start()
-        threads.append((comp, thread))
+        if component_func is not None:
+            thread = threading.Thread(target=component_func, args=(comp, queue), daemon=True)
+            thread.start()
+            threads.append((comp, thread))
 
+    components_finished = {comp.name: False for comp in components}
     with Live(layout, console=console, refresh_per_second=10):
         while True:
             # Process all available updates in the queue
@@ -167,7 +173,7 @@ def component_progression_display(
                     progress.update(task_id, completed=update.progress)
 
                     # Immediately finalize finished components
-                    if update.progress >= 100 and not finished_flags[update.component_name]:
+                    if update.progress >= finish_value and not finished_flags[update.component_name]:
                         finished_flags[update.component_name] = True
                         finished_times[update.component_name] = time.time()
 
@@ -178,11 +184,17 @@ def component_progression_display(
 
                         progress.update(
                             task_id,
-                            completed=100,
+                            completed=finish_value,
                             display_name=f"[green]{update.component_name}[/green]",
                             elapsed=elapsed_str,
                             refresh=True,
                         )
+                    
+                        components_finished[update.component_name] = True
+                    
+                    if component_func is None and all(components_finished.values()):
+                        completed = True
+                        return completed, progress
 
             except:
                 # No more updates currently in the queue
@@ -197,24 +209,23 @@ def component_progression_display(
                 progress.update(tid, elapsed=elapsed_str)
             
             # Exit when all threads are finished
-            if all(not thread.is_alive() for _, thread in threads):
-                break
+            if component_func is not None:
+                if all(not thread.is_alive() for _, thread in threads):
+                    break
 
     # Join all threads after finishing
-    for _, thread in threads:
-        thread.join()
+    if component_func is not None:
+        for _, thread in threads:
+            thread.join()
 
-    return completed
+    return completed, progress
 
 
 def parallel_func_apply(
-    components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str, queue: Optional[multiprocessing.Queue] = None, health_thread: Optional[threading.Thread] = None
+    components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str, queue: Optional[multiprocessing.Queue] = None, progress: Optional[Progress] = None
 ):
     if queue is None:
         queue = multiprocessing.Queue()
-
-    if health_thread is not None:
-        health_thread.start()
 
     # Start processes
     processes = []
@@ -224,13 +235,10 @@ def parallel_func_apply(
         processes.append(p)
 
     console = Console()
-    completed = component_progression_display(console, components, queue, present_verb, component_func)
+    completed, _ = component_progression_display(console, components, queue, present_verb, component_func, progress=progress)
 
     for p in processes:
         p.join()
-    
-    if health_thread is not None:
-        health_thread.join()
 
     if completed:
         console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
@@ -352,8 +360,12 @@ def main(args) -> None:
     
     # Run health check in background thread
     health_thread = threading.Thread(target=deployer.healthy, args=(queue,), daemon=True)
-
-    parallel_func_apply(components, parallel_start_component, start_component, "started", "starting", queue, health_thread)
+    health_thread.start()
+    console = Console()
+    _, progress = component_progression_display(console, components, queue, "started", None, finish_value=33.0)
+    health_thread.join()
+    
+    parallel_func_apply(components, parallel_start_component, start_component, "started", "starting", queue, progress)
 
     # Clean up after execution
     match args.mode:
