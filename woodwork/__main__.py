@@ -155,10 +155,6 @@ def component_progression_display(
 
     with Live(layout, console=console, refresh_per_second=10):
         while True:
-            # Exit when all threads are finished
-            if all(not thread.is_alive() for _, thread in threads):
-                break
-
             # Process all available updates in the queue
             try:
                 while True:
@@ -191,7 +187,7 @@ def component_progression_display(
             except:
                 # No more updates currently in the queue
                 pass
-
+            
             # Update elapsed time only for unfinished components
             for cname, tid in tasks.items():
                 if finished_flags[cname]:
@@ -199,6 +195,10 @@ def component_progression_display(
                 elapsed_seconds = int(time.time() - start_times[cname])
                 elapsed_str = str(timedelta(seconds=elapsed_seconds))
                 progress.update(tid, elapsed=elapsed_str)
+            
+            # Exit when all threads are finished
+            if all(not thread.is_alive() for _, thread in threads):
+                break
 
     # Join all threads after finishing
     for _, thread in threads:
