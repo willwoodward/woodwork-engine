@@ -270,6 +270,15 @@ def main(args) -> None:
         generate_exported_objects_file(registry=registry)
         return
 
+    if args.gui is not None:
+        if args.gui == "run":
+            log.debug("GUI is set to run.")
+            from woodwork.gui.gui import GUI
+
+            gui = GUI()
+            gui.run()
+            return
+
     if args.workflow != "none":
         if args.mode in {"run", "debug"}:
             log.debug(

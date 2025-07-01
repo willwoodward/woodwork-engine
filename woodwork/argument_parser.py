@@ -44,6 +44,16 @@ def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--gui",
+        type=str,
+        nargs="?",
+        choices=["run"],
+        const="run",
+        default=None,
+        help=("Run the developer GUI for Woodwork. If the option is not specified, the GUI will not be launched. "),
+    )
+
+    parser.add_argument(
         "--workflow",
         choices=["none", "add", "remove", "find"],
         default="none",
