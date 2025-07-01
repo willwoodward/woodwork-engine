@@ -18,7 +18,7 @@ from rich.table import Column
 from rich.live import Live
 import time
 from datetime import timedelta
-from typing import Dict, List, Callable
+from typing import Dict, List, Callable, Optional
 import threading
 import warnings
 
@@ -51,7 +51,7 @@ def parallel_start_component(c: component, queue: multiprocessing.Queue):
         c.parallel_start(queue=queue, config={})
 
     if isinstance(c, Startable):
-        queue.put(Update(progress=50, component_name=c.name))
+        queue.put(Update(progress=67, component_name=c.name))
     else:
         queue.put(Update(progress=100, component_name=c.name))
 
@@ -67,7 +67,7 @@ def parallel_init_component(c: component, queue: multiprocessing.Queue):
         c.parallel_init(queue=queue, config={})
 
     if isinstance(c, Initializable):
-        queue.put(Update(progress=50, component_name=c.name))
+        queue.put(Update(progress=67, component_name=c.name))
     else:
         queue.put(Update(progress=100, component_name=c.name))
 
@@ -208,9 +208,13 @@ def component_progression_display(
 
 
 def parallel_func_apply(
-    components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str
+    components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str, queue: Optional[multiprocessing.Queue] = None, health_thread: Optional[threading.Thread] = None
 ):
-    queue = multiprocessing.Queue()
+    if queue is None:
+        queue = multiprocessing.Queue()
+
+    if health_thread is not None:
+        health_thread.start()
 
     # Start processes
     processes = []
@@ -224,9 +228,9 @@ def parallel_func_apply(
 
     for p in processes:
         p.join()
-
-    # for comp in components:
-    #     component_func(comp, queue)
+    
+    if health_thread is not None:
+        health_thread.join()
 
     if completed:
         console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
@@ -252,7 +256,6 @@ def main(args) -> None:
         "ignore",
         message="Importing verbose from langchain root module is no longer supported"
     )
-
 
     try:
         # Confirm that there are no known conflicts in the arguments before doing anything else
@@ -341,12 +344,16 @@ def main(args) -> None:
     config_parser.main_function()
     generate_exported_objects_file(registry=registry)
 
-    deployer = Deployer()
-    deployer.main()
-
     # Start all components that implement the Startable interface
     components = config_parser.task_m._tools
-    parallel_func_apply(components, parallel_start_component, start_component, "started", "starting")
+    deployer = Deployer()
+    queue = multiprocessing.Queue()
+    deployer.main()
+    
+    # Run health check in background thread
+    health_thread = threading.Thread(target=deployer.healthy, args=(queue,), daemon=True)
+
+    parallel_func_apply(components, parallel_start_component, start_component, "started", "starting", queue, health_thread)
 
     # Clean up after execution
     match args.mode:
