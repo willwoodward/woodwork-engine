@@ -4,7 +4,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "woodwork-engine"
-version = "0.2.10"
+version = "0.2.11"
 description = "An AI Agent IaC tool that aims to make developing and deploying AI Agents easier."
 readme = "README.md"
 authors = [{ name = "Will Woodward" }]
@@ -56,6 +56,7 @@ include = ["woodwork*"]
     "config/log_config.json",
     "config/.env.example",
     ]
+"woodwork.gui" = ["dist/**/*"]
 
 [tool.ruff]
 line-length = 120
