@@ -1,9 +1,12 @@
 import Page from "@/app/dashboard/page"
 
+import { ThemeProvider } from "@/components/theme-provider"
+
 function App() {
-  console.log(Page)
   return (
-    <Page />
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <Page />
+    </ThemeProvider>
   )
 }
 
