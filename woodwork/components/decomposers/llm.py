@@ -19,6 +19,7 @@ class llm(decomposer):
 
         self.__llm = ChatOpenAI(
             model="gpt-4o-mini",
+            model="gpt-4o-mini",
             temperature=0,
             max_tokens=None,
             timeout=None,
@@ -225,6 +226,17 @@ class llm(decomposer):
             self._cache_actions(result)
 
         # Send to task_master
+        res = self._output.execute(result)
+        reflected = self.reflect(query, result, res)
+        
+        if reflected is not None:
+            # print_debug(f"[REFLECTED] {reflected}")
+            # If the reflection is not None, it means we need to generate a new plan
+            new_plan = self.input(reflected)
+            return new_plan
+
+        # Else if no output, print the result
+        print(res)
         res = self._output.execute(result)
         reflected = self.reflect(query, result, res)
         
