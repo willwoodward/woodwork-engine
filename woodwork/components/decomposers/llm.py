@@ -216,30 +216,28 @@ class llm(decomposer):
         #         log.debug("Cache hit!")
         #         return self._output.execute(self._generate_workflow(query, closest_query))
 
+        # Build tool documentation string
         tool_documentation = ""
         for obj in self._tools:
             tool_documentation += f"tool name: {obj.name}\ntool type: {obj.type}\n{obj.description}\n\n\n"
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
+
+        # Build system prompt
         system_prompt = (
             "You are a reasoning agent that solves user prompts step-by-step using available tools.\n\n"
-
             "Here are the available tools:\n"
             "{tools}\n\n"
-
             "At each step, follow this format exactly:\n\n"
             "Thought: [Explain what you're thinking or what needs to be done next. Be concise but logical.]\n"
             "Action: {{\"tool\": tool_name, \"action\": function_or_endpoint, \"inputs\": {{input_variable: variable_name}}, \"output\": output_variable}}\n"
             "Observation: [This will be provided by the system after the action is executed. Do NOT fabricate or guess the observation.]\n\n"
-
             "If you need more information to proceed, ask the user a clarifying question:\n"
             "Thought: [Identify what's missing and why you need it.]\n"
             "Action: AskUser(\"Your question here\")\n"
             "Observation: [The user's response]\n\n"
-
             "When the task is complete, respond with:\n"
             "Final Answer: [your conclusion or solution]\n\n"
-
             "Guidelines:\n"
             "- Only one Action per step.\n"
             "- Do not include an Observation unless it is provided to you.\n"
@@ -248,7 +246,6 @@ class llm(decomposer):
             "  Example: {{\"word\": \"word\"}}, not {{\"word\": \"orange\"}}.\n"
             "- Always assign the result to an output variable, even if unused.\n"
             "- Do not fabricate or predict the results of an action — wait for the actual observation to be provided by the system.\n\n"
-
             "Example:\n"
             "User prompt: What is the length of the word orange?\n\n"
             "Thought: I need to find the length of the word provided.\n"
@@ -256,10 +253,10 @@ class llm(decomposer):
             "Observation: 6\n"
             "Thought: I now know the length of the word.\n"
             "Final Answer: The length of the word 'orange' is 6.\n\n"
-
             "Begin reasoning now."
         ).format(tools=tool_documentation)
 
+        # Escape for template compatibility
         escaped_prompt = system_prompt.replace("{", "{{").replace("}", "}}")
 
         prompt = ChatPromptTemplate.from_messages(
@@ -270,19 +267,27 @@ class llm(decomposer):
         )
 
         chain = prompt | self.__llm
-        result = chain.invoke({"input": query}).content
 
-        log.debug(f"[RESULT] {result}")
+        current_prompt = query
 
-        thought, action, isFinished = self._parse(result)
+        for iteration in range(10):
+            log.debug(f"\n--- Iteration {iteration + 1} ---")
+            result = chain.invoke({"input": current_prompt}).content
+            log.debug(f"[RESULT] {result}")
 
-        if isFinished:
-            # Output final answer to task_master
-            return thought
+            thought, action, is_final = self._parse(result)
 
-        # Else execute the action
-        obs = self._task_m.execute(action)
-        print("Observation: ", obs)
+            if is_final:
+                log.debug("Final Answer found.")
+                return thought
+
+            log.debug(f"Thought: {thought}")
+            log.debug(f"Action: {action}")
+            observation = self._task_m.execute(action)
+            log.debug(f"Observation: {observation}")
+
+            # Append step to ongoing prompt
+            current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action)}\nObservation: {observation}\n\nContinue with the next step:"
 
         # # Cache instructions
         # if self._cache_mode:
