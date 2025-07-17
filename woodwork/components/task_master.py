@@ -23,49 +23,74 @@ class task_master(component):
         self._inputs = [component for component in tools if isinstance(component, inputs)]
         self._outputs = [component for component in tools if isinstance(component, outputs)]
 
-    def execute(self, workflow: dict[str, Any]):
-        log.debug("Executing instructions...")
-        variables = {}
-        prev_instructon = ""
-
-        # Add the initial variables
-        for key in workflow["inputs"]:
-            variables[key] = workflow["inputs"][key]
-
-        instructions = workflow["plan"]
-
-        for instruction in instructions:
-            # Substitute variable inputs
-            for key in instruction["inputs"]:
-                variable = str(instruction["inputs"][key])
-                if variable in variables:
-                    instruction["inputs"][key] = variables[variable]
-
-            # Use tool
-            result = self._use_tool(instruction)
-
-            if not result:
-                break
-
-            # Add the result to the variables
-            variables[instruction["output"]] = result
-            prev_instructon = result  # TODO: @willwoodward fix spelling of variable if necessary
-            log.debug(f"instruction = {instruction}")
-            log.debug(f"result = {result}")
-
-        return prev_instructon
-
-    def _use_tool(self, instruction):
+    def execute(self, action: dict[str, Any]):
+        """
+        Executes a single action dictionary returned by the agent.
+        """
         try:
-            result = None
+            tool_name = action["tool"]
+            action_name = action["action"]
+            inputs = action.get("inputs", {})
 
-            tool = list(filter(lambda x: x.name == instruction["tool"], self._tools))[0]
-            result = tool.input(instruction["action"], instruction["inputs"])
+            log.debug(f"Executing tool '{tool_name}' with action '{action_name}' and inputs {inputs}")
 
+            # Find the tool object by name
+            tool = next((t for t in self._tools if t.name == tool_name), None)
+            if tool is None:
+                raise ValueError(f"Tool '{tool_name}' not found.")
+
+            # Call the tool's input method
+            result = tool.input(action_name, inputs)
+            log.debug(f"Tool result: {result}")
             return result
-        except:
-            print("This instruction was not able to execute.")
-            return
+
+        except Exception as e:
+            log.error(f"Failed to execute action: {e}")
+            return None
+
+    # def execute(self, workflow: dict[str, Any]):
+    #     log.debug("Executing instructions...")
+    #     variables = {}
+    #     prev_instructon = ""
+
+    #     # Add the initial variables
+    #     for key in workflow["inputs"]:
+    #         variables[key] = workflow["inputs"][key]
+
+    #     instructions = workflow["plan"]
+
+    #     for instruction in instructions:
+    #         # Substitute variable inputs
+    #         for key in instruction["inputs"]:
+    #             variable = str(instruction["inputs"][key])
+    #             if variable in variables:
+    #                 instruction["inputs"][key] = variables[variable]
+
+    #         # Use tool
+    #         result = self._use_tool(instruction)
+
+    #         if not result:
+    #             break
+
+    #         # Add the result to the variables
+    #         variables[instruction["output"]] = result
+    #         prev_instructon = result  # TODO: @willwoodward fix spelling of variable if necessary
+    #         log.debug(f"instruction = {instruction}")
+    #         log.debug(f"result = {result}")
+
+    #     return prev_instructon
+
+    # def _use_tool(self, instruction):
+    #     try:
+    #         result = None
+
+    #         tool = list(filter(lambda x: x.name == instruction["tool"], self._tools))[0]
+    #         result = tool.input(instruction["action"], instruction["inputs"])
+
+    #         return result
+    #     except:
+    #         print("This instruction was not able to execute.")
+    #         return
 
     def close_all(self):
         for tool in self._tools:

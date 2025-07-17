@@ -1,9 +1,10 @@
 import json
+import re
 import logging
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-from typing import Any
+from typing import Any, Tuple, Optional
 
 from woodwork.components.decomposers.decomposer import decomposer
 from woodwork.helper_functions import format_kwargs
@@ -53,6 +54,52 @@ class llm(decomposer):
             log.debug("Couldn't load array as JSON")
             log.debug(x[start_index : end_index + 1 :])
             return x
+
+    def _parse(self, agent_output: str) -> Tuple[str, Optional[dict], bool]:
+        """
+        Parse a ReAct-style agent output and extract either:
+        - (thought, action_dict) if Action is present
+        - (final_answer, None) if Final Answer is present
+
+        Args:
+            agent_output (str): The full output from the agent.
+
+        Returns:
+            Tuple[str, Optional[dict]]: 
+                - If Action is present: (thought, action_dict)
+                - If Final Answer is present: (final_answer, None)
+
+        Raises:
+            ValueError: if neither an Action nor Final Answer can be found.
+        """
+        # Handle Final Answer
+        final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
+        if final_answer_match:
+            final_answer = final_answer_match.group(1).strip()
+            return final_answer, None, True
+
+        # Extract Thought
+        thought_match = re.search(r"Thought:\s*(.*)", agent_output)
+        if not thought_match:
+            raise ValueError("Could not find 'Thought:' line.")
+        thought = thought_match.group(1).strip()
+
+        # Extract Action
+        action_match = re.search(r"Action:\s*(\{.*\})", agent_output)
+        if not action_match:
+            raise ValueError("Could not find valid JSON 'Action:' block.")
+
+        action_str = action_match.group(1).strip()
+        # Strip out common invisible or problematic characters
+        cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
+
+        try:
+            action = json.loads(cleaned_action_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
+
+
+        return thought, action, False
 
     def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, Any]:
         """Given a prompt and the inputs to be extracted, return the input dictionary."""
@@ -162,12 +209,12 @@ class llm(decomposer):
 
 
     def input(self, query):
-        # Search cache for similar results
-        if self._cache_mode:
-            closest_query = self._cache_search_actions(query)
-            if closest_query["score"] > 0.90:
-                log.debug("Cache hit!")
-                return self._output.execute(self._generate_workflow(query, closest_query))
+        # # Search cache for similar results
+        # if self._cache_mode:
+        #     closest_query = self._cache_search_actions(query)
+        #     if closest_query["score"] > 0.90:
+        #         log.debug("Cache hit!")
+        #         return self._output.execute(self._generate_workflow(query, closest_query))
 
         tool_documentation = ""
         for obj in self._tools:
@@ -175,34 +222,49 @@ class llm(decomposer):
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
         system_prompt = (
-            "Given the following tools and their descriptions:\n"
-            "{tools} "
-            "Answer the user's prompt, returning only the necessary action plan "
-            "to carry out the steps to solving the user's prompt. "
-            "If you do not have necessary tools, say so."
-            "Structure your steps in the following schema: "
-            '[{{{{"tool": tool, "action": prompt, function or endpoint, "inputs": {{{{variable: value}}}}, "output": value}}}}, ...]'
-            "Format this JSON into an array of steps, returing only this array. "
-            "Include only these keys in the JSON object, no others. "
-            "Specify only the function or endpoint name as an action when they are used, do not include them as a function key. "
-            "If you do not have the necessary information, ask for the required information. "
-            "Always specify an output variable. "
-            "Once this array of steps has been constructed, insert it into the following JSON schema: "
-            '{{{{"name": name, "inputs": dictionary of inputs, "plan": array of steps}}}}'
-            "The name should be the user's prompt, with input variables in curly braces and proper punctuation."
-            "The dictionary of inputs should have keys as the input variables, and values as the hardcoded value to be substituted into the name. These will be replaced whenever the action is called."
-            "For example, a prompt could be: what is the length of the word orange, which will have name: What is the length of the word {{{{word}}}}?"
-            'Where the dictionary of inputs is {{{{"word": "orange"}}}}.'
-            "The inputs of the action plan should not be hardcoded. Using this example:"
-            '{{{{"inputs": {{{{"word": "word"}}}}}}}}, not {{{{"inputs": {{{{"word": "orange"}}}}}}}}.'
-            "Just a reminder that inputs of the plan should be a string (which references a variable), and not wrapped in curly braces when used as a key."
-            "And an extra reminder that the inputs inside an action plan should not be hardcoded. For example, if the word changed, the action plan should be able to execute on the different word."
-            "Return only this fully constructed JSON object."
+            "You are a reasoning agent that solves user prompts step-by-step using available tools.\n\n"
+
+            "Here are the available tools:\n"
+            "{tools}\n\n"
+
+            "At each step, follow this format exactly:\n\n"
+            "Thought: [Explain what you're thinking or what needs to be done next. Be concise but logical.]\n"
+            "Action: {{\"tool\": tool_name, \"action\": function_or_endpoint, \"inputs\": {{input_variable: variable_name}}, \"output\": output_variable}}\n"
+            "Observation: [This will be provided by the system after the action is executed. Do NOT fabricate or guess the observation.]\n\n"
+
+            "If you need more information to proceed, ask the user a clarifying question:\n"
+            "Thought: [Identify what's missing and why you need it.]\n"
+            "Action: AskUser(\"Your question here\")\n"
+            "Observation: [The user's response]\n\n"
+
+            "When the task is complete, respond with:\n"
+            "Final Answer: [your conclusion or solution]\n\n"
+
+            "Guidelines:\n"
+            "- Only one Action per step.\n"
+            "- Do not include an Observation unless it is provided to you.\n"
+            "- All actions must include: 'tool', 'action', 'inputs', and 'output'.\n"
+            "- Inputs in the action must reference variable names, not hardcoded values.\n"
+            "  Example: {{\"word\": \"word\"}}, not {{\"word\": \"orange\"}}.\n"
+            "- Always assign the result to an output variable, even if unused.\n"
+            "- Do not fabricate or predict the results of an action — wait for the actual observation to be provided by the system.\n\n"
+
+            "Example:\n"
+            "User prompt: What is the length of the word orange?\n\n"
+            "Thought: I need to find the length of the word provided.\n"
+            "Action: {{\"tool\": \"string_utils\", \"action\": \"length\", \"inputs\": {{\"word\": \"word\"}}, \"output\": \"length\"}}\n"
+            "Observation: 6\n"
+            "Thought: I now know the length of the word.\n"
+            "Final Answer: The length of the word 'orange' is 6.\n\n"
+
+            "Begin reasoning now."
         ).format(tools=tool_documentation)
+
+        escaped_prompt = system_prompt.replace("{", "{{").replace("}", "}}")
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", system_prompt),
+                ("system", escaped_prompt),
                 ("human", "{input}"),
             ]
         )
@@ -212,38 +274,41 @@ class llm(decomposer):
 
         log.debug(f"[RESULT] {result}")
 
-        # Clean output as JSON
-        result = self.__clean(result)
+        thought, action, isFinished = self._parse(result)
 
-        log.debug(f"[RESULT] {result}")
+        if isFinished:
+            # Output final answer to task_master
+            return thought
 
-        if isinstance(result, str):
-            return result
+        # Else execute the action
+        obs = self._task_m.execute(action)
+        print("Observation: ", obs)
 
-        # Cache instructions
-        if self._cache_mode:
-            self._cache_actions(result)
+        # # Cache instructions
+        # if self._cache_mode:
+        #     self._cache_actions(result)
 
-        # Send to task_master
-        res = self._output.execute(result)
-        reflected = self.reflect(query, result, res)
         
-        if reflected is not None:
-            # print_debug(f"[REFLECTED] {reflected}")
-            # If the reflection is not None, it means we need to generate a new plan
-            new_plan = self.input(reflected)
-            return new_plan
-
-        # Else if no output, print the result
-        print(res)
-        res = self._output.execute(result)
-        reflected = self.reflect(query, result, res)
+        # # Send to task master
+        # res = self._output.execute(result)
+        # reflected = self.reflect(query, result, res)
         
-        if reflected is not None:
-            # print_debug(f"[REFLECTED] {reflected}")
-            # If the reflection is not None, it means we need to generate a new plan
-            new_plan = self.input(reflected)
-            return new_plan
+        # if reflected is not None:
+        #     # print_debug(f"[REFLECTED] {reflected}")
+        #     # If the reflection is not None, it means we need to generate a new plan
+        #     new_plan = self.input(reflected)
+        #     return new_plan
 
-        # Else if no output, print the result
-        print(res)
+        # # Else if no output, print the result
+        # print(res)
+        # res = self._output.execute(result)
+        # reflected = self.reflect(query, result, res)
+        
+        # if reflected is not None:
+        #     # print_debug(f"[REFLECTED] {reflected}")
+        #     # If the reflection is not None, it means we need to generate a new plan
+        #     new_plan = self.input(reflected)
+        #     return new_plan
+
+        # # Else if no output, print the result
+        # print(res)
