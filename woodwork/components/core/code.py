@@ -1,12 +1,11 @@
 from woodwork.components.core.core import core
-from woodwork.helper_functions import print_debug, format_kwargs
+from woodwork.helper_functions import format_kwargs
 
 
 class code(core):
     def __init__(self, container, repo_url: str, **config):
         format_kwargs(config, container=container, repo_url=repo_url, type="code")
         super().__init__(**config)
-        print_debug("Setting up code component...")
 
         # Required components
         self.docker = container.docker
@@ -23,11 +22,11 @@ class code(core):
         if result.exit_code != 0:
             clone_command = f"git clone https://github.com/{self.repo_url}.git {self.local_path}"
             out = container.exec_run(f"/bin/sh -c '{clone_command}'")
-            print_debug("Repo cloned: " + out.output.decode("utf-8"))
+            print("Repo cloned: " + out.output.decode("utf-8"))
 
     def sync_to_vector_db(self):
         if not self.vector_db or not self.embedding_model:
-            print_debug("Vector DB or embedding model not configured. Skipping sync.")
+            print("Vector DB or embedding model not configured. Skipping sync.")
             return
 
         container = self.docker.get_container()

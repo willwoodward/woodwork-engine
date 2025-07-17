@@ -19,7 +19,6 @@ class llm(decomposer):
 
         self.__llm = ChatOpenAI(
             model="gpt-4o-mini",
-            model="gpt-4o-mini",
             temperature=0,
             max_tokens=None,
             timeout=None,
@@ -138,7 +137,7 @@ class llm(decomposer):
 
         result = self.__llm.invoke(reflection_prompt).content.strip()
         result = self.__clean(result)
-        print_debug(f"[REFLECTION RESULT] {result}")
+        print(f"[REFLECTION RESULT] {result}")
 
         if result["is_sufficient"]:
             return None
