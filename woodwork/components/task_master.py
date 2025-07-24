@@ -155,18 +155,21 @@ class task_master(component):
         self.validate_workflow(workflow, self._tools)
         id = self._cache_actions(workflow)
         print(f"Successfully added a new workflow with ID: {id}")
+        return True
     
     def list_workflows(self):
-        return self.cache.run(
+        result = self.cache.run(
             f"""MATCH (n:Prompt)-[:NEXT]->(m)
             RETURN n.value"""
         )
+        return list(map(lambda x: x["n.value"], result))
 
-    def _cache_actions(self, workflow: dict[str, Any]):
+
+    def _cache_actions(self, workflow: Workflow):
         """Add the actions to the graph if they aren't already present, as a chain."""
-        prompt = workflow["name"]
-        workflow_inputs = str(list(workflow["inputs"].keys()))
-        instructions = workflow["plan"]
+        prompt = workflow.name
+        workflow_inputs = str(list(workflow.inputs.keys()))
+        instructions = workflow.plan
 
         # # Check to see if the action has been cached
         # if self._cache_search_actions(prompt)["score"] > 0.96:

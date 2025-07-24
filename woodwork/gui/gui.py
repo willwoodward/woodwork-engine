@@ -6,6 +6,7 @@ import shutil
 import webbrowser
 
 from woodwork.components.task_master import task_master
+from woodwork.types import Workflow
 
 
 class GUI:
@@ -36,7 +37,8 @@ class GUI:
             workflow_data = request.json
             if not workflow_data:
                 return jsonify({"error": "No JSON payload provided"}), 400
-            success = self.task_m.add_workflow(workflow_data)
+            workflow = Workflow.from_dict(workflow_data)
+            success = self.task_m.add_workflow(workflow)
             if success:
                 return jsonify({"status": "success"}), 201
             else:
