@@ -46,39 +46,6 @@ class decomposer(component, ABC):
         """Given a query, return the JSON array denoting the actions to take, passed to the task master."""
         pass
 
-    def _cache_actions(self, workflow: dict[str, Any]):
-        """Add the actions to the graph if they aren't already present, as a chain."""
-        prompt = workflow["name"]
-        workflow_inputs = str(list(workflow["inputs"].keys()))
-        instructions = workflow["plan"]
-
-        # Check to see if the action has been cached
-        if self._cache_search_actions(prompt)["score"] > 0.96:
-            log.debug("Similar prompts have already been cached.")
-            return
-
-        # Instructions must have at least one instruction
-        if len(instructions) == 0:
-            return
-
-        # Generate the database query
-        query = f'MERGE (p:Prompt {{value: "{prompt}", inputs: {workflow_inputs}}})'
-
-        for instruction in instructions:
-            query += f'-[:NEXT]->(:Action {{value: "{instruction}"}})'
-
-        query += "\nRETURN elementId(p) as id"
-
-        # Execute query
-        # result = self._cache.run(query)[0]
-
-        # Add the vector embedding for the prompt
-        # self._cache.embed("Prompt", "value")
-
-        # Return the ID of the prompt node
-        # return result["id"]
-        return None
-
     def _cache_search_actions(self, prompt: str):
         similar_prompts = self._cache.similarity_search(prompt, "Prompt", "value")
 

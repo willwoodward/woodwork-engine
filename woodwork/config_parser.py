@@ -460,27 +460,6 @@ def clear_all():
             tool.clear_all()
 
 
-def validate_action_plan(workflow: dict[str, Any], tools: list):
-    # Check tools exist
-    for action in workflow["plan"]:
-        tool_names = list(map(lambda x: x.name, tools))
-
-        if action["tool"] not in tool_names:
-            raise SyntaxError("Tool not found.")
-
-
-def add_action_plan(file_path: str):
-    from woodwork.components.decomposers.decomposer import decomposer
-
-    for tool in task_m._tools:
-        if isinstance(tool, decomposer):
-            with open(file_path) as f:
-                plan = json.loads(f.read())
-                validate_action_plan(plan, task_m._tools)
-                id = tool._cache_actions(plan)
-                print(f"Successfully added a new workflow with ID: {id}")
-
-
 def delete_action_plan(id: str):
     from woodwork.components.decomposers.decomposer import decomposer
 

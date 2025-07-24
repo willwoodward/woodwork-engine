@@ -1,6 +1,7 @@
 import logging
 from threading import Thread
 import asyncio
+import json
 
 from typing import Any
 
@@ -10,6 +11,7 @@ from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
 from woodwork.deployments.router import get_router
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+from woodwork.types import Workflow
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +28,8 @@ class task_master(component):
             password="testpassword",
             name="decomposer_cache",
         )
+
+        self._tools = []
 
     def add_tools(self, tools):
         self._tools = tools
@@ -137,3 +141,56 @@ class task_master(component):
 
         thread = Thread(target=run)
         thread.start()
+    
+    def validate_workflow(self, workflow: Workflow, tools: list):
+        # # Check tools exist
+        # for action in workflow["plan"]:
+        #     tool_names = list(map(lambda x: x.name, tools))
+
+        #     if action["tool"] not in tool_names:
+        #         raise SyntaxError("Tool not found.")
+        return True
+
+    def add_workflow(self, workflow: Workflow):
+        self.validate_workflow(workflow, self._tools)
+        id = self._cache_actions(workflow)
+        print(f"Successfully added a new workflow with ID: {id}")
+    
+    def list_workflows(self):
+        return self.cache.run(
+            f"""MATCH (n:Prompt)-[:NEXT]->(m)
+            RETURN n.value"""
+        )
+
+    def _cache_actions(self, workflow: dict[str, Any]):
+        """Add the actions to the graph if they aren't already present, as a chain."""
+        prompt = workflow["name"]
+        workflow_inputs = str(list(workflow["inputs"].keys()))
+        instructions = workflow["plan"]
+
+        # # Check to see if the action has been cached
+        # if self._cache_search_actions(prompt)["score"] > 0.96:
+        #     log.debug("Similar prompts have already been cached.")
+        #     return
+
+        # Instructions must have at least one instruction
+        if len(instructions) == 0:
+            return
+
+        # Generate the database query
+        query = f'MERGE (p:Prompt {{value: "{prompt}", inputs: {workflow_inputs}}})'
+
+        for instruction in instructions:
+            query += f'-[:NEXT]->(:Action {{value: "{instruction}"}})'
+
+        query += "\nRETURN elementId(p) as id"
+
+        # Execute query
+        result = self.cache.run(query)[0]
+
+        # Add the vector embedding for the prompt
+        # self._cache.embed("Prompt", "value")
+
+        # Return the ID of the prompt node
+        # return result["id"]
+        return None

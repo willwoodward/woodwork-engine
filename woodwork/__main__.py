@@ -274,7 +274,7 @@ def main(args) -> None:
             log.debug("GUI is set to run.")
             from woodwork.gui.gui import GUI
 
-            gui = GUI()
+            gui = GUI(config_parser.task_m)
             gui.run()
             return
 

@@ -1,9 +1,11 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request, jsonify
 import threading
 import subprocess
 import sys
 import shutil
 import webbrowser
+
+from woodwork.components.task_master import task_master
 
 
 class GUI:
@@ -11,10 +13,11 @@ class GUI:
     A class to represent a developer GUI for Woodwork Engine.
     """
 
-    def __init__(self):
+    def __init__(self, task_master: task_master):
         """Initialize the GUI."""
         self.app = Flask(__name__, static_folder="dist", static_url_path="")
         self.port = 43000
+        self.task_m = task_master
 
         @self.app.route("/")
         def serve_index():
@@ -23,6 +26,21 @@ class GUI:
         @self.app.route("/<path:path>")
         def serve_static(path):
             return send_from_directory(self.app.static_folder, path)
+        
+        @self.app.route("/api/workflows/get", methods=["GET"])
+        def get_workflows():
+            return jsonify(self.task_m.list_workflows())
+
+        @self.app.route("/api/workflows", methods=["POST"])
+        def create_workflow():
+            workflow_data = request.json
+            if not workflow_data:
+                return jsonify({"error": "No JSON payload provided"}), 400
+            success = self.task_m.add_workflow(workflow_data)
+            if success:
+                return jsonify({"status": "success"}), 201
+            else:
+                return jsonify({"status": "error saving"}), 500
 
     def _try_open_browser(self):
         if sys.platform == "linux":
