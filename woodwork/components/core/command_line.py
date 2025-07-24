@@ -28,13 +28,13 @@ class command_line(core):
             docker_volume_location="/home/ubuntu/repo",
         )
         self.docker.init()
-        self.current_directory = "/"
+        self.current_directory = "/home/ubuntu/repo"
 
         log.debug("Command line configured.")
 
     def change_directory(self, new_path):
         if not new_path:
-            self.current_directory = "/"
+            self.current_directory = "/home/ubuntu/repo"
             return
 
         resolved_path = os.path.abspath(os.path.join(self.current_directory, new_path))

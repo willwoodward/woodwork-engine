@@ -7,19 +7,20 @@ from typing import Any
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.helper_functions import format_kwargs, get_optional
+from woodwork.components.task_master import task_master
 
 log = logging.getLogger(__name__)
 
 
 class decomposer(component, ABC):
-    def __init__(self, tools, output, **config):
+    def __init__(self, tools, output, task_m: task_master, **config):
         format_kwargs(config, tools=tools, output=output, component="decomposer")
         super().__init__(**config)
         log.debug("Creating the decomposer...")
 
         self._tools = tools
         self._task_m = output
-        self._cache = None
+        self._cache = task_m.cache
         self._cache_mode = False
         api_key = get_optional(config, "api_key")
 
@@ -30,15 +31,9 @@ class decomposer(component, ABC):
 
                 if api_key is None:
                     exit()
-
-                self._cache = neo4j(
-                    uri="bolt://localhost:7687",
-                    user="neo4j",
-                    password="testpassword",
-                    api_key=api_key,
-                    name="decomposer_cache",
-                )
-                self._cache.init_vector_index("embeddings", "Prompt", "embedding")
+                
+                self._cache.set_api_key(api_key=api_key)
+                self._cache.init_vector_index(index_name="embeddings", label="Prompt", property="embedding")
         else:
             self._cache_mode = False
 

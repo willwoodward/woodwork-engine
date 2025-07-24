@@ -29,7 +29,6 @@ class Router:
         self.deployments: dict[str, Deployment] = {}
 
     def get(self, name) -> Optional[DeploymentWrapper]:
-        print(self.components, name)
         return self.components.get(name)
 
     def add(self, component: component, deployment=None):

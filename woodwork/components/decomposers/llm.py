@@ -65,7 +65,7 @@ class llm(decomposer):
             agent_output (str): The full output from the agent.
 
         Returns:
-            Tuple[str, Optional[dict]]: 
+            Tuple[str, Optional[dict]]:
                 - If Action is present: (thought, action_dict)
                 - If Final Answer is present: (final_answer, None)
 
@@ -97,8 +97,6 @@ class llm(decomposer):
             action = json.loads(cleaned_action_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
-
-
         return thought, action, False
 
     def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, Any]:
@@ -168,17 +166,17 @@ class llm(decomposer):
             "If the output uses markdown bullet points or list formatting, or if it includes multiple mini explanations instead of one clear statement, it is insufficient.\n\n"
             "Examples:\n"
             "Insufficient (because of bullet points):\n"
-            "\"\"\"\n"
+            '"""\n'
             "- fileA.py handles X\n"
             "- fileB.py handles Y\n"
-            "\"\"\"\n"
+            '"""\n'
             "Sufficient:\n"
-            "\"The code files related to voice input handling are fileA.py and fileB.py, which manage recording and keyword detection respectively.\"\n\n"
+            '"The code files related to voice input handling are fileA.py and fileB.py, which manage recording and keyword detection respectively."\n\n'
             "Answer using a JSON dictionary with the structure:\n"
             "- If sufficient:\n"
-            '  {\"is_sufficient\": true, \"suggested_prompt\": null, \"reason\": \"The output is concise, clear, and formatted as a single sentence or brief paragraph that directly answers the question without list formatting.\"}\n'
+            '  {"is_sufficient": true, "suggested_prompt": null, "reason": "The output is concise, clear, and formatted as a single sentence or brief paragraph that directly answers the question without list formatting."}\n'
             "- If not sufficient:\n"
-            '  {\"is_sufficient\": false, \"suggested_prompt\": \"Please provide a concise sentence or brief paragraph that directly answers the question, including relevant file names naturally, without markdown bullet points or lists.\", \"reason\": \"The output uses markdown bullet points, lists, or multiple mini explanations instead of a single clear statement.\"}\n\n'
+            '  {"is_sufficient": false, "suggested_prompt": "Please provide a concise sentence or brief paragraph that directly answers the question, including relevant file names naturally, without markdown bullet points or lists.", "reason": "The output uses markdown bullet points, lists, or multiple mini explanations instead of a single clear statement."}\n\n'
             "Be strict and only mark outputs as sufficient if they meet these criteria."
         )
 
@@ -206,8 +204,6 @@ class llm(decomposer):
 
             return new_plan_prompt
 
-
-
     def input(self, query):
         # # Search cache for similar results
         # if self._cache_mode:
@@ -230,11 +226,11 @@ class llm(decomposer):
             "{tools}\n\n"
             "At each step, follow this format exactly:\n\n"
             "Thought: [Explain what you're thinking or what needs to be done next. Be concise but logical.]\n"
-            "Action: {{\"tool\": tool_name, \"action\": function_or_endpoint, \"inputs\": {{input_variable: variable_name}}, \"output\": output_variable}}\n"
+            'Action: {{"tool": tool_name, "action": function_or_endpoint, "inputs": {{input_variable: variable_name}}, "output": output_variable}}\n'
             "Observation: [This will be provided by the system after the action is executed. Do NOT fabricate or guess the observation.]\n\n"
             "If you need more information to proceed, ask the user a clarifying question:\n"
             "Thought: [Identify what's missing and why you need it.]\n"
-            "Action: AskUser(\"Your question here\")\n"
+            'Action: {{"tool": "ask_user", "action": "ask", "inputs": {{"question": "your question here"}}, "output": "user_response"}}\n'
             "Observation: [The user's response]\n\n"
             "When the task is complete, respond with:\n"
             "Final Answer: [your conclusion or solution]\n\n"
@@ -243,13 +239,13 @@ class llm(decomposer):
             "- Do not include an Observation unless it is provided to you.\n"
             "- All actions must include: 'tool', 'action', 'inputs', and 'output'.\n"
             "- Inputs in the action must reference variable names, not hardcoded values.\n"
-            "  Example: {{\"word\": \"word\"}}, not {{\"word\": \"orange\"}}.\n"
+            '  Example: {{"word": "word"}}, not {{"word": "orange"}}.\n'
             "- Always assign the result to an output variable, even if unused.\n"
             "- Do not fabricate or predict the results of an action — wait for the actual observation to be provided by the system.\n\n"
             "Example:\n"
             "User prompt: What is the length of the word orange?\n\n"
             "Thought: I need to find the length of the word provided.\n"
-            "Action: {{\"tool\": \"string_utils\", \"action\": \"length\", \"inputs\": {{\"word\": \"word\"}}, \"output\": \"length\"}}\n"
+            'Action: {{"tool": "string_utils", "action": "length", "inputs": {{"word": "word"}}, "output": "length"}}\n'
             "Observation: 6\n"
             "Thought: I now know the length of the word.\n"
             "Final Answer: The length of the word 'orange' is 6.\n\n"
@@ -283,6 +279,11 @@ class llm(decomposer):
 
             log.debug(f"Thought: {thought}")
             log.debug(f"Action: {action}")
+            print(f"Thought: {thought}")
+
+            if action["tool"] == "ask_user":
+                return action["inputs"]["question"]
+
             observation = self._task_m.execute(action)
             log.debug(f"Observation: {observation}")
 
@@ -293,11 +294,10 @@ class llm(decomposer):
         # if self._cache_mode:
         #     self._cache_actions(result)
 
-        
         # # Send to task master
         # res = self._output.execute(result)
         # reflected = self.reflect(query, result, res)
-        
+
         # if reflected is not None:
         #     # print_debug(f"[REFLECTED] {reflected}")
         #     # If the reflection is not None, it means we need to generate a new plan
@@ -308,7 +308,7 @@ class llm(decomposer):
         # print(res)
         # res = self._output.execute(result)
         # reflected = self.reflect(query, result, res)
-        
+
         # if reflected is not None:
         #     # print_debug(f"[REFLECTED] {reflected}")
         #     # If the reflection is not None, it means we need to generate a new plan

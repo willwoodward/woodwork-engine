@@ -5,10 +5,11 @@ import asyncio
 from typing import Any
 
 from woodwork.components.component import component
-from woodwork.helper_functions import format_kwargs
+from woodwork.helper_functions import format_kwargs, get_optional
 from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
 from woodwork.deployments.router import get_router
+from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 
 log = logging.getLogger(__name__)
 
@@ -17,6 +18,14 @@ class task_master(component):
     def __init__(self, **config):
         format_kwargs(config, component="task_master", type="default")
         super().__init__(**config)
+
+        # Setup workflows storage
+        self.cache = neo4j(
+            uri="bolt://localhost:7687",
+            user="neo4j",
+            password="testpassword",
+            name="decomposer_cache",
+        )
 
     def add_tools(self, tools):
         self._tools = tools

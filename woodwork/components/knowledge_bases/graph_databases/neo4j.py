@@ -8,14 +8,14 @@ from woodwork.components.knowledge_bases.graph_databases.graph_database import (
     graph_database,
 )
 from woodwork.deployments import Docker
-from woodwork.helper_functions import format_kwargs
+from woodwork.helper_functions import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
 
 class neo4j(graph_database):
-    def __init__(self, uri, user, password, api_key, **config):
-        format_kwargs(config, uri=uri, user=user, password=password, api_key=api_key, type="neo4j")
+    def __init__(self, uri, user, password, **config):
+        format_kwargs(config, uri=uri, user=user, password=password, type="neo4j")
         super().__init__(**config)
         log.debug("Initializing Neo4j Knowledge Base...")
 
@@ -48,10 +48,18 @@ class neo4j(graph_database):
         if not self._connected():
             exit()
 
-        self._api_key = api_key
-        self._openai_client = OpenAI()
+        self._api_key = get_optional(config, "api_key")
+        self._openai_client = None
+
+        if self._api_key:
+            self._openai_client = OpenAI()
 
         log.debug("Neo4j Knowledge Base created.")
+    
+    def set_api_key(self, api_key: str):
+        self._openai_client = OpenAI(api_key)
+        self._api_key = api_key
+
 
     def _connected(self):
         try:
