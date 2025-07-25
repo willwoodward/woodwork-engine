@@ -20,20 +20,21 @@ class command_line(core):
             container_name="command-line",
             dockerfile="""
             FROM ubuntu:latest
-            RUN apt-get update && apt-get install -y bash
+            RUN apt-get update && apt-get install -y bash git
             CMD ["tail", "-f", "/dev/null"]
             """,
             container_args={},
             volume_location=".woodwork/vm",
+            docker_volume_location="/home/ubuntu/repo",
         )
         self.docker.init()
-        self.current_directory = "/"
+        self.current_directory = "/home/ubuntu/repo"
 
         log.debug("Command line configured.")
 
     def change_directory(self, new_path):
         if not new_path:
-            self.current_directory = "/"
+            self.current_directory = "/home/ubuntu/repo"
             return
 
         resolved_path = os.path.abspath(os.path.join(self.current_directory, new_path))

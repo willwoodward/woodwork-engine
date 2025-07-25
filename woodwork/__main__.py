@@ -272,9 +272,11 @@ def main(args) -> None:
     if args.gui is not None:
         if args.gui == "run":
             log.debug("GUI is set to run.")
+            dependencies.activate_virtual_environment()
+            config_parser.main_function()
             from woodwork.gui.gui import GUI
 
-            gui = GUI()
+            gui = GUI(config_parser.task_m)
             gui.run()
             return
 
