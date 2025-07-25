@@ -28,6 +28,10 @@ class GUI:
         def serve_static(path):
             return send_from_directory(self.app.static_folder, path)
         
+        @self.app.route("/api/components/list", methods=["GET"])
+        def get_tools_list():
+            return jsonify(list(map(lambda x: x.name, self.task_m._tools)))
+        
         @self.app.route("/api/workflows/get", methods=["GET"])
         def get_workflows():
             return jsonify(self.task_m.list_workflows())
