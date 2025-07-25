@@ -56,8 +56,8 @@ const data = {
       isActive: true,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Workflows",
+          url: "/workflows",
         },
         {
           title: "Starred",
