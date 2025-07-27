@@ -60,12 +60,12 @@ const data = {
           url: "/",
         },
         {
-          title: "Workflows",
+          title: "Workflow Builder",
           url: "/workflows",
         },
         {
-          title: "Settings",
-          url: "#",
+          title: "Workflow View",
+          url: "/workflow-graph",
         },
       ],
     },
