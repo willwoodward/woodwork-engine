@@ -51,17 +51,17 @@ const data = {
   navMain: [
     {
       title: "Playground",
-      url: "#",
+      url: "/",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: "Workflows",
-          url: "/workflows",
+          title: "Home",
+          url: "/",
         },
         {
-          title: "Starred",
-          url: "/",
+          title: "Workflows",
+          url: "/workflows",
         },
         {
           title: "Settings",

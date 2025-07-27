@@ -7,9 +7,12 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger} from "@/components/ui/sidebar"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
 import {
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+  ArrowUp
+} from "lucide-react"
 
 export default function Page() {
   return (
@@ -37,13 +40,31 @@ export default function Page() {
         </div>
       </header>
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min px-64">
+          <div className="flex flex-1 flex-col h-full" id="chat-box">
+            <div className="flex-1" />
+            <div className="h-32 px-8 py-8 flex">
+              <div className="w-16" />
+              <div className="flex-1">
+                <Textarea />
+              </div>
+              <div className="w-16 ml-4 py-3">
+                <Button>
+                  <ArrowUp />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
         <div className="grid auto-rows-min gap-4 md:grid-cols-3">
           <div className="bg-muted/50 aspect-video rounded-xl" />
           <div className="bg-muted/50 aspect-video rounded-xl" />
           <div className="bg-muted/50 aspect-video rounded-xl" />
         </div>
         <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
-      </div>
+      </div> */}
     </>
   )
 }
