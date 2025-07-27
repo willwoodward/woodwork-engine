@@ -2,8 +2,8 @@ import { Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from "@/components/theme-provider"
 
 import Layout from "@/layout/layout";
-import Page from "@/app/dashboard/page"
-import WorkflowsPage from "@/app/dashboard/workflows"
+import Page from "@/app/page"
+import WorkflowsPage from "@/app/workflows/workflows"
 
 function App() {
   return (

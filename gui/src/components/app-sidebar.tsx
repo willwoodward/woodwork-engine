@@ -61,7 +61,7 @@ const data = {
         },
         {
           title: "Starred",
-          url: "#",
+          url: "/",
         },
         {
           title: "Settings",
