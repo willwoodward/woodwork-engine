@@ -13,13 +13,13 @@ log = logging.getLogger(__name__)
 
 
 class decomposer(component, ABC):
-    def __init__(self, tools, output, task_m: task_master, **config):
-        format_kwargs(config, tools=tools, output=output, component="decomposer")
+    def __init__(self, tools, task_m: task_master, **config):
+        format_kwargs(config, tools=tools, task_m=task_m, component="decomposer")
         super().__init__(**config)
         log.debug("Creating the decomposer...")
 
         self._tools = tools
-        self._task_m = output
+        self._task_m = task_m
         self._cache = task_m.cache
         self._cache_mode = False
         api_key = get_optional(config, "api_key")
