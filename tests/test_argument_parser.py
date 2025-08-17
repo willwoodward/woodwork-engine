@@ -2,8 +2,8 @@ import unittest
 
 import pytest
 
-from woodwork.errors import ParseError
-from woodwork.argument_parser import parse_args, check_parse_conflicts
+from woodwork.utils.errors.errors import ParseError
+from woodwork.cli.argument_parser import parse_args, check_parse_conflicts
 
 
 class TestCLIArgs(unittest.TestCase):

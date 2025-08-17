@@ -1,0 +1,11 @@
+- Make sure that linting, tests and types work
+- Add dev dependencies and instructions
+- Restructure package
+    - CLI
+    - Language parser
+    - Orchestration (task_master)
+    - Networking
+    - Deployments
+    - GUI
+    - utils/
+    - types/

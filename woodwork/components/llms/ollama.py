@@ -4,7 +4,7 @@ import subprocess
 import shutil
 
 from woodwork.components.llms.llm import llm
-from woodwork.errors import RuntimeError
+from woodwork.utils.errors.errors import RuntimeError
 from woodwork.helper_functions import format_kwargs, get_optional
 from woodwork.interfaces import Initializable, Startable
 

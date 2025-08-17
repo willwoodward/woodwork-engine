@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from typing import Any
 
 from woodwork.components.task_master import task_master
-from woodwork.errors import (
+from woodwork.utils.errors.errors import (
     ForbiddenVariableNameError,
     MissingConfigKeyError,
 )
