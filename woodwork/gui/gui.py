@@ -4,6 +4,7 @@ import subprocess
 import sys
 import shutil
 import webbrowser
+import os
 
 from woodwork.components.task_master import task_master
 from woodwork.types import Workflow
@@ -19,22 +20,20 @@ class GUI:
         self.app = Flask(__name__, static_folder="dist", static_url_path="")
         self.port = 43000
         self.task_m = task_master
-
-        @self.app.route("/")
-        def serve_index():
-            return send_from_directory(self.app.static_folder, "index.html")
-
-        @self.app.route("/<path:path>")
-        def serve_static(path):
-            return send_from_directory(self.app.static_folder, path)
         
         @self.app.route("/api/components/list", methods=["GET"])
         def get_tools_list():
             return jsonify(list(map(lambda x: x.name, self.task_m._tools)))
         
+        @self.app.route("/api/input", methods=["GET"])
+        def get_output():
+            """Input is sent and received from an API component."""
+            return jsonify({"response": "hello, this is a test response."})
+        
         @self.app.route("/api/workflows/get", methods=["GET"])
         def get_workflows():
-            return jsonify(self.task_m.list_workflows())
+            workflows = self.task_m.list_workflows()
+            return jsonify([{"id": hash(workflow), "name": workflow} for workflow in workflows])
 
         @self.app.route("/api/workflows", methods=["POST"])
         def create_workflow():
@@ -47,6 +46,18 @@ class GUI:
                 return jsonify({"status": "success"}), 201
             else:
                 return jsonify({"status": "error saving"}), 500
+
+        @self.app.route("/", defaults={"path": ""})
+        @self.app.route("/<path:path>")
+        def serve_react(path):
+            # If path starts with 'api/', return 404 (Flask will match actual routes)
+            if path.startswith("api/"):
+                return "Not Found", 404
+            # Try to return the static file if it exists, otherwise return index.html for client-side routing
+            file_path = "dist" + "/" + path
+            if path != "" and os.path.exists(file_path):
+                return send_from_directory("dist/", path)
+            return send_from_directory("dist/", "index.html")
 
     def _try_open_browser(self):
         if sys.platform == "linux":

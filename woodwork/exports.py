@@ -2,6 +2,8 @@
 
 from woodwork.components.llms.openai import openai
 from woodwork.components.inputs.command_line import command_line
+from woodwork.components.apis.functions import functions
+from woodwork.components.decomposers.llm import llm
 
 from woodwork.registry import get_registry
 from woodwork.config_parser import main_function
@@ -11,5 +13,7 @@ registry = get_registry()
 
 llm1: openai = registry.get('llm1')
 in: command_line = registry.get('in')
+endpoint: functions = registry.get('endpoint')
+agent: llm = registry.get('agent')
 
-__all__ = ['llm1', 'in']
+__all__ = ['llm1', 'in', 'endpoint', 'agent']

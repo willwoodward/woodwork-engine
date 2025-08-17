@@ -2,7 +2,6 @@ import * as React from "react"
 import {
   AudioWaveform,
   BookOpen,
-  Bot,
   Command,
   Frame,
   GalleryVerticalEnd,
@@ -51,63 +50,52 @@ const data = {
   navMain: [
     {
       title: "Playground",
-      url: "#",
+      url: "/",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Home",
+          url: "/",
         },
         {
-          title: "Starred",
-          url: "#",
+          title: "Workflow Builder",
+          url: "/workflows",
         },
         {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
+          title: "Workflow View",
+          url: "/workflow-graph",
         },
       ],
     },
     {
       title: "Documentation",
-      url: "#",
+      url: "https://woodwork-engine.com/docs",
       icon: BookOpen,
       items: [
         {
           title: "Introduction",
-          url: "#",
+          url: "https://woodwork-engine.com/docs/introduction",
         },
         {
           title: "Get Started",
-          url: "#",
+          url: "https://woodwork-engine.com/docs/getting-started",
         },
         {
           title: "Tutorials",
-          url: "#",
+          url: "https://woodwork-engine.com/docs/tutorials",
         },
         {
-          title: "Changelog",
-          url: "#",
+          title: "How-To",
+          url: "https://woodwork-engine.com/docs/how-to",
+        },
+        {
+          title: "Explanation",
+          url: "https://woodwork-engine.com/docs/explanation",
+        },
+        {
+          title: "Technical Reference",
+          url: "https://woodwork-engine.com/docs/reference",
         },
       ],
     },

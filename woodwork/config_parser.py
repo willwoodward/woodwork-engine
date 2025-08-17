@@ -196,7 +196,7 @@ def create_object(command):
             return init_object(functions, **config)
 
     if component == "decomposer":
-        config["output"] = task_m
+        config["task_m"] = task_m
         if type == "llm":
             from woodwork.components.decomposers.llm import llm
 

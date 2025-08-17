@@ -1,9 +1,8 @@
 import logging
 from threading import Thread
 import asyncio
-import json
 
-from typing import Any
+from typing import Any, Optional
 
 from woodwork.components.component import component
 from woodwork.helper_functions import format_kwargs, get_optional
@@ -11,7 +10,7 @@ from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
 from woodwork.deployments.router import get_router
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
-from woodwork.types import Workflow
+from woodwork.types import Action, Workflow
 
 log = logging.getLogger(__name__)
 
@@ -30,80 +29,81 @@ class task_master(component):
         )
 
         self._tools = []
+        self.workflow_name: Optional[str] = None
+        self.workflow_actions: dict[str, Action] = {}
+        self.workflow_variables: dict[str, Any] = {}
+        self.last_action_name: str = None
 
     def add_tools(self, tools):
         self._tools = tools
         self._inputs = [component for component in tools if isinstance(component, inputs)]
         self._outputs = [component for component in tools if isinstance(component, outputs)]
-
-    def execute(self, action: dict[str, Any]):
+    
+    def start_workflow(self, workflow_name: str):
         """
-        Executes a single action dictionary returned by the agent.
+        Initialises a new workflow collection to track workflow.
+        """
+        self.workflow_name = workflow_name
+    
+    def end_workflow(self):
+        """
+        Triggers a clean-up of unhelpful actions.
+        """
+        # logic to clean actions
+        print(self.workflow_actions)
+        self.workflow_actions = {}
+        self.workflow_variables = {}
+
+    def execute(self, action: Action):
+        """
+        Executes a single action returned by the agent.
         """
         try:
-            tool_name = action["tool"]
-            action_name = action["action"]
-            inputs = action.get("inputs", {})
+            # Substitute variable inputs
+            for key in action.inputs:
+                variable = str(action.inputs[key])
+                if variable in self.workflow_variables:
+                    action.inputs[key] = self.workflow_variables[variable]
 
-            log.debug(f"Executing tool '{tool_name}' with action '{action_name}' and inputs {inputs}")
+            log.debug(f"Executing tool '{action.tool}' with action '{action.action}' and inputs {action.inputs}")
 
-            # Find the tool object by name
-            tool = next((t for t in self._tools if t.name == tool_name), None)
-            if tool is None:
-                raise ValueError(f"Tool '{tool_name}' not found.")
+            tools = list(filter(lambda t: t.name == action.tool, self._tools))
+            if len(tools) == 0:
+                raise ValueError(f"Tool '{action.tool}' not found.")
+            tool = tools[0]
 
-            # Call the tool's input method
-            result = tool.input(action_name, inputs)
+            result = tool.input(action.action, action.inputs)
             log.debug(f"Tool result: {result}")
+
+            self.workflow_actions[action.output] = action
+            self.workflow_variables = result
+            self.last_action_name = action.output
             return result
 
         except Exception as e:
             log.error(f"Failed to execute action: {e}")
             return None
+    
 
-    # def execute(self, workflow: dict[str, Any]):
-    #     log.debug("Executing instructions...")
-    #     variables = {}
-    #     prev_instructon = ""
+    def cache_add_action(self, action: Action):
+        dependencies = [var for var in action.inputs.values() if var in self.workflow_variables]
+        if len(dependencies) == 0:
+            self.cache.run(
+                f"""MERGE (p:Prompt)-[:NEXT]->(:Action {{value: "{action.to_dict()}"}})
+                WHERE p.name = {self.workflow_name}"""
+            )
+        else:
+            self.cache.run(
+                f"""
+                    MATCH (prompt:Prompt {name: $prompt_name})
+                    MATCH (target:Action {name: $action_name})
+                    // Ensure there's a NEXT path from the prompt to the action
+                    MATCH path=(prompt)-[:NEXT*]->(target)
+                    WITH target
+                    MATCH (dep:Dependency {name: $new_name})
+                    MERGE (target)-[:DEPENDS_ON]->(dep)
+                """)
 
-    #     # Add the initial variables
-    #     for key in workflow["inputs"]:
-    #         variables[key] = workflow["inputs"][key]
-
-    #     instructions = workflow["plan"]
-
-    #     for instruction in instructions:
-    #         # Substitute variable inputs
-    #         for key in instruction["inputs"]:
-    #             variable = str(instruction["inputs"][key])
-    #             if variable in variables:
-    #                 instruction["inputs"][key] = variables[variable]
-
-    #         # Use tool
-    #         result = self._use_tool(instruction)
-
-    #         if not result:
-    #             break
-
-    #         # Add the result to the variables
-    #         variables[instruction["output"]] = result
-    #         prev_instructon = result  # TODO: @willwoodward fix spelling of variable if necessary
-    #         log.debug(f"instruction = {instruction}")
-    #         log.debug(f"result = {result}")
-
-    #     return prev_instructon
-
-    # def _use_tool(self, instruction):
-    #     try:
-    #         result = None
-
-    #         tool = list(filter(lambda x: x.name == instruction["tool"], self._tools))[0]
-    #         result = tool.input(instruction["action"], instruction["inputs"])
-
-    #         return result
-    #     except:
-    #         print("This instruction was not able to execute.")
-    #         return
 
     def close_all(self):
         for tool in self._tools:
@@ -171,13 +171,12 @@ class task_master(component):
         workflow_inputs = str(list(workflow.inputs.keys()))
         instructions = workflow.plan
 
-        # # Check to see if the action has been cached
-        # if self._cache_search_actions(prompt)["score"] > 0.96:
-        #     log.debug("Similar prompts have already been cached.")
-        #     return
-
-        # Instructions must have at least one instruction
         if len(instructions) == 0:
+            return
+
+        # Check to see if the action has been cached
+        if self._cache_search_actions(prompt)["score"] > 0.97:
+            log.debug("Similar prompts have already been cached.")
             return
 
         # Generate the database query
@@ -192,8 +191,7 @@ class task_master(component):
         result = self.cache.run(query)[0]
 
         # Add the vector embedding for the prompt
-        # self._cache.embed("Prompt", "value")
+        self.cache.embed("Prompt", "value")
 
         # Return the ID of the prompt node
-        # return result["id"]
-        return None
+        return result["id"]

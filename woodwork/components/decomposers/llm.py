@@ -8,6 +8,7 @@ from typing import Any, Tuple, Optional
 
 from woodwork.components.decomposers.decomposer import decomposer
 from woodwork.helper_functions import format_kwargs
+from woodwork.types import Action
 
 log = logging.getLogger(__name__)
 
@@ -211,6 +212,7 @@ class llm(decomposer):
         #     if closest_query["score"] > 0.90:
         #         log.debug("Cache hit!")
         #         return self._output.execute(self._generate_workflow(query, closest_query))
+        self._task_m.start_workflow(query)
 
         # Build tool documentation string
         tool_documentation = ""
@@ -271,49 +273,27 @@ class llm(decomposer):
             result = chain.invoke({"input": current_prompt}).content
             log.debug(f"[RESULT] {result}")
 
-            thought, action, is_final = self._parse(result)
+            thought, action_dict, is_final = self._parse(result)
 
             if is_final:
                 log.debug("Final Answer found.")
+                self._task_m.end_workflow()
                 return thought
 
             log.debug(f"Thought: {thought}")
-            log.debug(f"Action: {action}")
+            log.debug(f"Action: {action_dict}")
             print(f"Thought: {thought}")
 
-            if action["tool"] == "ask_user":
-                return action["inputs"]["question"]
+            action = Action.from_dict(action_dict)
+            if action.tool == "ask_user":
+                return action.inputs["question"]
 
             observation = self._task_m.execute(action)
             log.debug(f"Observation: {observation}")
 
             # Append step to ongoing prompt
-            current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action)}\nObservation: {observation}\n\nContinue with the next step:"
+            current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action_dict)}\nObservation: {observation}\n\nContinue with the next step:"
 
         # # Cache instructions
         # if self._cache_mode:
         #     self._cache_actions(result)
-
-        # # Send to task master
-        # res = self._output.execute(result)
-        # reflected = self.reflect(query, result, res)
-
-        # if reflected is not None:
-        #     # print_debug(f"[REFLECTED] {reflected}")
-        #     # If the reflection is not None, it means we need to generate a new plan
-        #     new_plan = self.input(reflected)
-        #     return new_plan
-
-        # # Else if no output, print the result
-        # print(res)
-        # res = self._output.execute(result)
-        # reflected = self.reflect(query, result, res)
-
-        # if reflected is not None:
-        #     # print_debug(f"[REFLECTED] {reflected}")
-        #     # If the reflection is not None, it means we need to generate a new plan
-        #     new_plan = self.input(reflected)
-        #     return new_plan
-
-        # # Else if no output, print the result
-        # print(res)
