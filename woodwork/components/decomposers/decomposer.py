@@ -2,10 +2,8 @@ import json
 import logging
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from woodwork.components.component import component
-from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.core.task_master import task_master
 
@@ -31,7 +29,7 @@ class decomposer(component, ABC):
 
                 if api_key is None:
                     exit()
-                
+
                 self._cache.set_api_key(api_key=api_key)
                 self._cache.init_vector_index(index_name="embeddings", label="Prompt", property="embedding")
         else:

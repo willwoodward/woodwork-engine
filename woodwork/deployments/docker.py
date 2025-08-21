@@ -2,6 +2,7 @@ import io
 import logging
 import os
 import time
+from typing import Optional
 
 import docker
 from docker.errors import NotFound
@@ -16,8 +17,8 @@ class Docker:
         container_name: str,
         dockerfile: str,
         container_args: dict,
-        volume_location: str = None,
-        docker_volume_location: str = None,
+        volume_location: Optional[str] = None,
+        docker_volume_location: Optional[str] = None,
     ):
         self.image_name = image_name
         self.container_name = container_name

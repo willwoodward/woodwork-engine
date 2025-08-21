@@ -38,13 +38,13 @@ class task_master(component):
         self._tools = tools
         self._inputs = [component for component in tools if isinstance(component, inputs)]
         self._outputs = [component for component in tools if isinstance(component, outputs)]
-    
+
     def start_workflow(self, workflow_name: str):
         """
         Initialises a new workflow collection to track workflow.
         """
         self.workflow_name = workflow_name
-    
+
     def end_workflow(self):
         """
         Triggers a clean-up of unhelpful actions.
@@ -83,7 +83,6 @@ class task_master(component):
         except Exception as e:
             log.error(f"Failed to execute action: {e}")
             return None
-    
 
     def cache_add_action(self, action: Action):
         dependencies = [var for var in action.inputs.values() if var in self.workflow_variables]
@@ -94,16 +93,15 @@ class task_master(component):
             )
         else:
             self.cache.run(
-                f"""
-                    MATCH (prompt:Prompt {name: $prompt_name})
-                    MATCH (target:Action {name: $action_name})
-                    // Ensure there's a NEXT path from the prompt to the action
-                    MATCH path=(prompt)-[:NEXT*]->(target)
-                    WITH target
-                    MATCH (dep:Dependency {name: $new_name})
-                    MERGE (target)-[:DEPENDS_ON]->(dep)
-                """)
-
+                """
+                MATCH (prompt:Prompt {name: $prompt_name})
+                MATCH (target:Action {name: $action_name})
+                MATCH path=(prompt)-[:NEXT*]->(target)
+                WITH target
+                MATCH (dep:Dependency {name: $new_name})
+                MERGE (target)-[:DEPENDS_ON]->(dep)
+                """
+            )
 
     def close_all(self):
         for tool in self._tools:
@@ -141,7 +139,7 @@ class task_master(component):
 
         thread = Thread(target=run)
         thread.start()
-    
+
     def validate_workflow(self, workflow: Workflow, tools: list):
         # # Check tools exist
         # for action in workflow["plan"]:
@@ -156,14 +154,13 @@ class task_master(component):
         id = self._cache_actions(workflow)
         print(f"Successfully added a new workflow with ID: {id}")
         return True
-    
+
     def list_workflows(self):
         result = self.cache.run(
-            f"""MATCH (n:Prompt)-[:NEXT]->(m)
+            """MATCH (n:Prompt)-[:NEXT]->(m)
             RETURN n.value"""
         )
         return list(map(lambda x: x["n.value"], result))
-
 
     def _cache_actions(self, workflow: Workflow):
         """Add the actions to the graph if they aren't already present, as a chain."""

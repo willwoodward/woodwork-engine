@@ -20,16 +20,16 @@ class GUI:
         self.app = Flask(__name__, static_folder="dist", static_url_path="")
         self.port = 43000
         self.task_m = task_master
-        
+
         @self.app.route("/api/components/list", methods=["GET"])
         def get_tools_list():
             return jsonify(list(map(lambda x: x.name, self.task_m._tools)))
-        
+
         @self.app.route("/api/input", methods=["GET"])
         def get_output():
             """Input is sent and received from an API component."""
             return jsonify({"response": "hello, this is a test response."})
-        
+
         @self.app.route("/api/workflows/get", methods=["GET"])
         def get_workflows():
             workflows = self.task_m.list_workflows()

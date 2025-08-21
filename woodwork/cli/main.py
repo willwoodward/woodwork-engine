@@ -20,6 +20,7 @@ from . import globals
 
 log = logging.getLogger(__name__)
 
+
 def app_entrypoint(args):
     registry = get_registry()
 
@@ -134,8 +135,7 @@ def app_entrypoint(args):
 
     match args.workflow:
         case "add":
-            config_parser.add_action_plan(args.target)
-            log.debug("%s Workflow set with path: %s.", args.workflow, args.target)
+            pass
         case "remove":
             config_parser.delete_action_plan(args.target)
             log.debug("%s Workflow removed with id: %s.", args.workflow, args.target)

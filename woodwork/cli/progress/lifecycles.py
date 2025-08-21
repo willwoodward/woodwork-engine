@@ -5,6 +5,7 @@ from woodwork.interfaces.intializable import ParallelInitializable, Initializabl
 from woodwork.interfaces.startable import ParallelStartable, Startable
 from woodwork.types import Update
 
+
 def parallel_start_component(c: component, queue: multiprocessing.Queue):
     if isinstance(c, ParallelStartable):
         c.parallel_start(queue=queue, config={})

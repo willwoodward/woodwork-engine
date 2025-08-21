@@ -42,8 +42,6 @@ class code(core):
                 vector = self.embedding_model.get_embedding(chunk)
                 self.vector_db.upsert(id=hash(chunk), embedding=vector, metadata={"path": file_path})
 
-        print_debug("Synced code to vector DB.")
-
     def chunk_code(self, text, max_length=500):
         return [text[i : i + max_length] for i in range(0, len(text), max_length)]
 
