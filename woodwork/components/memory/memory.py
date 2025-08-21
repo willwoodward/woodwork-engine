@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from woodwork.components.component import component
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 
 class memory(component, ABC):

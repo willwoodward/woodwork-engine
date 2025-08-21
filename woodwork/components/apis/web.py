@@ -4,7 +4,7 @@ import os
 import requests
 
 from woodwork.components.apis.api import api
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 

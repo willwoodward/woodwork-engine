@@ -7,12 +7,12 @@ import re
 from dotenv import load_dotenv
 from typing import Any
 
-from woodwork.components.task_master import task_master
+from woodwork.core.task_master import task_master
 from woodwork.utils.errors.errors import (
     ForbiddenVariableNameError,
     MissingConfigKeyError,
 )
-from woodwork.registry import get_registry
+from woodwork.deployments.registry import get_registry
 from woodwork.components.component import component
 from woodwork.deployments.router import get_router, Deployment
 

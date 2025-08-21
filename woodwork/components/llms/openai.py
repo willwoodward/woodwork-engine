@@ -5,7 +5,7 @@ import time
 
 from woodwork.components.llms.llm import llm
 from woodwork.interfaces import ParallelStartable, Startable
-from woodwork.helper_functions import format_kwargs, get_optional
+from woodwork.utils import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 

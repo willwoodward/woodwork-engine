@@ -5,8 +5,8 @@ from woodwork.components.inputs.command_line import command_line
 from woodwork.components.apis.functions import functions
 from woodwork.components.decomposers.llm import llm
 
-from woodwork.registry import get_registry
-from woodwork.config_parser import main_function
+from woodwork.deployments.registry import get_registry
+from woodwork.parser.config_parser import main_function
 
 main_function()
 registry = get_registry()

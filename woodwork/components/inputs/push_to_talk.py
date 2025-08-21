@@ -8,7 +8,7 @@ import sounddevice as sd
 import webrtcvad
 
 from woodwork.components.inputs.inputs import inputs
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 

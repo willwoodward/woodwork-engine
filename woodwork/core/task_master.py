@@ -5,7 +5,7 @@ import asyncio
 from typing import Any, Optional
 
 from woodwork.components.component import component
-from woodwork.helper_functions import format_kwargs, get_optional
+from woodwork.utils import format_kwargs
 from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
 from woodwork.deployments.router import get_router

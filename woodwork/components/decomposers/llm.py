@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 from typing import Any, Tuple, Optional
 
 from woodwork.components.decomposers.decomposer import decomposer
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 from woodwork.types import Action
 
 log = logging.getLogger(__name__)

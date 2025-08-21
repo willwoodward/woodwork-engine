@@ -5,7 +5,7 @@ from uvicorn import Config, Server
 
 from woodwork.components.component import component
 from woodwork.deployments.deployment import Deployment
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 
 class LocalDeployment(Deployment):

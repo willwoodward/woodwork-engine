@@ -1,5 +1,5 @@
 from typing import Set
-from woodwork.registry import get_registry
+from woodwork.deployments.registry import get_registry
 import importlib.resources as pkg_resources
 
 

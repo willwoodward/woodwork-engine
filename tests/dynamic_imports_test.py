@@ -1,6 +1,6 @@
 import pytest
-from woodwork.helper_functions import import_all_classes
-from woodwork.dependencies import init, activate_virtual_environment
+from woodwork.utils.helper_functions import import_all_classes
+from woodwork.parser.dependencies import init, activate_virtual_environment
 
 
 def test_venv_setup():

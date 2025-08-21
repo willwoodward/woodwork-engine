@@ -6,8 +6,8 @@ from typing import Any
 
 from woodwork.components.component import component
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
-from woodwork.helper_functions import format_kwargs, get_optional
-from woodwork.components.task_master import task_master
+from woodwork.utils import format_kwargs, get_optional
+from woodwork.core.task_master import task_master
 
 log = logging.getLogger(__name__)
 

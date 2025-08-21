@@ -1,5 +1,5 @@
 from woodwork.components.memory.memory import memory
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 
 class short_term(memory):

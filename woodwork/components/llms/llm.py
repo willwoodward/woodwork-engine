@@ -1,7 +1,7 @@
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.interfaces.knowledge_base_interface import knowledge_base_interface
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod

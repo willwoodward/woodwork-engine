@@ -1,7 +1,7 @@
 import os
 
 from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 
 class text_file(knowledge_base):

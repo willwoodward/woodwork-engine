@@ -3,7 +3,7 @@ import os
 import logging
 from importlib import util
 
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 from woodwork.components.apis.api import api
 
 log = logging.getLogger(__name__)

@@ -1,5 +1,5 @@
 # from woodwork.dependencies import activate_virtual_environment
-from woodwork.config_parser import parse
+from woodwork.parser.config_parser import parse
 from woodwork.utils.errors.errors import ForbiddenVariableNameError
 
 import pytest

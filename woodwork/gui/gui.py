@@ -6,7 +6,7 @@ import shutil
 import webbrowser
 import os
 
-from woodwork.components.task_master import task_master
+from woodwork.core.task_master import task_master
 from woodwork.types import Workflow
 
 

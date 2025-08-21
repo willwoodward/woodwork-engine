@@ -4,14 +4,15 @@ import logging.config
 import pathlib
 import sys
 
-from woodwork import config_parser, dependencies
-from woodwork import helper_functions
+from woodwork.parser import dependencies
+from woodwork.utils import helper_functions
 from woodwork.cli import argument_parser
+from woodwork.parser import config_parser
 from woodwork.utils.errors.errors import ParseError
-from woodwork.helper_functions import set_globals
-from woodwork.registry import get_registry
+from woodwork.utils.helper_functions import set_globals
+from woodwork.deployments.registry import get_registry
 from woodwork.deployments import Deployer
-from woodwork.generate_exports import generate_exported_objects_file
+from woodwork.deployments.generate_exports import generate_exported_objects_file
 from .progress.progress import parallel_func_apply
 from .progress.lifecycles import init_component, parallel_init_component, start_component, parallel_start_component
 

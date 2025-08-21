@@ -7,6 +7,7 @@ import sys
 
 log = logging.getLogger(__name__)
 
+REQUIREMENTS_DIR = pkg_resources.files("woodwork") / "parser" / "requirements"
 
 def setup_virtual_env(options):
     isolated = options["isolated"]
@@ -109,16 +110,14 @@ def get_requirements(components: list, temp_requirements_file: str):
     # Dependencies stored in requirements/{component}/{type}
     for component, type in components:
         # Access the requirements directory as a package resource
-        requirements_dir = pkg_resources.files("woodwork") / "requirements"
-
-        component_requirements = os.path.join(requirements_dir, component, f"{component}.txt")
+        component_requirements = os.path.join(REQUIREMENTS_DIR, component, f"{component}.txt")
         try:
             parse_requirements_file(requirements_set, component_requirements)
         except subprocess.CalledProcessError:
             sys.exit(1)
 
         # Install the component type dependencies
-        type_requirements = os.path.join(requirements_dir, component, f"{type}.txt")
+        type_requirements = os.path.join(REQUIREMENTS_DIR, component, f"{type}.txt")
         try:
             parse_requirements_file(requirements_set, type_requirements)
         except subprocess.CalledProcessError:
@@ -156,7 +155,7 @@ def init(options={"isolated": False, "all": False}):
 
     print("Installing dependencies...")
     if options["all"]:
-        get_all_requirements(pkg_resources.files("woodwork") / "requirements", temp_requirements_file)
+        get_all_requirements(REQUIREMENTS_DIR, temp_requirements_file)
     else:
         components = get_components()
         get_requirements(components, temp_requirements_file)
