@@ -10,11 +10,11 @@ from woodwork.core.task_master import task_master
 log = logging.getLogger(__name__)
 
 
-class decomposer(component, ABC):
+class agent(component, ABC):
     def __init__(self, tools, task_m: task_master, **config):
-        format_kwargs(config, tools=tools, task_m=task_m, component="decomposer")
+        format_kwargs(config, tools=tools, task_m=task_m, component="agent")
         super().__init__(**config)
-        log.debug("Creating the decomposer...")
+        log.debug("Creating the agent...")
 
         self._tools = tools
         self._task_m = task_m

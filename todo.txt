@@ -1,0 +1,6 @@
+- Make sure all unit tests pass
+- Finish restructuring task, add a task for refactoring & polishing
+- Add developer instructions and packages
+- Do prompt stuff (defaults etc)
+- Add planner type to agent
+- Add agents as tools

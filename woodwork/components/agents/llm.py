@@ -6,18 +6,18 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from typing import Any, Tuple, Optional
 
-from woodwork.components.decomposers.decomposer import decomposer
+from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs
 from woodwork.types import Action
 
 log = logging.getLogger(__name__)
 
 
-class llm(decomposer):
+class llm(agent):
     def __init__(self, api_key: str, **config):
         format_kwargs(config, api_key=api_key, type="llm")
         super().__init__(**config)
-        log.debug("Initializing decomposer...")
+        log.debug("Initializing agent...")
 
         self.__llm = ChatOpenAI(
             model="gpt-4o-mini",

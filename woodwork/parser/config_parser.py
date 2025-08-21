@@ -194,10 +194,10 @@ def create_object(command):
 
             return init_object(functions, **config)
 
-    if component == "decomposer":
+    if component == "agent":
         config["task_m"] = task_m
         if type == "llm":
-            from woodwork.components.decomposers.llm import llm
+            from woodwork.components.agents.llm import llm
 
             return init_object(llm, **config)
 
@@ -460,10 +460,10 @@ def clear_all():
 
 
 def delete_action_plan(id: str):
-    from woodwork.components.decomposers.decomposer import decomposer
+    from woodwork.components.agents.agent import agent
 
     for tool in task_m._tools:
-        if isinstance(tool, decomposer):
+        if isinstance(tool, agent):
             tool._cache.run(f"""MATCH (n)-[:NEXT*]->(m)
                 WHERE elementId(n) = "{id}"
                 DETACH DELETE n
@@ -473,10 +473,10 @@ def delete_action_plan(id: str):
 
 
 def find_action_plan(query: str):
-    from woodwork.components.decomposers.decomposer import decomposer
+    from woodwork.components.agents.agent import agent
 
     for tool in task_m._tools:
-        if isinstance(tool, decomposer):
+        if isinstance(tool, agent):
             similar_prompts = tool._cache.similarity_search(query, "Prompt", "value")
             num_results = min(len(similar_prompts), 10)
 

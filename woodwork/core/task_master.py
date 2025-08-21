@@ -25,7 +25,7 @@ class task_master(component):
             uri="bolt://localhost:7687",
             user="neo4j",
             password="testpassword",
-            name="decomposer_cache",
+            name="agent_cache",
         )
 
         self._tools = []

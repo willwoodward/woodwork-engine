@@ -148,7 +148,7 @@ def test_list_variable_values():
         api_key: $OPENAI_API_KEY
     }
     
-    planner = decomposer llm {
+    planner = agent llm {
         api_key: $OPENAI_API_KEY
         tools: [llm1, llm2]
     }

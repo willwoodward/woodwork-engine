@@ -1,4 +1,4 @@
-agent = decomposer llm {
+agent = agent llm {
     api_key: $OPENAI_API_KEY
     cache: False
     tools: [github_api, line, code, kb, llm]
