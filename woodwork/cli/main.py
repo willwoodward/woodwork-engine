@@ -15,13 +15,16 @@ from woodwork.deployments import Deployer
 from woodwork.deployments.generate_exports import generate_exported_objects_file
 from .progress.progress import parallel_func_apply
 from .progress.lifecycles import init_component, parallel_init_component, start_component, parallel_start_component
+from woodwork.cli.setup_defaults import copy_prompts
+from woodwork.utils import get_package_directory
 
-from . import globals
+import woodwork.globals as globals
 
 log = logging.getLogger(__name__)
 
 
 def app_entrypoint(args):
+    print("hey")
     registry = get_registry()
 
     # Set a delineator for a new application run in log file
@@ -76,6 +79,7 @@ def app_entrypoint(args):
             options["isolated"] = True
             options["all"] = True
             log.debug("Initialization mode set to 'all'.")
+        copy_prompts()
         dependencies.init(options)
 
         # Run the initialization methods
@@ -164,9 +168,10 @@ def cli_entrypoint() -> None:
         # If a custom logging configuration file is specified, use it
         config_file = pathlib.Path(args.logConfig)
     else:
-        config_file = pathlib.Path(__file__).parent / "config" / "log_config.json"
+        config_file = pathlib.Path(get_package_directory()) / "config" / "log_config.json"
 
     try:
+        print(config_file)
         with pathlib.Path.open(config_file) as f_in:
             config = json.load(f_in)
     except FileNotFoundError:

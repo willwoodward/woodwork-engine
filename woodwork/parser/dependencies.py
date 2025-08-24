@@ -106,6 +106,7 @@ def parse_requirements_file(requirements_set, file_path):
 
 def get_requirements(components: list, temp_requirements_file: str):
     requirements_set = set()
+    print(components)
 
     # Install dependencies
     # Dependencies stored in requirements/{component}/{type}
@@ -128,6 +129,8 @@ def get_requirements(components: list, temp_requirements_file: str):
     with open(temp_requirements_file, "w") as f:
         for requirement in sorted(requirements_set):
             f.write(f"{requirement}\n")
+    
+    print(requirements_set)
 
 
 def get_all_requirements(root_dir, output_file):

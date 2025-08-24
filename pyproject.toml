@@ -57,6 +57,7 @@ include = ["woodwork*"]
     "requirements/**/*.txt",
     "config/log_config.json",
     "config/.env.example",
+    "config/prompts/**/*",
     ]
 "woodwork.gui" = ["dist/**/*"]
 
