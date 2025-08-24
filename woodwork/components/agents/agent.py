@@ -22,6 +22,11 @@ class agent(component, ABC):
         self._cache_mode = False
         api_key = get_optional(config, "api_key")
 
+        # Inject core planning tools
+        self._is_planner = get_optional(config, "planning", False)
+        if self._is_planner:
+            self._tools = self._tools + []
+
         if "cache" in config:
             if config["cache"]:
                 # Initialise neo4j cache

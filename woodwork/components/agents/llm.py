@@ -7,8 +7,8 @@ from langchain_openai import ChatOpenAI
 from typing import Any, Tuple, Optional
 
 from woodwork.components.agents.agent import agent
-from woodwork.utils import format_kwargs
-from woodwork.types import Action
+from woodwork.utils import format_kwargs, get_optional, get_prompt
+from woodwork.types import Action, Prompt
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +27,10 @@ class llm(agent):
             max_retries=2,
             api_key=api_key,
         )
+
+        self._is_planner = get_optional(config, "planning", False)
+        self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"}))
+        self._prompt = get_prompt(self._prompt_config.file)
 
         # self.__retriever = None
         # if "knowledge_base" in config:
@@ -132,79 +136,6 @@ class llm(agent):
         workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
         return workflow
 
-    def reflect(self, query: str, plan: dict, execution_output: str) -> str | None:
-        """
-        Reflect on whether the execution output sufficiently answers the original query.
-
-        Args:
-            query (str): The original user input.
-            plan (dict): The action plan that was generated.
-            execution_output (str): The result of executing the action plan.
-
-        Returns:
-            str | None: A follow-up prompt to improve the plan, or None if the result is sufficient.
-        """
-        # Safety fallback for non-dict plan
-        try:
-            plan_str = json.dumps(plan, indent=2)
-        except Exception:
-            plan_str = str(plan)
-
-        reflection_prompt = (
-            "You are a helpful assistant critically reviewing the result of an executed action plan.\n\n"
-            "Here is the original user query:\n"
-            f"{query}\n\n"
-            "Here is the action plan that was generated:\n"
-            f"{plan_str}\n\n"
-            "And here is the output after executing the plan:\n"
-            f"{execution_output}\n\n"
-            "Determine if this output fully and accurately answers the user's question.\n"
-            "The output should be:\n"
-            "- Concise and focused\n"
-            "- Formatted as a clear sentence or a brief paragraph (no markdown bullet points or lists)\n"
-            "- Avoid unnecessary technical details or code dumps\n"
-            "- When file names are requested, include them naturally within a sentence or paragraph, not as bullet points or enumerated lists\n\n"
-            "If the output uses markdown bullet points or list formatting, or if it includes multiple mini explanations instead of one clear statement, it is insufficient.\n\n"
-            "Examples:\n"
-            "Insufficient (because of bullet points):\n"
-            '"""\n'
-            "- fileA.py handles X\n"
-            "- fileB.py handles Y\n"
-            '"""\n'
-            "Sufficient:\n"
-            '"The code files related to voice input handling are fileA.py and fileB.py, which manage recording and keyword detection respectively."\n\n'
-            "Answer using a JSON dictionary with the structure:\n"
-            "- If sufficient:\n"
-            '  {"is_sufficient": true, "suggested_prompt": null, "reason": "The output is concise, clear, and formatted as a single sentence or brief paragraph that directly answers the question without list formatting."}\n'
-            "- If not sufficient:\n"
-            '  {"is_sufficient": false, "suggested_prompt": "Please provide a concise sentence or brief paragraph that directly answers the question, including relevant file names naturally, without markdown bullet points or lists.", "reason": "The output uses markdown bullet points, lists, or multiple mini explanations instead of a single clear statement."}\n\n'
-            "Be strict and only mark outputs as sufficient if they meet these criteria."
-        )
-
-        result = self.__llm.invoke(reflection_prompt).content.strip()
-        result = self.__clean(result)
-        print(f"[REFLECTION RESULT] {result}")
-
-        if result["is_sufficient"]:
-            return None
-        else:
-            new_plan_prompt = (
-                f"The execution output was not sufficient to fully answer the user's query: {query}\n\n"
-                f"Here is the previous action plan that was generated:\n{json.dumps(plan, indent=2)}\n\n"
-                f"Here is the output after executing that plan:\n{execution_output}\n\n"
-                f"Upon reflection, the reason this output was not sufficient is:\n{result['reason']}\n\n"
-                "Please generate a new action plan that better addresses the user's request.\n"
-                "IMPORTANT GUIDELINES:\n"
-                "- If the needed information is already present in the execution output (e.g., filenames or summaries), do NOT use shell or 'line' tool commands just to echo or re-print this known information.\n"
-                "- Instead, use the LLM tool or equivalent to directly summarise, reformat, or answer based on the existing information.\n"
-                "- Use shell or 'line' tool commands only if you need to retrieve new data from the environment or file system that is not already available.\n"
-                "- Avoid redundant commands that simply echo known strings.\n"
-                "- The new plan should leverage any available data from the previous plan and output, and produce a concise, accurate answer to the user's query.\n\n"
-                f"Here is a suggested prompt to help generate this improved plan:\n{result['suggested_prompt']}\n"
-            )
-
-            return new_plan_prompt
-
     def input(self, query):
         # # Search cache for similar results
         # if self._cache_mode:
@@ -221,45 +152,14 @@ class llm(agent):
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
 
-        # Build system prompt
         system_prompt = (
-            "You are a reasoning agent that solves user prompts step-by-step using available tools.\n\n"
             "Here are the available tools:\n"
             "{tools}\n\n"
-            "At each step, follow this format exactly:\n\n"
-            "Thought: [Explain what you're thinking or what needs to be done next. Be concise but logical.]\n"
-            'Action: {{"tool": tool_name, "action": function_or_endpoint, "inputs": {{input_variable: variable_name}}, "output": output_variable}}\n'
-            "Observation: [This will be provided by the system after the action is executed. Do NOT fabricate or guess the observation.]\n\n"
-            "If you need more information to proceed, ask the user a clarifying question:\n"
-            "Thought: [Identify what's missing and why you need it.]\n"
-            'Action: {{"tool": "ask_user", "action": "ask", "inputs": {{"question": "your question here"}}, "output": "user_response"}}\n'
-            "Observation: [The user's response]\n\n"
-            "When the task is complete, respond with:\n"
-            "Final Answer: [your conclusion or solution]\n\n"
-            "Guidelines:\n"
-            "- Only one Action per step.\n"
-            "- Do not include an Observation unless it is provided to you.\n"
-            "- All actions must include: 'tool', 'action', 'inputs', and 'output'.\n"
-            "- Inputs in the action must reference variable names, not hardcoded values.\n"
-            '  Example: {{"word": "word"}}, not {{"word": "orange"}}.\n'
-            "- Always assign the result to an output variable, even if unused.\n"
-            "- Do not fabricate or predict the results of an action — wait for the actual observation to be provided by the system.\n\n"
-            "Example:\n"
-            "User prompt: What is the length of the word orange?\n\n"
-            "Thought: I need to find the length of the word provided.\n"
-            'Action: {{"tool": "string_utils", "action": "length", "inputs": {{"word": "word"}}, "output": "length"}}\n'
-            "Observation: 6\n"
-            "Thought: I now know the length of the word.\n"
-            "Final Answer: The length of the word 'orange' is 6.\n\n"
-            "Begin reasoning now."
-        ).format(tools=tool_documentation)
-
-        # Escape for template compatibility
-        escaped_prompt = system_prompt.replace("{", "{{").replace("}", "}}")
+        ).format(tools=tool_documentation) + self._prompt
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", escaped_prompt),
+                ("system", system_prompt),
                 ("human", "{input}"),
             ]
         )

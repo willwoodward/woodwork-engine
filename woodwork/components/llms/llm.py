@@ -13,7 +13,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
         format_kwargs(config, component="llm")
         super().__init__(**config)
 
-        self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": ".woodwork/prompts/defaults/llm.txt"}))
+        self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/llm.txt"}))
         self._prompt = get_prompt(self._prompt_config.file)
         self._memory = config.get("memory")
         self._output = config.get("to")

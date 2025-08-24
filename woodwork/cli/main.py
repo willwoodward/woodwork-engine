@@ -24,7 +24,6 @@ log = logging.getLogger(__name__)
 
 
 def app_entrypoint(args):
-    print("hey")
     registry = get_registry()
 
     # Set a delineator for a new application run in log file
@@ -171,7 +170,6 @@ def cli_entrypoint() -> None:
         config_file = pathlib.Path(get_package_directory()) / "config" / "log_config.json"
 
     try:
-        print(config_file)
         with pathlib.Path.open(config_file) as f_in:
             config = json.load(f_in)
     except FileNotFoundError:
