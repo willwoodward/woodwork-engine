@@ -20,7 +20,7 @@ class llm(agent):
         log.debug("Initializing agent...")
 
         self.__llm = ChatOpenAI(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             temperature=0,
             max_tokens=None,
             timeout=None,
@@ -63,19 +63,9 @@ class llm(agent):
     def _parse(self, agent_output: str) -> Tuple[str, Optional[dict], bool]:
         """
         Parse a ReAct-style agent output and extract either:
-        - (thought, action_dict) if Action is present
-        - (final_answer, None) if Final Answer is present
-
-        Args:
-            agent_output (str): The full output from the agent.
-
-        Returns:
-            Tuple[str, Optional[dict]]:
-                - If Action is present: (thought, action_dict)
-                - If Final Answer is present: (final_answer, None)
-
-        Raises:
-            ValueError: if neither an Action nor Final Answer can be found.
+        - (thought, action_dict, False) if Action is present
+        - (final_answer, None, True) if Final Answer is present
+        - (raw_output, None, False) if nothing structured is found
         """
         # Handle Final Answer
         final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
@@ -83,26 +73,31 @@ class llm(agent):
             final_answer = final_answer_match.group(1).strip()
             return final_answer, None, True
 
-        # Extract Thought
-        thought_match = re.search(r"Thought:\s*(.*)", agent_output)
-        if not thought_match:
-            raise ValueError("Could not find 'Thought:' line.")
-        thought = thought_match.group(1).strip()
+        # Match Thought up to Action or Final Answer or end
+        thought_match = re.search(r"Thought:\s*(.*?)(?=\s*Action:|\s*Final Answer:|$)", agent_output, re.DOTALL)
+        action_match = re.search(
+            r"Action:\s*(\{.*?\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))",
+            agent_output,
+            re.DOTALL
+        )
 
-        # Extract Action
-        action_match = re.search(r"Action:\s*(\{.*\})", agent_output)
+        thought = ""
+        if thought_match:
+            thought = thought_match.group(1).strip()
+
         if not action_match:
-            raise ValueError("Could not find valid JSON 'Action:' block.")
+            return (thought or agent_output.strip(), None, False)
 
         action_str = action_match.group(1).strip()
-        # Strip out common invisible or problematic characters
         cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
 
         try:
             action = json.loads(cleaned_action_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
+
         return thought, action, False
+
 
     def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, Any]:
         """Given a prompt and the inputs to be extracted, return the input dictionary."""
@@ -179,15 +174,17 @@ class llm(agent):
                 log.debug("Final Answer found.")
                 self._task_m.end_workflow()
                 return thought
+            
+            if action_dict is None:
+                print(f"Thought: {thought}")
+                current_prompt += f"\n\nThought: {thought}\n\nContinue with the next step:"
+                continue
 
             log.debug(f"Thought: {thought}")
             log.debug(f"Action: {action_dict}")
             print(f"Thought: {thought}")
 
             action = Action.from_dict(action_dict)
-            if action.tool == "ask_user":
-                return action.inputs["question"]
-
             observation = self._task_m.execute(action)
             log.debug(f"Observation: {observation}")
 

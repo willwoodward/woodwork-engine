@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from woodwork.components.component import component
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.core.task_master import task_master
+from woodwork.components.core.planning import planning_tools
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,9 @@ class agent(component, ABC):
         # Inject core planning tools
         self._is_planner = get_optional(config, "planning", False)
         if self._is_planner:
-            self._tools = self._tools + []
+            planning = planning_tools(**{"name": "planning_tools"})
+            self._tools.append(planning)
+            self._task_m.add_tools([planning])
 
         if "cache" in config:
             if config["cache"]:

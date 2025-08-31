@@ -6,6 +6,7 @@ from typing import Optional
 
 import docker
 from docker.errors import NotFound
+from woodwork.utils.errors import WoodworkError
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,10 @@ class Docker:
                 }
             }
 
-        self.docker_client = docker.from_env()
+        try:
+            self.docker_client = docker.from_env()
+        except:
+            raise WoodworkError("Docker client not found.")
 
     def _ensure_data_directory(self):
         """Ensure the data directory exists."""

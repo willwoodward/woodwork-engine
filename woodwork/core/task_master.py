@@ -29,15 +29,17 @@ class task_master(component):
         )
 
         self._tools = []
+        self._inputs = []
+        self._outputs = []
         self.workflow_name: Optional[str] = None
         self.workflow_actions: dict[str, Action] = {}
         self.workflow_variables: dict[str, Any] = {}
         self.last_action_name: str = None
 
     def add_tools(self, tools):
-        self._tools = tools
-        self._inputs = [component for component in tools if isinstance(component, inputs)]
-        self._outputs = [component for component in tools if isinstance(component, outputs)]
+        self._tools = self._tools + tools
+        self._inputs = self._inputs + [component for component in tools if isinstance(component, inputs)]
+        self._outputs = self._outputs + [component for component in tools if isinstance(component, outputs)]
 
     def start_workflow(self, workflow_name: str):
         """
@@ -67,13 +69,17 @@ class task_master(component):
 
             log.debug(f"Executing tool '{action.tool}' with action '{action.action}' and inputs {action.inputs}")
 
-            tools = list(filter(lambda t: t.name == action.tool, self._tools))
-            if len(tools) == 0:
-                raise ValueError(f"Tool '{action.tool}' not found.")
-            tool = tools[0]
+            result = None
+            if action.tool == "ask_user":
+                result = input(f"{action.inputs["question"]}\n")
+            else:
+                tools = list(filter(lambda t: t.name == action.tool, self._tools))
+                if len(tools) == 0:
+                    raise ValueError(f"Tool '{action.tool}' not found.")
+                tool = tools[0]
 
-            result = tool.input(action.action, action.inputs)
-            log.debug(f"Tool result: {result}")
+                result = tool.input(action.action, action.inputs)
+                log.debug(f"Tool result: {result}")
 
             self.workflow_actions[action.output] = action
             self.workflow_variables = result

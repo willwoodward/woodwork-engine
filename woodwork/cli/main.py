@@ -69,6 +69,8 @@ def app_entrypoint(args):
         globals.global_config["mode"],
     )
 
+    copy_prompts()
+
     if args.init is not None:
         options = {"isolated": False, "all": False}
         if args.init == "isolated":
@@ -78,7 +80,6 @@ def app_entrypoint(args):
             options["isolated"] = True
             options["all"] = True
             log.debug("Initialization mode set to 'all'.")
-        copy_prompts()
         dependencies.init(options)
 
         # Run the initialization methods
