@@ -4,6 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 
 from woodwork.components.component import component
+from woodwork.interfaces import tool_interface
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.core.task_master import task_master
 from woodwork.components.core.planning import planning_tools
@@ -11,7 +12,7 @@ from woodwork.components.core.planning import planning_tools
 log = logging.getLogger(__name__)
 
 
-class agent(component, ABC):
+class agent(component, tool_interface, ABC):
     def __init__(self, tools, task_m: task_master, **config):
         format_kwargs(config, tools=tools, task_m=task_m, component="agent")
         super().__init__(**config)
@@ -47,11 +48,6 @@ class agent(component, ABC):
         if self._cache_mode:
             self._cache.close()
 
-    @abstractmethod
-    def input(self, query):
-        """Given a query, return the JSON array denoting the actions to take, passed to the task master."""
-        pass
-
     def _cache_search_actions(self, prompt: str):
         similar_prompts = self._cache.similarity_search(prompt, "Prompt", "value")
 
@@ -73,3 +69,28 @@ class agent(component, ABC):
         actions = list(map(lambda x: json.loads(x["result"]["value"].replace("'", '"')), actions))
 
         return {"prompt": best_prompt, "inputs": best_inputs, "actions": actions, "score": score}
+
+    @abstractmethod
+    def input(self, query: str, inputs: dict = None):
+        """Given a query, will use the provided tools and memory to perform actions to solve the query."""
+        pass
+
+    @property
+    def description(self):
+        return f"""\
+General Reasoning Agent — callable tool.
+
+Call this tool by setting the step **Action** with:
+- **tool**: {self.name}
+- **action**: a natural-language prompt describing the task. You may include variable placeholders in curly braces, e.g., "Summarize {{{{document}}}}".
+- **inputs**: a dict mapping placeholder names (from the prompt) to **variable names** produced by earlier steps outputs (not literals).
+- **output**: the variable name to store the result.
+
+The agent will plan, use its internal tools, and memory, and return a result.
+
+Usage Example:
+Action: {{{{"tool": "agent", "action": "Translate {{{{text}}}} to French", "inputs": {{{{"text": "text"}}}}, "output": "french_text"}}}}
+
+Available Tools for this Agent:
+{[t.name for t in self._tools]}
+"""

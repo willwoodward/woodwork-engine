@@ -3,6 +3,7 @@ def read_messages(sender: str) -> str:
 
     messages = [
         {"from": "Will", "content": "Can you send me your contact details?"},
+        
         {"from": "Bob", "content": "Can you check your messages from Will?"},
     ]
 

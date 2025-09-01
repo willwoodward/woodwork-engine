@@ -13,7 +13,8 @@ registry = get_registry()
 
 langmodel: openai = registry.get('langmodel')
 in: command_line = registry.get('in')
-endpoint: functions = registry.get('endpoint')
-agmodel: llm = registry.get('agmodel')
+message_reader: functions = registry.get('message_reader')
+orchestrator: llm = registry.get('orchestrator')
+secretary_agent: llm = registry.get('secretary_agent')
 
-__all__ = ['langmodel', 'in', 'endpoint', 'agmodel']
+__all__ = ['langmodel', 'in', 'message_reader', 'orchestrator', 'secretary_agent']

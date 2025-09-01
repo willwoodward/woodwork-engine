@@ -22,6 +22,7 @@ Guidelines:
   Example: {{"word": "word"}}, not {{"word": "orange"}}.
 - Always assign the result to an output variable, even if unused.
 - Do not fabricate or predict the results of an action — wait for the actual observation to be provided by the system.
+- If a sub-agent is available that is specialized for the task (e.g., reading files, handling messages, performing domain-specific reasoning), **prefer delegating the step to that sub-agent** rather than handling it yourself.
 
 Example:
 User prompt: What is the length of the word orange?

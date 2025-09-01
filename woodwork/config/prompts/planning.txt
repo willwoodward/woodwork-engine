@@ -26,6 +26,7 @@ Guidelines:
 - You must always provide a thought when you provide an action
 - Thought and Action must always be on new lines
 - Thought must never be empty
+- If a sub-agent is available that is specialized for the task (e.g., reading files, handling messages, performing domain-specific reasoning), **prefer delegating the step to that sub-agent** rather than handling it yourself.
 
 You have access to a number of standard tools
 

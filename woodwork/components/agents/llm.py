@@ -67,13 +67,8 @@ class llm(agent):
         - (final_answer, None, True) if Final Answer is present
         - (raw_output, None, False) if nothing structured is found
         """
-        # Handle Final Answer
-        final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
-        if final_answer_match:
-            final_answer = final_answer_match.group(1).strip()
-            return final_answer, None, True
-
         # Match Thought up to Action or Final Answer or end
+        final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
         thought_match = re.search(r"Thought:\s*(.*?)(?=\s*Action:|\s*Final Answer:|$)", agent_output, re.DOTALL)
         action_match = re.search(
             r"Action:\s*(\{.*?\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))",
@@ -84,6 +79,10 @@ class llm(agent):
         thought = ""
         if thought_match:
             thought = thought_match.group(1).strip()
+        
+        if final_answer_match and not thought_match and not action_match:
+            final_answer = final_answer_match.group(1).strip()
+            return final_answer, None, True
 
         if not action_match:
             return (thought or agent_output.strip(), None, False)
@@ -131,7 +130,15 @@ class llm(agent):
         workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
         return workflow
 
-    def input(self, query):
+    def input(self, query: str, inputs: dict = None):
+        if inputs is None:
+            inputs = {}
+        
+        # Substitute inputs
+        prompt = query
+        for key in inputs:
+            prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
+        
         # # Search cache for similar results
         # if self._cache_mode:
         #     closest_query = self._cache_search_actions(query)
@@ -143,7 +150,7 @@ class llm(agent):
         # Build tool documentation string
         tool_documentation = ""
         for obj in self._tools:
-            tool_documentation += f"tool name: {obj.name}\ntool type: {obj.type}\n{obj.description}\n\n\n"
+            tool_documentation += f"tool name: {obj.name}\ntool type: {obj.type}\n<tool_description>\n{obj.description}</tool_description>\n\n\n"
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
 
