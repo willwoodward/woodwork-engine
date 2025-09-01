@@ -216,6 +216,12 @@ def create_object(command):
             from woodwork.components.outputs.voice import voice
 
             return init_object(voice, **config)
+    
+    if component == "mcp":
+        if type == "server":
+            from woodwork.components.mcp.server import mcp_server
+
+            return init_object(mcp_server, **config)
 
     # Deployment components
     if component == "vm":

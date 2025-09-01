@@ -51,11 +51,18 @@ class Docker:
             log.debug(f"Data directory already exists at {self.path}")
 
     def _build_docker_image(self):
-        """Build the Docker image."""
-
-        log.debug("Building Docker image...")
-        self.docker_client.images.build(fileobj=io.BytesIO(self.dockerfile.encode("utf-8")), tag=self.image_name)
-        log.debug(f"Successfully built image: {self.image_name}")
+        """Build the Docker image if a Dockerfile is provided; otherwise pull pre-built image."""
+        if self.dockerfile:
+            log.debug("Building Docker image from Dockerfile...")
+            self.docker_client.images.build(
+                fileobj=io.BytesIO(self.dockerfile.encode("utf-8")),
+                tag=self.image_name
+            )
+            log.debug(f"Successfully built image: {self.image_name}")
+        else:
+            log.debug(f"No Dockerfile provided. Pulling pre-built image: {self.image_name}")
+            self.docker_client.images.pull(self.image_name)
+            log.debug(f"Successfully pulled image: {self.image_name}")
 
     def _run_docker_container(self):
         """Run the Docker container."""
@@ -83,7 +90,7 @@ class Docker:
         log.debug(f"Container '{self.container_name}' is running.")
         return container
 
-    def wait_for_container(self, container, timeout=60):
+    def wait_for_container(self, container, timeout=180):
         start_time = time.time()
         while time.time() - start_time < timeout:
             container.reload()  # Refresh container state
