@@ -22,10 +22,12 @@ def _rm_tree(path: pathlib.Path) -> None:
 
 
 def _cleanup_docker():
-    """Attempt to stop/remove Docker containers and images that mention 'woodwork'.
+    """Attempt to stop/remove Docker containers and images that are tagged with 'woodwork'.
 
-    This is intentionally conservative: it only targets containers/images with
-    'woodwork' in their name/tag to avoid removing unrelated resources.
+    We intentionally only target resources by tag now: containers are stopped/removed
+    only when their image has a tag containing 'woodwork'. We no longer remove
+    containers based on their name to avoid accidentally deleting unrelated containers
+    whose names happen to contain the substring.
     """
     try:
         import docker
@@ -40,37 +42,35 @@ def _cleanup_docker():
         log.debug("Could not initialise Docker client: %s", e)
         return
 
-    # Stop and remove containers with 'woodwork' in name
+    # Stop and remove containers whose image tags include 'woodwork'
     try:
         for container in client.containers.list(all=True):
             try:
-                names = []
-                # container.name may be present; container.attrs has Names, but use name
-                try:
-                    names = [container.name]
-                except Exception:
-                    pass
-
-                matches = any("woodwork" in n for n in names if n)
-                # also check image tag
                 image_tags = []
                 try:
                     image_tags = container.image.tags or []
                 except Exception:
                     pass
-                matches = matches or any("woodwork" in t for t in image_tags)
+
+                # Only base matching on tags now
+                matches = any("woodwork" in t for t in image_tags)
 
                 if matches:
-                    log.info("Stopping container %s...", container.name)
+                    cname = None
+                    try:
+                        cname = container.name
+                    except Exception:
+                        cname = "<unknown>"
+                    log.info("Stopping container %s...", cname)
                     try:
                         container.stop()
                     except Exception:
-                        log.debug("Container %s may already be stopped.", container.name)
-                    log.info("Removing container %s...", container.name)
+                        log.debug("Container %s may already be stopped.", cname)
+                    log.info("Removing container %s...", cname)
                     try:
                         container.remove(force=True)
                     except Exception as e:
-                        log.warning("Failed to remove container %s: %s", container.name, e)
+                        log.warning("Failed to remove container %s: %s", cname, e)
             except Exception as e:
                 log.debug("Skipping container due to error: %s", e)
     except APIError as e:
