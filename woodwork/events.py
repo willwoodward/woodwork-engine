@@ -163,6 +163,37 @@ class EventEmitter:
         finally:
             new_loop.close()
 
+    # Convenience helper methods moved from agent to emitter
+    def emit_hook(self, event: str, payload: Any = None) -> None:
+        """Emit a non-blocking hook/event in a best-effort way.
+
+        This mirrors the convenience helper previously on the agent. It uses the emitter's
+        sync wrapper and logs any failures without raising.
+        """
+        try:
+            try:
+                self.emit_sync(event, payload)
+            except Exception:
+                log.exception("Failed to emit hook %s", event)
+        except Exception:
+            # swallow any unexpected errors to avoid breaking caller flow
+            log.exception("Unexpected error while emitting hook %s", event)
+
+    def emit_through(self, event: str, payload: Any = None) -> Any:
+        """Run the pipe pipeline for an event and return possibly transformed payload.
+
+        This is a convenience wrapper for emit_through_sync with logging on failure.
+        """
+        try:
+            try:
+                return self.emit_through_sync(event, payload)
+            except Exception:
+                log.exception("Error running pipes for event %s", event)
+                return payload
+        except Exception:
+            log.exception("Unexpected error while running pipes for event %s", event)
+            return payload
+
 
 # Convenience factory
 def create_default_emitter() -> EventEmitter:

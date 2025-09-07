@@ -77,33 +77,6 @@ class agent(component, tool_interface, ABC):
 
         return {"prompt": best_prompt, "inputs": best_inputs, "actions": actions, "score": score}
 
-    # Convenience emit helpers for agents and other components
-    def emit_hook(self, event: str, payload=None) -> None:
-        """Emit a non-blocking hook/event. Uses the emitter's sync helper so callers need not worry about
-        asyncio internals.
-        """
-        try:
-            if hasattr(self, "_emitter") and self._emitter is not None:
-                # best-effort, don't raise on emitter failures
-                try:
-                    self._emitter.emit_sync(event, payload)
-                except Exception:
-                    log.exception("Failed to emit event %s", event)
-        except Exception:
-            # swallow any unexpected errors to avoid breaking agent flow
-            log.exception("Unexpected error while emitting hook %s", event)
-
-    def emit_through(self, event: str, payload=None):
-        """Run pipe pipeline for the event and return possibly transformed payload. This is blocking from
-        the caller's perspective and uses the emitter's sync wrapper.
-        """
-        if hasattr(self, "_emitter") and self._emitter is not None:
-            try:
-                return self._emitter.emit_through_sync(event, payload)
-            except Exception:
-                log.exception("Error running pipes for event %s", event)
-                return payload
-        return payload
 
     @abstractmethod
     def input(self, query: str, inputs: dict = None):
