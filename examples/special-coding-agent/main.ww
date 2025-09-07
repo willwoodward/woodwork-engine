@@ -1,11 +1,12 @@
-agent = agent llm {
+coding_ag = agent llm {
     api_key: $OPENAI_API_KEY
+    planning: True
     cache: False
     tools: [github_api, line, code, kb, llm]
 }
 
 input = input command_line {
-    to: agent
+    to: coding_ag
 }
 
 llm = llm openai {

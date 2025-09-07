@@ -160,6 +160,10 @@ def create_object(command):
             from woodwork.components.llms.openai import openai
 
             return init_object(openai, **config)
+        if type == "claude":
+            from woodwork.components.llms.claude import claude
+
+            return init_object(claude, **config)
         if type == "ollama":
             from woodwork.components.llms.ollama import ollama
 

@@ -73,5 +73,5 @@ class command_line(core):
         A command line isolated inside a docker container for use by the agent.
         This also comes with a file system that can be manipulated using the command line.
         If you change directory using `cd`, it will keep track of the current directory, as long as the command does nothing else.
-        The function provided is run(input: str), where it executes the command passed as input in a bash terminal.
+        The function provided is run(input: str), where it executes the command passed as input in a shell terminal.
         To use this, the action is the function name and the inputs are a dictionary of key word arguments for the run function."""

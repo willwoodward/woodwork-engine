@@ -360,6 +360,12 @@ The assistant did not use the todo list because this is a single information loo
 
 When in doubt, use this tool. Being proactive with task management demonstrates attentiveness and ensures you complete all requirements successfully.
 
+See docstrings and examples for more details on each tool.
+
+These tools all come under the planning_tools namespace. To access a tool, for example write_todos, you should specify the tool as "planning_tools", and then the specific tool as the action, in this case it would be "write_todos". You can then pass the inputs in as normal, knowing that they are the inputs of write_todos.
+"""
+
+    file_mangement_prompt = """
 read_file: Reads a file from the agent filesystem. You can access any file directly by using this tool.
 Assume this tool is able to read all files in the agent filesystem. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
 
@@ -385,10 +391,6 @@ Usage:
 write_file: Writes content to a file in the agent filesystem.
 
 ls: Lists all files in the agent filesystem.
-
-See docstrings and examples for more details on each tool.
-
-These tools all come under the planning_tools namespace. To access a tool, for example write_todos, you should specify the tool as "planning_tools", and then the specific tool as the action, in this case it would be "write_todos". You can then pass the inputs in as normal, knowing that they are the inputs of write_todos.
 """
 
     def input(self, action: str, inputs: dict = {}):

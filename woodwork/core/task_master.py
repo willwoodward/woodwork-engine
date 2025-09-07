@@ -82,7 +82,7 @@ class task_master(component):
                 log.debug(f"Tool result: {result}")
 
             self.workflow_actions[action.output] = action
-            self.workflow_variables = result
+            self.workflow_variables[action.output] = result
             self.last_action_name = action.output
             return result
 

@@ -5,6 +5,7 @@ import logging
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from typing import Any, Tuple, Optional
+import tiktoken
 
 from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
@@ -20,8 +21,8 @@ class llm(agent):
         log.debug("Initializing agent...")
 
         self.__llm = ChatOpenAI(
-            model="gpt-4o",
-            temperature=0,
+            model="gpt-5-mini",
+            # temperature=0,
             max_tokens=None,
             timeout=None,
             max_retries=2,
@@ -60,6 +61,15 @@ class llm(agent):
             log.debug(x[start_index : end_index + 1 :])
             return x
 
+    def _safe_json_extract(self, s: str):
+        decoder = json.JSONDecoder()
+        try:
+            obj, _ = decoder.raw_decode(s)
+            return obj
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(s)}")
+
+
     def _parse(self, agent_output: str) -> Tuple[str, Optional[dict], bool]:
         """
         Parse a ReAct-style agent output and extract either:
@@ -91,7 +101,7 @@ class llm(agent):
         cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
 
         try:
-            action = json.loads(cleaned_action_str)
+            action = self._safe_json_extract(cleaned_action_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
 
@@ -129,6 +139,17 @@ class llm(agent):
         input_dict = self._find_inputs(query, partial_workflow["inputs"])
         workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
         return workflow
+    
+    def count_tokens(self, text: str, model: str = "gpt-5-mini"):
+        if not isinstance(text, str):
+            text = str(text)
+
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            # Fall back to a known encoding
+            encoding = tiktoken.get_encoding("cl100k_base")
+        return len(encoding.encode(text))
 
     def input(self, query: str, inputs: dict = None):
         if inputs is None:
@@ -159,6 +180,8 @@ class llm(agent):
             "{tools}\n\n"
         ).format(tools=tool_documentation) + self._prompt
 
+        system_prompt_tokens = self.count_tokens(system_prompt)
+
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", system_prompt),
@@ -170,8 +193,31 @@ class llm(agent):
 
         current_prompt = query
 
-        for iteration in range(10):
+        for iteration in range(1000):
             log.debug(f"\n--- Iteration {iteration + 1} ---")
+            
+            current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
+            print(f"tokens: {current_tokens}")
+
+            if current_tokens > 100000:
+                log.debug("Token limit reached, summarising context...")
+
+                summariser_prompt = ChatPromptTemplate.from_messages(
+                    [
+                        ("system", "You are a helpful assistant that summarises context for another agent."),
+                        ("human", "Summarise the following context into a concise form that retains all important facts, goals, decisions, and observations:\n\n{context}")
+                    ]
+                )
+
+                summariser_chain = summariser_prompt | self.__llm
+
+                summary = summariser_chain.invoke({"context": current_prompt}).content
+                log.debug(f"[SUMMARY]: {summary}")
+
+                current_prompt = f"Summary of previous context:\n{summary}\n\nContinue reasoning from here."
+                system_prompt_tokens = self.count_tokens(system_prompt)
+                continue
+
             result = chain.invoke({"input": current_prompt}).content
             log.debug(f"[RESULT] {result}")
 
@@ -191,8 +237,18 @@ class llm(agent):
             log.debug(f"Action: {action_dict}")
             print(f"Thought: {thought}")
 
-            action = Action.from_dict(action_dict)
-            observation = self._task_m.execute(action)
+            try:
+                action = Action.from_dict(action_dict)
+                observation = self._task_m.execute(action)
+
+                observation_tokens = self.count_tokens(observation)
+                if observation_tokens > 5000:
+                    observation = f"The output from this tool was way too large, it contained {observation_tokens} tokens."
+
+            except KeyError as e:
+                log.warning(f"Action dict missing key {e}, feeding back as context.")
+                observation = f"Received incomplete action from Agent: {json.dumps(action_dict)}. It is likely missing the key {e}."
+            
             log.debug(f"Observation: {observation}")
 
             # Append step to ongoing prompt
