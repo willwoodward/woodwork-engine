@@ -81,6 +81,12 @@ def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Perform a conservative cleanup: remove .woodwork and any Docker resources tagged with 'woodwork', then exit.",
+    )
+
+    parser.add_argument(
         "--version",
         action="store_true",
         help="Display the version of Woodwork and exit.",

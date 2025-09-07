@@ -16,7 +16,6 @@ from woodwork.deployments.generate_exports import generate_exported_objects_file
 from .progress.progress import parallel_func_apply
 from .progress.lifecycles import init_component, parallel_init_component, start_component, parallel_start_component
 from woodwork.cli.setup_defaults import copy_prompts
-from woodwork.cli.cleanup import clean_all
 from woodwork.utils import get_package_directory
 
 import woodwork.globals as globals
@@ -42,11 +41,6 @@ def app_entrypoint(args):
             str(pathlib.Path(__file__).parent.parent / "pyproject.toml")
         )
         print(f"Woodwork version: {version_from_toml}")
-        return
-
-    if getattr(args, "clean", False):
-        log.info("--clean flag provided: running cleanup and exiting.")
-        clean_all()
         return
 
     log.debug("Arguments: %s", args)
