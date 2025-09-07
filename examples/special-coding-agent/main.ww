@@ -2,7 +2,7 @@ coding_ag = agent llm {
     api_key: $OPENAI_API_KEY
     planning: True
     cache: False
-    tools: [github_api, line, code, kb, llm]
+    tools: [github_api, dev_env, kb, llm]
 }
 
 input = input command_line {
@@ -20,13 +20,25 @@ github_api = api functions {
 
 kb = knowledge_base chroma {
     api_key: $OPENAI_API_KEY
-    file_to_embed: ".woodwork/vm"
+    file_to_embed: ".woodwork/coding-env"
 }
 
-line = core command_line {}
-
-code = core code {
-    container: line
+dev_env = environment coding {
     repo_url: "willwoodward/woodwork-engine"
-    knowledge_base: kb
+    local_path: "/workspace"
+    vector_db: kb
+    setup_scripts: [
+        "/workspace/setup_env.sh"
+    ]
+    startup_scripts: [
+        "/workspace/startup_env.sh"
+    ]
+    environment_variables: {
+        GIT_AUTHOR_NAME: $AGENT_GIT_NAME
+        GIT_AUTHOR_EMAIL: $AGENT_GIT_EMAIL
+        GIT_COMMITTER_NAME: $AGENT_GIT_NAME
+        GIT_COMMITTER_EMAIL: $AGENT_GIT_EMAIL
+        GITHUB_TOKEN: $GITHUB_PAT
+        PYTHON_ENV: "development"
+    }
 }

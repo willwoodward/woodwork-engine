@@ -5,8 +5,7 @@ from woodwork.components.inputs.command_line import command_line
 from woodwork.components.llms.openai import openai
 from woodwork.components.apis.functions import functions
 from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
-from woodwork.components.core.command_line import command_line
-from woodwork.components.core.code import code
+from woodwork.components.environments.coding import coding
 
 from woodwork.registry import get_registry
 from woodwork.config_parser import main_function
@@ -19,7 +18,6 @@ input: command_line = registry.get('input')
 llm: openai = registry.get('llm')
 github_api: functions = registry.get('github_api')
 kb: chroma = registry.get('kb')
-line: command_line = registry.get('line')
-code: code = registry.get('code')
+dev_env: coding = registry.get('dev_env')
 
-__all__ = ['coding_ag', 'input', 'llm', 'github_api', 'kb', 'line', 'code']
+__all__ = ['coding_ag', 'input', 'llm', 'github_api', 'kb', 'dev_env']
