@@ -51,18 +51,41 @@ class Docker:
             log.debug(f"Data directory already exists at {self.path}")
 
     def _build_docker_image(self):
-        """Build the Docker image if a Dockerfile is provided; otherwise pull pre-built image."""
+        """Build the Docker image if a Dockerfile is provided; otherwise pull pre-built image.
+
+        After building or pulling, also add a secondary tag '<repository>:woodwork' so that
+        images can be identified/cleaned up reliably by the 'woodwork' tag.
+        """
         if self.dockerfile:
             log.debug("Building Docker image from Dockerfile...")
-            self.docker_client.images.build(
-                fileobj=io.BytesIO(self.dockerfile.encode("utf-8")),
-                tag=self.image_name
-            )
-            log.debug(f"Successfully built image: {self.image_name}")
+            # images.build returns (image, logs) in the docker SDK
+            try:
+                built_image, _ = self.docker_client.images.build(
+                    fileobj=io.BytesIO(self.dockerfile.encode("utf-8")),
+                    tag=self.image_name
+                )
+                log.debug(f"Successfully built image: {self.image_name}")
+            except Exception as e:
+                log.debug(f"Failed to build image {self.image_name}: {e}")
+                raise
         else:
             log.debug(f"No Dockerfile provided. Pulling pre-built image: {self.image_name}")
-            self.docker_client.images.pull(self.image_name)
-            log.debug(f"Successfully pulled image: {self.image_name}")
+            try:
+                self.docker_client.images.pull(self.image_name)
+                log.debug(f"Successfully pulled image: {self.image_name}")
+            except Exception as e:
+                log.debug(f"Failed to pull image {self.image_name}: {e}")
+                raise
+
+        # Tag image with 'woodwork' tag (repository:woodwork). Use the repository part
+        # of the provided image_name (strip any existing tag) as the target repository.
+        try:
+            repo = self.image_name.split(":")[0]
+            img = self.docker_client.images.get(self.image_name)
+            img.tag(repo, tag="woodwork")
+            log.debug(f"Tagged image {self.image_name} as {repo}:woodwork")
+        except Exception as e:
+            log.debug(f"Could not tag image {self.image_name} with 'woodwork': {e}")
 
     def _run_docker_container(self):
         """Run the Docker container."""
