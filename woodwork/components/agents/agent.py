@@ -47,9 +47,13 @@ class agent(component, tool_interface, ABC):
         else:
             self._cache_mode = False
 
-        # Event emitter: accept an emitter via config (key: 'events') or create a default one
-        provided_emitter = config.get("events") if isinstance(config, dict) else None
-        self._emitter = provided_emitter if provided_emitter is not None else create_default_emitter()
+        # Event emitter: use component's emitter if available, or accept via config, or create default
+        if hasattr(self, '_emitter') and self._emitter is not None:
+            # Component already created an emitter with hooks/pipes
+            pass
+        else:
+            provided_emitter = config.get("events") if isinstance(config, dict) else None
+            self._emitter = provided_emitter if provided_emitter is not None else create_default_emitter()
 
     def close(self):
         if self._cache_mode:

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Optional
 
 
 @dataclass
@@ -15,6 +15,50 @@ class Action:
 
     def to_dict(self) -> Dict[str, Any]:
         return {"tool": self.tool, "action": self.action, "inputs": self.inputs, "output": self.output}
+
+
+@dataclass
+class Hook:
+    event: str
+    script_path: str
+    function_name: str
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Hook":
+        return cls(
+            event=data["event"],
+            script_path=data["script_path"], 
+            function_name=data["function_name"]
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "event": self.event,
+            "script_path": self.script_path,
+            "function_name": self.function_name
+        }
+
+
+@dataclass
+class Pipe:
+    event: str
+    script_path: str
+    function_name: str
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Pipe":
+        return cls(
+            event=data["event"],
+            script_path=data["script_path"],
+            function_name=data["function_name"]
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "event": self.event,
+            "script_path": self.script_path,
+            "function_name": self.function_name
+        }
 
 
 @dataclass

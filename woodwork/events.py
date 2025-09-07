@@ -2,7 +2,7 @@ import asyncio
 import inspect
 import logging
 from collections import defaultdict
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 log = logging.getLogger(__name__)
 
@@ -144,24 +144,40 @@ class EventEmitter:
                 new_loop.close()
 
     def emit_through_sync(self, event: str, payload: Any = None) -> Any:
-        """Run emit_through and return the (possibly transformed) payload in a sync-friendly way.
-
-        - If an event loop is running, run emit_through using loop.run_until_complete on a temporary loop
-          is not safe; instead, schedule a task and wait for it briefly if needed. To keep things simple,
-          if a loop is running we will create a new event loop to run the pipeline synchronously.
+        """Run pipes synchronously and return the (possibly transformed) payload.
+        
+        This version runs pipes directly without async overhead to avoid event loop conflicts.
         """
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # no running loop
-            return asyncio.run(self.emit_through(event, payload))
-
-        # If an event loop is already running, run on a new loop to completion
-        new_loop = asyncio.new_event_loop()
-        try:
-            return new_loop.run_until_complete(self.emit_through(event, payload))
-        finally:
-            new_loop.close()
+        pipes = list(self._pipes.get(event, []))
+        current = payload
+        for pipe in pipes:
+            try:
+                if inspect.iscoroutinefunction(pipe):
+                    # For async pipes, we need to handle them carefully
+                    try:
+                        loop = asyncio.get_running_loop()
+                        # If there's a running loop, we can't use run_until_complete
+                        # Skip async pipes in sync context for now
+                        log.warning(f"Skipping async pipe for event {event} in sync context")
+                        continue
+                    except RuntimeError:
+                        # No running loop, we can use asyncio.run
+                        result = asyncio.run(pipe(current))
+                        if result is not None:
+                            current = result
+                else:
+                    # Sync pipe - call directly
+                    result = pipe(current)
+                    if result is not None:
+                        current = result
+            except Exception as e:
+                log.exception("Error in pipe for event %s: %s", event, e)
+                # Emit an agent.error but keep going
+                try:
+                    self.emit_sync("agent.error", {"error": e, "event": event})
+                except Exception:
+                    pass
+        return current
 
     # Convenience helper methods moved from agent to emitter
     def emit_hook(self, event: str, payload: Any = None) -> None:
@@ -179,7 +195,7 @@ class EventEmitter:
             # swallow any unexpected errors to avoid breaking caller flow
             log.exception("Unexpected error while emitting hook %s", event)
 
-    def emit_through(self, event: str, payload: Any = None) -> Any:
+    def emit_pipe_sync(self, event: str, payload: Any = None) -> Any:
         """Run the pipe pipeline for an event and return possibly transformed payload.
 
         This is a convenience wrapper for emit_through_sync with logging on failure.

@@ -3,6 +3,23 @@ coding_ag = agent llm {
     planning: True
     cache: False
     tools: [github_api, dev_env, kb, llm]
+    hooks: [
+        {
+            event: "input.received"
+            script_path: "hooks.py"
+            function_name: "print_input_received"
+        },
+        {
+            event: "agent.action"
+            script_path: "hooks.py"
+            function_name: "print_agent_action"
+        },
+        {
+            event: "tool.observation"
+            script_path: "hooks.py"
+            function_name: "print_tool_observation"
+        }
+    ]
 }
 
 input = input command_line {

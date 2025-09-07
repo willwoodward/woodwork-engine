@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+import ast
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
@@ -62,12 +63,17 @@ class llm(agent):
             return x
 
     def _safe_json_extract(self, s: str):
-        decoder = json.JSONDecoder()
         try:
-            obj, _ = decoder.raw_decode(s)
-            return obj
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(s)}")
+            # First try strict JSON
+            return json.loads(s)
+        except json.JSONDecodeError:
+            try:
+                # Fallback: allow Python-style literals (True/False/None, single quotes, etc.)
+                return ast.literal_eval(s)
+            except Exception as e:
+                # If both fail, raise a clear error
+                raise ValueError(f"Invalid JSON in action: {e}\nRaw string: {repr(s)}")
+
 
 
     def _parse(self, agent_output: str) -> Tuple[str, Optional[dict], bool]:
@@ -171,7 +177,7 @@ class llm(agent):
         # Allow input pipes/hooks to transform the incoming query before the main loop
         if hasattr(self, "_emitter") and self._emitter is not None:
             try:
-                transformed = self._emitter.emit_through("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None), "timestamp": None})
+                transformed = self._emitter.emit_pipe_sync("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None), "timestamp": None})
                 if isinstance(transformed, dict) and "input" in transformed:
                     query = transformed.get("input", query)
                     inputs = transformed.get("inputs", inputs)
@@ -262,7 +268,7 @@ class llm(agent):
             # Allow pipes to transform the agent action payload before creating an Action
             if hasattr(self, "_emitter") and self._emitter is not None:
                 try:
-                    maybe = self._emitter.emit_through("agent.action", {"action": action_dict, "timestamp": None})
+                    maybe = self._emitter.emit_pipe_sync("agent.action", {"action": action_dict, "timestamp": None})
                     if isinstance(maybe, dict) and "action" in maybe:
                         action_dict = maybe.get("action", action_dict)
                 except Exception:
@@ -282,7 +288,7 @@ class llm(agent):
                 # Allow tool.call pipes to transform the call (tool name / args) before execution
                 if hasattr(self, "_emitter") and self._emitter is not None:
                     try:
-                        maybe_call = self._emitter.emit_through("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs"), "timestamp": None})
+                        maybe_call = self._emitter.emit_pipe_sync("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs"), "timestamp": None})
                         if isinstance(maybe_call, dict):
                             changed = False
                             if "tool" in maybe_call and maybe_call.get("tool") != action_dict.get("tool"):
@@ -310,7 +316,10 @@ class llm(agent):
 
             except KeyError as e:
                 log.warning(f"Action dict missing key {e}, feeding back as context.")
-                observation = f"Received incomplete action from Agent: {json.dumps(action_dict)}. It is likely missing the key {e}."
+                if e == "output":
+                    action["output"] = ""
+                else:
+                    observation = f"Received incomplete action from Agent: {json.dumps(action_dict)}. It is likely missing the key {e}."
             except Exception as e:
                 log.exception("Unhandled error while executing action: %s", e)
                 # Emit agent.error for unexpected failures
@@ -327,7 +336,7 @@ class llm(agent):
             # Allow tool.observation pipes/hooks to transform or observe the tool output
             if hasattr(self, "_emitter") and self._emitter is not None:
                 try:
-                    obs = self._emitter.emit_through("tool.observation", {"tool": action_dict.get("tool"), "observation": observation, "timestamp": None})
+                    obs = self._emitter.emit_pipe_sync("tool.observation", {"tool": action_dict.get("tool"), "observation": observation, "timestamp": None})
                     if obs is not None and isinstance(obs, dict) and "observation" in obs:
                         observation = obs.get("observation")
                 except Exception:

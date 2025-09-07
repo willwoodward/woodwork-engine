@@ -137,7 +137,6 @@ class planning_tools(core):
         # Write back to file
         with open(abs_path, "w", encoding="utf-8") as f:
             for todo, st in current.items():
-                print(todo, st)
                 f.write(f"[{st}] {todo}\n")
         
         print("DEBUG written todos:")
