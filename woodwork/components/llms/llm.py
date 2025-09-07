@@ -1,7 +1,8 @@
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.interfaces.knowledge_base_interface import knowledge_base_interface
-from woodwork.helper_functions import format_kwargs
+from woodwork.types import Prompt
+from woodwork.utils import format_kwargs, get_prompt
 
 from langchain_core.prompts import ChatPromptTemplate
 from abc import ABC, abstractmethod
@@ -12,6 +13,8 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
         format_kwargs(config, component="llm")
         super().__init__(**config)
 
+        self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/llm.txt"}))
+        self._prompt = get_prompt(self._prompt_config.file)
         self._memory = config.get("memory")
         self._output = config.get("to")
 

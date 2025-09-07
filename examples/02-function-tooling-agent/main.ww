@@ -2,7 +2,7 @@ endpoint = api functions {
     path: "functions.py"
 }
 
-action_model = decomposer llm {
+action_model = agent llm {
     api_key: $OPENAI_API_KEY
     tools: [endpoint]
 }

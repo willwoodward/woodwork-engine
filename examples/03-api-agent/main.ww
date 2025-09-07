@@ -8,7 +8,7 @@ endpoint = api web {
     documentation: "endpoint.txt"
 }
 
-action_model = decomposer llm {
+action_model = agent llm {
     api_key: $OPENAI_API_KEY
     tools: [model2, endpoint]
 }

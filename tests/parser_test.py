@@ -1,6 +1,6 @@
 # from woodwork.dependencies import activate_virtual_environment
-from woodwork.config_parser import parse
-from woodwork.errors import ForbiddenVariableNameError
+from woodwork.parser.config_parser import parse
+from woodwork.utils.errors.errors import ForbiddenVariableNameError
 
 import pytest
 import os
@@ -148,7 +148,7 @@ def test_list_variable_values():
         api_key: $OPENAI_API_KEY
     }
     
-    planner = decomposer llm {
+    planner = agent llm {
         api_key: $OPENAI_API_KEY
         tools: [llm1, llm2]
     }

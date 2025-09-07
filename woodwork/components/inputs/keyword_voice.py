@@ -16,7 +16,7 @@ import webrtcvad
 from vosk import KaldiRecognizer, Model
 
 from woodwork.components.inputs.inputs import inputs
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 

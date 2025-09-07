@@ -3,7 +3,7 @@ import logging
 from langchain_community.llms import HuggingFaceEndpoint
 
 from woodwork.components.llms.llm import llm
-from woodwork.helper_functions import format_kwargs
+from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 

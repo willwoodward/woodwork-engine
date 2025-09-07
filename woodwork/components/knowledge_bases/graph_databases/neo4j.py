@@ -8,7 +8,7 @@ from woodwork.components.knowledge_bases.graph_databases.graph_database import (
     graph_database,
 )
 from woodwork.deployments import Docker
-from woodwork.helper_functions import format_kwargs, get_optional
+from woodwork.utils import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
@@ -55,11 +55,10 @@ class neo4j(graph_database):
             self._openai_client = OpenAI()
 
         log.debug("Neo4j Knowledge Base created.")
-    
+
     def set_api_key(self, api_key: str):
         self._openai_client = OpenAI(api_key=api_key)
         self._api_key = api_key
-
 
     def _connected(self):
         try:

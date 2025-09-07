@@ -1,5 +1,4 @@
 import inspect
-import json
 import logging
 import os
 import re
@@ -7,12 +6,12 @@ import re
 from dotenv import load_dotenv
 from typing import Any
 
-from woodwork.components.task_master import task_master
-from woodwork.errors import (
+from woodwork.core.task_master import task_master
+from woodwork.utils.errors.errors import (
     ForbiddenVariableNameError,
     MissingConfigKeyError,
 )
-from woodwork.registry import get_registry
+from woodwork.deployments.registry import get_registry
 from woodwork.components.component import component
 from woodwork.deployments.router import get_router, Deployment
 
@@ -46,6 +45,14 @@ def dependency_resolver(commands, component):
 
     # Else, if the depends_on array has dependencies
     for dependency in component["depends_on"]:
+        # Skip empty dependencies
+        if not dependency or dependency.strip() == "":
+            continue
+            
+        # Check if dependency exists
+        if dependency not in commands:
+            raise ValueError(f"Dependency '{dependency}' not found for component '{component.get('variable', 'unknown')}'")
+            
         # Resolve that dependency, replace those variables in the config
         component_object = dependency_resolver(commands, commands[dependency])
 
@@ -161,6 +168,10 @@ def create_object(command):
             from woodwork.components.llms.openai import openai
 
             return init_object(openai, **config)
+        if type == "claude":
+            from woodwork.components.llms.claude import claude
+
+            return init_object(claude, **config)
         if type == "ollama":
             from woodwork.components.llms.ollama import ollama
 
@@ -195,10 +206,10 @@ def create_object(command):
 
             return init_object(functions, **config)
 
-    if component == "decomposer":
+    if component == "agent":
         config["task_m"] = task_m
         if type == "llm":
-            from woodwork.components.decomposers.llm import llm
+            from woodwork.components.agents.llm import llm
 
             return init_object(llm, **config)
 
@@ -217,6 +228,18 @@ def create_object(command):
             from woodwork.components.outputs.voice import voice
 
             return init_object(voice, **config)
+    
+    if component == "mcp":
+        if type == "server":
+            from woodwork.components.mcp.server import mcp_server
+
+            return init_object(mcp_server, **config)
+
+    if component == "environment":
+        if type == "coding":
+            from woodwork.components.environments.coding import coding
+
+            return init_object(coding, **config)
 
     # Deployment components
     if component == "vm":
@@ -304,6 +327,34 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
     )
     config_items = [x for x in config_items if x != ""]
 
+    # Handle multiline arrays by joining them
+    merged_items = []
+    i = 0
+    while i < len(config_items):
+        item = config_items[i]
+        
+        # Check if this line starts an array
+        if ":" in item and "[" in item and "]" not in item:
+            # This is a multiline array - collect all lines until we find the closing ]
+            array_lines = [item]
+            i += 1
+            while i < len(config_items) and "]" not in config_items[i]:
+                array_lines.append(config_items[i])
+                i += 1
+            # Add the closing line
+            if i < len(config_items):
+                array_lines.append(config_items[i])
+            
+            # Join all array lines into one
+            key_part = array_lines[0].split(":", 1)[0] + ":"
+            array_content = " ".join([line.split(":", 1)[1] if ":" in line else line for line in array_lines])
+            merged_items.append(key_part + " " + array_content.strip())
+        else:
+            merged_items.append(item)
+        i += 1
+    
+    config_items = merged_items
+
     # If the value is a {, delete the nested elements (will be parsed later)
     i = 0
     brace_counter = 0
@@ -329,8 +380,16 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
     # Make to a set
     depends_on = []
     for item in config_items:
-        key = item.split(":", 1)[0].strip()
-        value = item.split(":", 1)[1].strip()
+        # Skip empty lines or lines without colons
+        if not item.strip() or ":" not in item:
+            continue
+            
+        parts = item.split(":", 1)
+        if len(parts) < 2:
+            continue
+            
+        key = parts[0].strip()
+        value = parts[1].strip()
 
         # Dealing with nested dictionaries:
         if value[0] == "{":
@@ -345,10 +404,57 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
 
         # If the value is an array, parse it as an array of references
         elif value[0] == "[":
-            value = list(map(lambda x: x.strip(), value[1:-1:].split(",")))
-
-            for i in range(len(value)):
-                depends_on.append(value[i])
+            array_content = value[1:-1]  # Remove [ and ]
+            array_items = []
+            
+            # Better parsing that respects quotes
+            current_item = ""
+            in_quotes = False
+            quote_char = None
+            
+            i = 0
+            while i < len(array_content):
+                char = array_content[i]
+                
+                if not in_quotes and char in ['"', "'"]:
+                    in_quotes = True
+                    quote_char = char
+                    current_item += char
+                elif in_quotes and char == quote_char:
+                    in_quotes = False
+                    current_item += char
+                    quote_char = None
+                elif not in_quotes and char == ',':
+                    # End of current item
+                    cleaned_item = current_item.strip()
+                    if cleaned_item:
+                        # Remove outer quotes if present
+                        if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
+                            (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
+                            cleaned_item = cleaned_item[1:-1]
+                        array_items.append(cleaned_item)
+                    current_item = ""
+                else:
+                    current_item += char
+                i += 1
+            
+            # Don't forget the last item
+            if current_item.strip():
+                cleaned_item = current_item.strip()
+                if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
+                    (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
+                    cleaned_item = cleaned_item[1:-1]
+                array_items.append(cleaned_item)
+            
+            value = array_items
+            
+            # Only add to dependencies if they look like simple variable references
+            for item in value:
+                # Only treat as dependency if it's a simple identifier (letters, numbers, underscore only)
+                if (item and 
+                    re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', item) and
+                    not item.startswith('$')):
+                    depends_on.append(item)
 
         elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
             value = value[1:-1:]
@@ -461,10 +567,10 @@ def clear_all():
 
 
 def delete_action_plan(id: str):
-    from woodwork.components.decomposers.decomposer import decomposer
+    from woodwork.components.agents.agent import agent
 
     for tool in task_m._tools:
-        if isinstance(tool, decomposer):
+        if isinstance(tool, agent):
             tool._cache.run(f"""MATCH (n)-[:NEXT*]->(m)
                 WHERE elementId(n) = "{id}"
                 DETACH DELETE n
@@ -474,10 +580,10 @@ def delete_action_plan(id: str):
 
 
 def find_action_plan(query: str):
-    from woodwork.components.decomposers.decomposer import decomposer
+    from woodwork.components.agents.agent import agent
 
     for tool in task_m._tools:
-        if isinstance(tool, decomposer):
+        if isinstance(tool, agent):
             similar_prompts = tool._cache.similarity_search(query, "Prompt", "value")
             num_results = min(len(similar_prompts), 10)
 

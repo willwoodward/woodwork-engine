@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from woodwork.interfaces.tool_interface import tool_interface
-from woodwork.helper_functions import import_all_classes
+from woodwork.utils.helper_functions import import_all_classes
 
 import_all_classes("woodwork.components")
 load_dotenv()

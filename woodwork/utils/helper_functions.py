@@ -1,8 +1,10 @@
 import importlib
+import importlib.resources as pkg_resources
 import os
 import logging
 import tomli  # tomli since we support P3.10 and tomllib is not available until P3.11
 
+from woodwork.utils.errors import WoodworkError
 from woodwork.globals import global_config as config
 
 log = logging.getLogger(__name__)
@@ -82,3 +84,17 @@ def get_version_from_pyproject(pyproject_path="pyproject.toml") -> str:
         data = tomli.load(f)
 
     return data["project"]["version"]
+
+
+def get_package_directory():
+    return pkg_resources.files("woodwork")
+
+
+def get_prompt(path: str) -> str:
+    """Returns the system prompt from the file location specified."""
+    if not os.path.isfile(path):
+        raise WoodworkError(f"Failed to find the prompt file specified at location: {path}")
+
+    with open(path) as f:
+        prompt = f.read()
+    return prompt
