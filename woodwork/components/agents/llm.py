@@ -168,6 +168,21 @@ class llm(agent):
         #         return self._output.execute(self._generate_workflow(query, closest_query))
         self._task_m.start_workflow(query)
 
+        # Allow input pipes/hooks to transform the incoming query before the main loop
+        if hasattr(self, "_emitter") and self._emitter is not None:
+            try:
+                transformed = self._emitter.emit_through("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None), "timestamp": None})
+                if isinstance(transformed, dict) and "input" in transformed:
+                    query = transformed.get("input", query)
+                    inputs = transformed.get("inputs", inputs)
+            except Exception:
+                log.exception("Error applying input.received pipes")
+
+            try:
+                self._emitter.emit_hook("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
+            except Exception:
+                log.exception("Error emitting input.received hook")
+
         # Build tool documentation string
         tool_documentation = ""
         for obj in self._tools:
@@ -237,8 +252,56 @@ class llm(agent):
             log.debug(f"Action: {action_dict}")
             print(f"Thought: {thought}")
 
+            # Emit agent.thought (non-blocking hook)
+            if hasattr(self, "_emitter") and self._emitter is not None:
+                try:
+                    self._emitter.emit_hook("agent.thought", {"thought": thought, "timestamp": None})
+                except Exception:
+                    log.exception("Error emitting agent.thought")
+
+            # Allow pipes to transform the agent action payload before creating an Action
+            if hasattr(self, "_emitter") and self._emitter is not None:
+                try:
+                    maybe = self._emitter.emit_through("agent.action", {"action": action_dict, "timestamp": None})
+                    if isinstance(maybe, dict) and "action" in maybe:
+                        action_dict = maybe.get("action", action_dict)
+                except Exception:
+                    log.exception("Error applying agent.action pipes")
+
+            # Emit agent.action hook
+            if hasattr(self, "_emitter") and self._emitter is not None:
+                try:
+                    self._emitter.emit_hook("agent.action", {"action": action_dict})
+                except Exception:
+                    log.exception("Error emitting agent.action")
+
             try:
+                # Create Action from possibly-transformed dict
                 action = Action.from_dict(action_dict)
+
+                # Allow tool.call pipes to transform the call (tool name / args) before execution
+                if hasattr(self, "_emitter") and self._emitter is not None:
+                    try:
+                        maybe_call = self._emitter.emit_through("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs"), "timestamp": None})
+                        if isinstance(maybe_call, dict):
+                            changed = False
+                            if "tool" in maybe_call and maybe_call.get("tool") != action_dict.get("tool"):
+                                action_dict["tool"] = maybe_call.get("tool")
+                                changed = True
+                            if "args" in maybe_call and maybe_call.get("args") != action_dict.get("inputs"):
+                                action_dict["inputs"] = maybe_call.get("args")
+                                changed = True
+                            if changed:
+                                # rebuild the Action if pipes modified it
+                                action = Action.from_dict(action_dict)
+                    except Exception:
+                        log.exception("Error applying tool.call pipes")
+
+                    try:
+                        self._emitter.emit_hook("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs"), "timestamp": None})
+                    except Exception:
+                        log.exception("Error emitting tool.call")
+
                 observation = self._task_m.execute(action)
 
                 observation_tokens = self.count_tokens(observation)
@@ -248,11 +311,42 @@ class llm(agent):
             except KeyError as e:
                 log.warning(f"Action dict missing key {e}, feeding back as context.")
                 observation = f"Received incomplete action from Agent: {json.dumps(action_dict)}. It is likely missing the key {e}."
-            
+            except Exception as e:
+                log.exception("Unhandled error while executing action: %s", e)
+                # Emit agent.error for unexpected failures
+                if hasattr(self, "_emitter") and self._emitter is not None:
+                    try:
+                        self._emitter.emit_hook("agent.error", {"error": e, "context": {"query": query}})
+                    except Exception:
+                        log.exception("Error emitting agent.error")
+                # feed back a generic observation and continue
+                observation = f"An error occurred while executing the action: {e}"
+
             log.debug(f"Observation: {observation}")
+
+            # Allow tool.observation pipes/hooks to transform or observe the tool output
+            if hasattr(self, "_emitter") and self._emitter is not None:
+                try:
+                    obs = self._emitter.emit_through("tool.observation", {"tool": action_dict.get("tool"), "observation": observation, "timestamp": None})
+                    if obs is not None and isinstance(obs, dict) and "observation" in obs:
+                        observation = obs.get("observation")
+                except Exception:
+                    log.exception("Error applying tool.observation pipes")
+
+                try:
+                    self._emitter.emit_hook("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
+                except Exception:
+                    log.exception("Error emitting tool.observation")
 
             # Append step to ongoing prompt
             current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action_dict)}\nObservation: {observation}\n\nContinue with the next step:"
+
+            # Emit step complete
+            if hasattr(self, "_emitter") and self._emitter is not None:
+                try:
+                    self._emitter.emit_hook("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
+                except Exception:
+                    log.exception("Error emitting agent.step_complete")
 
         # # Cache instructions
         # if self._cache_mode:

@@ -9,6 +9,9 @@ from woodwork.utils import format_kwargs, get_optional
 from woodwork.core.task_master import task_master
 from woodwork.components.core.planning import planning_tools
 
+# EventEmitter factory
+from woodwork.events import create_default_emitter
+
 log = logging.getLogger(__name__)
 
 
@@ -44,6 +47,10 @@ class agent(component, tool_interface, ABC):
         else:
             self._cache_mode = False
 
+        # Event emitter: accept an emitter via config (key: 'events') or create a default one
+        provided_emitter = config.get("events") if isinstance(config, dict) else None
+        self._emitter = provided_emitter if provided_emitter is not None else create_default_emitter()
+
     def close(self):
         if self._cache_mode:
             self._cache.close()
@@ -61,7 +68,7 @@ class agent(component, tool_interface, ABC):
         score = similar_prompts[0]["score"]
 
         actions = self._cache.run(f"""MATCH (p:Prompt)
-                WHERE elementId(p) = \"{similar_prompts[0]["nodeID"]}\"
+                WHERE elementId(p) = "{similar_prompts[0]["nodeID"]}"
                 WITH p
                 MATCH path=(p)-[NEXT*]-(a:Action)
                 RETURN a AS result, p as name""")
@@ -70,6 +77,7 @@ class agent(component, tool_interface, ABC):
 
         return {"prompt": best_prompt, "inputs": best_inputs, "actions": actions, "score": score}
 
+
     @abstractmethod
     def input(self, query: str, inputs: dict = None):
         """Given a query, will use the provided tools and memory to perform actions to solve the query."""
@@ -77,8 +85,7 @@ class agent(component, tool_interface, ABC):
 
     @property
     def description(self):
-        return f"""\
-General Reasoning Agent — callable tool.
+        return f"""\nGeneral Reasoning Agent — callable tool.
 
 Call this tool by setting the step **Action** with:
 - **tool**: {self.name}
