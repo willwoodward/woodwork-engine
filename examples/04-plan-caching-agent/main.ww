@@ -2,8 +2,14 @@ endpoint = api functions {
     path: "functions.py"
 }
 
-action_model = agent llm {
+# Define an LLM component and then provide it to the agent as the required `model`.
+language_model = llm openai {
+    model: "gpt-4o-mini"
     api_key: $OPENAI_API_KEY
+}
+
+action_model = agent llm {
+    model: language_model
     cache: true
     tools: [endpoint]
 }

@@ -25,19 +25,7 @@ class agent(component, tool_interface, ABC):
         self._task_m = task_m
         self._cache = task_m.cache
         self._cache_mode = False
-        # Agents must be provided with a model (an LLM component instance) via the config key 'model'.
-        # This is mandatory — agents should not require an api_key to be passed directly.
-        model = get_optional(config, "model")
-        if model is None:
-            raise TypeError("Agent components must be configured with a 'model' (LLM component).")
-        self.model = model
-
-        # Backwards-compatible retrieval of api_key where required (e.g., for cache initialization).
-        api_key = None
-        if hasattr(model, "_api_key"):
-            api_key = getattr(model, "_api_key")
-        elif hasattr(model, "config") and isinstance(getattr(model, "config"), dict):
-            api_key = model.config.get("api_key")
+        api_key = get_optional(config, "api_key")
 
         # Inject core planning tools
         self._is_planner = get_optional(config, "planning", False)
@@ -52,8 +40,7 @@ class agent(component, tool_interface, ABC):
                 self._cache_mode = True
 
                 if api_key is None:
-                    # If cache functionality requires an API key, prefer taking it from the provided model.
-                    raise TypeError("Cache enabled for agent but no API key provided via model or agent config.")
+                    exit()
 
                 self._cache.set_api_key(api_key=api_key)
                 self._cache.init_vector_index(index_name="embeddings", label="Prompt", property="embedding")
