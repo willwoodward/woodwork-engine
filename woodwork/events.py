@@ -1,6 +1,8 @@
 import asyncio
 import inspect
 import logging
+import importlib.util
+import os
 from collections import defaultdict
 from typing import Any, Callable, Dict, List
 
@@ -9,208 +11,271 @@ log = logging.getLogger(__name__)
 Listener = Callable[[Any], Any]
 
 
-class EventEmitter:
-    """A lightweight event/emitter system with two concepts:
+class EventManager:
+    """Unified event system with three concepts:
 
-    - Hooks: read-only asynchronous listeners that are fired but do not modify payloads. They are registered
-      via on/once and are invoked in the background (errors are logged and emitted via 'agent.error' event).
-    - Pipes: blocking transform functions that are invoked sequentially and may modify the payload. They
-      can be sync or async and are awaited in sequence when emit_through is used.
+    - Events: fire-and-forget listeners (no return expected)
+    - Hooks: async read-only listeners that run concurrently
+    - Pipes: async transform functions that run sequentially and modify payloads
+    
+    All are triggered by a single emit() method that handles the orchestration.
     """
 
     def __init__(self) -> None:
-        self._listeners: Dict[str, List[Listener]] = defaultdict(list)
-        self._once_listeners: Dict[str, List[Listener]] = defaultdict(list)
+        self._events: Dict[str, List[Listener]] = defaultdict(list)
+        self._hooks: Dict[str, List[Listener]] = defaultdict(list) 
         self._pipes: Dict[str, List[Listener]] = defaultdict(list)
 
-    # Hooks API (read-only, async-friendly)
-    def on(self, event: str, listener: Listener) -> None:
-        self._listeners[event].append(listener)
-
+    # Event API (fire-and-forget)
+    def on_event(self, event: str, listener: Listener) -> None:
+        """Register a fire-and-forget event listener"""
+        self._events[event].append(listener)
+        log.debug(f"[EventManager] Registered EVENT listener for '{event}'. Total events for this event: {len(self._events[event])}")
+    
+    # Hook API (read-only, async)
+    def on_hook(self, event: str, listener: Listener) -> None:
+        """Register an async hook (read-only)"""
+        self._hooks[event].append(listener)
+        log.debug(f"[EventManager] Registered HOOK listener for '{event}'. Total hooks for this event: {len(self._hooks[event])}")
+    
+    # Pipe API (transform payload)
+    def on_pipe(self, event: str, listener: Listener) -> None:
+        """Register an async pipe (transform payload)"""
+        self._pipes[event].append(listener)
+        log.debug(f"[EventManager] Registered PIPE listener for '{event}'. Total pipes for this event: {len(self._pipes[event])}")
+    
+    # Removal methods
     def off(self, event: str, listener: Listener) -> None:
-        if listener in self._listeners.get(event, []):
-            self._listeners[event].remove(listener)
-        if listener in self._once_listeners.get(event, []):
-            self._once_listeners[event].remove(listener)
+        """Remove a listener from events, hooks, or pipes"""
+        for collection in [self._events, self._hooks, self._pipes]:
+            if listener in collection.get(event, []):
+                collection[event].remove(listener)
 
-    def once(self, event: str, listener: Listener) -> None:
-        self._once_listeners[event].append(listener)
-
-    async def emit(self, event: str, payload: Any = None) -> None:
-        """Emit an event to hooks. Hooks are invoked but the emitter does not block on them finishing
-        (if they are async the coroutine is scheduled as a background task). Exceptions are caught and
-        an 'agent.error' event will be emitted if possible.
-        """
-        # Gather listeners
-        listeners = list(self._listeners.get(event, [])) + list(self._once_listeners.get(event, []))
-
-        # clear once-listeners for this emission
-        if self._once_listeners.get(event):
-            self._once_listeners[event] = []
-
-        for listener in listeners:
+    async def emit(self, event: str, payload: Any = None) -> Any:
+        """Unified emit method that handles events, hooks, and pipes in sequence"""
+        log.debug(f"[EventManager] Emitting event '{event}' with payload type: {type(payload)}")
+        
+        # Check what listeners we have for this event
+        num_events = len(self._events[event])
+        num_hooks = len(self._hooks[event]) 
+        num_pipes = len(self._pipes[event])
+        log.debug(f"[EventManager] Event '{event}' has {num_events} events, {num_hooks} hooks, {num_pipes} pipes")
+        
+        # 1. Events (fire-and-forget, not awaited)
+        for i, listener in enumerate(self._events[event]):
             try:
+                log.debug(f"[EventManager] Executing event listener {i+1}/{num_events} for '{event}'")
                 if inspect.iscoroutinefunction(listener):
-                    # schedule background task
-                    try:
-                        asyncio.create_task(self._safe_call_async(listener, payload))
-                    except RuntimeError:
-                        # No running loop; run it synchronously
-                        await self._safe_call_async(listener, payload)
+                    asyncio.create_task(listener(payload))
                 else:
-                    # sync function: call now but don't await
-                    try:
-                        listener(payload)
-                    except Exception as e:
-                        log.exception("Error in sync listener for event %s: %s", event, e)
-                        # try to notify via error event
-                        if event != "agent.error":
-                            try:
-                                await self.emit("agent.error", {"error": e, "event": event})
-                            except Exception:
-                                pass
-            except Exception as outer:
-                log.exception("Failed to schedule listener for event %s: %s", event, outer)
+                    listener(payload)
+            except Exception as e:
+                log.exception(f"[event error] Event listener {i+1} failed for '{event}': {e}")
 
-    async def _safe_call_async(self, listener: Listener, payload: Any) -> None:
+        # 2. Hooks (await all concurrently)  
+        hook_tasks = []
+        for i, hook in enumerate(self._hooks[event]):
+            log.debug(f"[EventManager] Preparing hook {i+1}/{num_hooks} for '{event}'")
+            if inspect.iscoroutinefunction(hook):
+                hook_tasks.append(self._safe_call_async(hook, payload, event))
+            else:
+                # Wrap sync function in async with proper closure
+                hook_tasks.append(self._wrap_sync_call(hook, payload, event))
+        
+        if hook_tasks:
+            log.debug(f"[EventManager] Executing {len(hook_tasks)} hooks concurrently for '{event}'")
+            await asyncio.gather(*hook_tasks, return_exceptions=True)
+
+        # 3. Pipes (chain sequentially)
+        current_payload = payload
+        for i, pipe in enumerate(self._pipes[event]):
+            try:
+                log.debug(f"[EventManager] Executing pipe {i+1}/{num_pipes} for '{event}'")
+                if inspect.iscoroutinefunction(pipe):
+                    result = await pipe(current_payload)
+                else:
+                    result = pipe(current_payload)
+                
+                if result is not None:
+                    log.debug(f"[EventManager] Pipe {i+1} transformed payload for '{event}'")
+                    current_payload = result
+                else:
+                    log.debug(f"[EventManager] Pipe {i+1} returned None, keeping original payload for '{event}'")
+            except Exception as e:
+                log.exception(f"[pipe error] Pipe {i+1} failed for '{event}': {e}")
+        
+        log.debug(f"[EventManager] Finished emitting '{event}', returning payload type: {type(current_payload)}")
+        return current_payload
+
+    async def _safe_call_async(self, listener: Listener, payload: Any, event: str) -> None:
+        """Safely call an async listener with error handling"""
         try:
             await listener(payload)
         except Exception as e:
-            log.exception("Error in async listener: %s", e)
-            # attempt to emit an error event but avoid recursion
-            try:
-                await self.emit("agent.error", {"error": e})
-            except Exception:
-                pass
-
-    # Pipes API (blocking transform pipeline)
-    def add_pipe(self, event: str, pipe: Listener) -> None:
-        """Add a pipe (transformer) for an event. Pipes are executed sequentially by emit_through.
-        Each pipe may be sync or async. If it returns a non-None value, that value replaces the payload
-        for the next pipe.
-        """
-        self._pipes[event].append(pipe)
-
-    def remove_pipe(self, event: str, pipe: Listener) -> None:
-        if pipe in self._pipes.get(event, []):
-            self._pipes[event].remove(pipe)
-
-    async def emit_through(self, event: str, payload: Any = None) -> Any:
-        """Run registered pipes for an event sequentially. Each pipe may synchronously return a new payload
-        or (if async) return one when awaited. The final payload is returned.
-        """
-        pipes = list(self._pipes.get(event, []))
-        current = payload
-        for pipe in pipes:
-            try:
-                if inspect.iscoroutinefunction(pipe):
-                    result = await pipe(current)
-                else:
-                    result = pipe(current)
-                if result is not None:
-                    current = result
-            except Exception as e:
-                log.exception("Error in pipe for event %s: %s", event, e)
-                # Emit an agent.error but keep going
-                try:
-                    await self.emit("agent.error", {"error": e, "event": event})
-                except Exception:
-                    pass
-        return current
-
-    # Synchronous convenience wrappers so code that is not async can still emit safely
-    def emit_sync(self, event: str, payload: Any = None) -> None:
-        """Emit hooks in a best-effort, synchronous-friendly way.
-
-        - If an event loop is running, schedule emit() as a background task.
-        - Otherwise, run emit() to completion using asyncio.run().
-        """
+            log.exception(f"[hook error] {e}")
+    
+    async def _wrap_sync_call(self, listener: Listener, payload: Any, event: str) -> None:
+        """Wrap a sync call for use in async context"""
         try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # no running loop
-            asyncio.run(self.emit(event, payload))
-            return
+            listener(payload)
+        except Exception as e:
+            log.exception(f"[hook error] {e}")
 
-        # If we have a running loop, create a task to run emit
+    # Configuration-based registration methods
+    def load_script_function(self, script_path: str, function_name: str) -> Callable:
+        """Load a function from a Python script file"""
         try:
-            loop.create_task(self.emit(event, payload))
-        except Exception:
-            # fallback: run emit synchronously using run_until_complete on a new loop
-            new_loop = asyncio.new_event_loop()
-            try:
-                new_loop.run_until_complete(self.emit(event, payload))
-            finally:
-                new_loop.close()
+            # Convert relative path to absolute if needed
+            if not os.path.isabs(script_path):
+                script_path = os.path.abspath(script_path)
+            
+            spec = importlib.util.spec_from_file_location("dynamic_module", script_path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Cannot load module from {script_path}")
+            
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            if not hasattr(module, function_name):
+                raise AttributeError(f"Function '{function_name}' not found in {script_path}")
+            
+            return getattr(module, function_name)
+        except Exception as e:
+            log.error(f"Failed to load function {function_name} from {script_path}: {e}")
+            raise
+    
+    def register_hook_from_config(self, event: str, script_path: str, function_name: str) -> None:
+        """Register a hook from configuration"""
+        log.debug(f"[EventManager] Loading hook {function_name} from {script_path} for event '{event}'")
+        func = self.load_script_function(script_path, function_name)
+        self.on_hook(event, func)
+        log.debug(f"[EventManager] Successfully registered hook {function_name} for event '{event}'")
+    
+    def register_pipe_from_config(self, event: str, script_path: str, function_name: str) -> None:
+        """Register a pipe from configuration"""
+        log.debug(f"[EventManager] Loading pipe {function_name} from {script_path} for event '{event}'")
+        func = self.load_script_function(script_path, function_name)
+        self.on_pipe(event, func)
+        log.debug(f"[EventManager] Successfully registered pipe {function_name} for event '{event}'")
+    
+    def register_event_from_config(self, event: str, script_path: str, function_name: str) -> None:
+        """Register an event listener from configuration"""
+        log.debug(f"[EventManager] Loading event listener {function_name} from {script_path} for event '{event}'")
+        func = self.load_script_function(script_path, function_name)
+        self.on_event(event, func)
+        log.debug(f"[EventManager] Successfully registered event listener {function_name} for event '{event}'")
 
-    def emit_through_sync(self, event: str, payload: Any = None) -> Any:
-        """Run pipes synchronously and return the (possibly transformed) payload.
+    # Synchronous convenience method
+    def emit_sync(self, event: str, payload: Any = None) -> Any:
+        """Emit events, hooks, and pipes synchronously - much simpler!"""
+        log.debug(f"[EventManager] emit_sync called for event '{event}'")
         
-        This version runs pipes directly without async overhead to avoid event loop conflicts.
-        """
-        pipes = list(self._pipes.get(event, []))
-        current = payload
-        for pipe in pipes:
+        # Check what listeners we have
+        num_events = len(self._events[event])
+        num_hooks = len(self._hooks[event]) 
+        num_pipes = len(self._pipes[event])
+        log.debug(f"[EventManager] Event '{event}' has {num_events} events, {num_hooks} hooks, {num_pipes} pipes")
+        
+        if num_events == 0 and num_hooks == 0 and num_pipes == 0:
+            return payload
+        
+        # 1. Events (fire-and-forget)
+        for i, listener in enumerate(self._events[event]):
             try:
-                if inspect.iscoroutinefunction(pipe):
-                    # For async pipes, we need to handle them carefully
+                log.debug(f"[EventManager] Executing event listener {i+1} for '{event}'")
+                if inspect.iscoroutinefunction(listener):
+                    # For async functions, run them synchronously 
                     try:
                         loop = asyncio.get_running_loop()
-                        # If there's a running loop, we can't use run_until_complete
-                        # Skip async pipes in sync context for now
-                        log.warning(f"Skipping async pipe for event {event} in sync context")
+                        # We're in an async context, but let's be simple and skip async events for now
+                        log.warning(f"[EventManager] Skipping async event listener for '{event}' in sync context")
                         continue
                     except RuntimeError:
-                        # No running loop, we can use asyncio.run
-                        result = asyncio.run(pipe(current))
-                        if result is not None:
-                            current = result
+                        # No loop, we can run it
+                        asyncio.run(listener(payload))
                 else:
-                    # Sync pipe - call directly
-                    result = pipe(current)
-                    if result is not None:
-                        current = result
+                    listener(payload)
             except Exception as e:
-                log.exception("Error in pipe for event %s: %s", event, e)
-                # Emit an agent.error but keep going
-                try:
-                    self.emit_sync("agent.error", {"error": e, "event": event})
-                except Exception:
-                    pass
-        return current
+                log.exception(f"[EventManager] Event listener {i+1} failed for '{event}': {e}")
 
-    # Convenience helper methods moved from agent to emitter
-    def emit_hook(self, event: str, payload: Any = None) -> None:
-        """Emit a non-blocking hook/event in a best-effort way.
-
-        This mirrors the convenience helper previously on the agent. It uses the emitter's
-        sync wrapper and logs any failures without raising.
-        """
-        try:
+        # 2. Hooks (run all synchronously)
+        for i, hook in enumerate(self._hooks[event]):
             try:
-                self.emit_sync(event, payload)
-            except Exception:
-                log.exception("Failed to emit hook %s", event)
-        except Exception:
-            # swallow any unexpected errors to avoid breaking caller flow
-            log.exception("Unexpected error while emitting hook %s", event)
+                log.debug(f"[EventManager] Executing hook {i+1} for '{event}'")
+                if inspect.iscoroutinefunction(hook):
+                    # For async hooks, run them synchronously
+                    try:
+                        loop = asyncio.get_running_loop()
+                        # We're in an async context, but let's be simple and skip async hooks for now
+                        log.warning(f"[EventManager] Skipping async hook for '{event}' in sync context")
+                        continue
+                    except RuntimeError:
+                        # No loop, we can run it
+                        asyncio.run(hook(payload))
+                else:
+                    hook(payload)
+            except Exception as e:
+                log.exception(f"[EventManager] Hook {i+1} failed for '{event}': {e}")
 
-    def emit_pipe_sync(self, event: str, payload: Any = None) -> Any:
-        """Run the pipe pipeline for an event and return possibly transformed payload.
-
-        This is a convenience wrapper for emit_through_sync with logging on failure.
-        """
-        try:
+        # 3. Pipes (run sequentially, transform payload)
+        current_payload = payload
+        for i, pipe in enumerate(self._pipes[event]):
             try:
-                return self.emit_through_sync(event, payload)
-            except Exception:
-                log.exception("Error running pipes for event %s", event)
-                return payload
-        except Exception:
-            log.exception("Unexpected error while running pipes for event %s", event)
-            return payload
+                log.debug(f"[EventManager] Executing pipe {i+1} for '{event}'")
+                if inspect.iscoroutinefunction(pipe):
+                    # For async pipes, run them synchronously
+                    try:
+                        loop = asyncio.get_running_loop()
+                        log.warning(f"[EventManager] Skipping async pipe for '{event}' in sync context")
+                        continue
+                    except RuntimeError:
+                        result = asyncio.run(pipe(current_payload))
+                        if result is not None:
+                            current_payload = result
+                else:
+                    result = pipe(current_payload)
+                    if result is not None:
+                        current_payload = result
+            except Exception as e:
+                log.exception(f"[EventManager] Pipe {i+1} failed for '{event}': {e}")
 
+        log.debug(f"[EventManager] Finished emitting '{event}' synchronously")
+        return current_payload
+
+
+# Global event manager instance
+_global_event_manager = None
+
+def get_global_event_manager() -> EventManager:
+    """Get the global event manager instance"""
+    global _global_event_manager
+    if _global_event_manager is None:
+        _global_event_manager = EventManager()
+    return _global_event_manager
+
+def set_global_event_manager(manager: EventManager) -> None:
+    """Set the global event manager instance"""
+    global _global_event_manager
+    _global_event_manager = manager
+
+# Super simple global functions that components can use
+def emit(event: str, payload: Any = None) -> Any:
+    """Emit an event through the global event manager - super simple with built-in error handling!"""
+    try:
+        return get_global_event_manager().emit_sync(event, payload)
+    except Exception as e:
+        log.exception(f"Error emitting event '{event}': {e}")
+        # Return original payload on error so the caller can continue
+        return payload
+
+def register_hook(event: str, script_path: str, function_name: str) -> None:
+    """Register a hook globally - super simple!"""
+    get_global_event_manager().register_hook_from_config(event, script_path, function_name)
+
+def register_pipe(event: str, script_path: str, function_name: str) -> None:
+    """Register a pipe globally - super simple!"""
+    get_global_event_manager().register_pipe_from_config(event, script_path, function_name)
 
 # Convenience factory
-def create_default_emitter() -> EventEmitter:
-    return EventEmitter()
+def create_default_emitter() -> EventManager:
+    return EventManager()

@@ -9,7 +9,7 @@ from woodwork.utils import format_kwargs, get_optional
 from woodwork.core.task_master import task_master
 from woodwork.components.core.planning import planning_tools
 
-# EventEmitter factory
+# EventManager factory
 from woodwork.events import create_default_emitter
 
 log = logging.getLogger(__name__)
@@ -17,7 +17,9 @@ log = logging.getLogger(__name__)
 
 class agent(component, tool_interface, ABC):
     def __init__(self, tools, task_m: task_master, **config):
+        log.debug(f"[Agent] Received config keys: {list(config.keys())}")
         format_kwargs(config, tools=tools, task_m=task_m, component="agent")
+        log.debug(f"[Agent] Config keys after format_kwargs: {list(config.keys())}")
         super().__init__(**config)
         log.debug("Creating the agent...")
 
@@ -47,9 +49,9 @@ class agent(component, tool_interface, ABC):
         else:
             self._cache_mode = False
 
-        # Event emitter: use component's emitter if available, or accept via config, or create default
+        # Event manager: use component's manager if available, or accept via config, or create default
         if hasattr(self, '_emitter') and self._emitter is not None:
-            # Component already created an emitter with hooks/pipes
+            # Component already created an event manager with hooks/pipes
             pass
         else:
             provided_emitter = config.get("events") if isinstance(config, dict) else None

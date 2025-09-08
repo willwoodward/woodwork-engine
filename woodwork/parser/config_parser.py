@@ -132,8 +132,23 @@ def create_object(command):
     variable = command["variable"]
     config = command["config"].copy()
 
+    # Debug: show what's in the parsed command
+    log.debug(f"[create_object] Creating {variable} with keys: {list(command.keys())}")
+    if "hooks" in command:
+        log.debug(f"[create_object] Found hooks: {command['hooks']}")
+    if "pipes" in command:
+        log.debug(f"[create_object] Found pipes: {command['pipes']}")
+
     # Add metadata to the config
     config["name"] = variable
+    
+    # Include hooks and pipes in config if they exist
+    if "hooks" in command:
+        config["hooks"] = command["hooks"]
+        log.debug(f"[create_object] Added hooks to config for {variable}")
+    if "pipes" in command:
+        config["pipes"] = command["pipes"]
+        log.debug(f"[create_object] Added pipes to config for {variable}")
 
     if component == "knowledge_base":
         if type == "chroma":
@@ -356,23 +371,49 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
     config_items = merged_items
 
     # If the value is a {, delete the nested elements (will be parsed later)
+    # BUT preserve dictionary content that's inside arrays (for hooks/pipes)
     i = 0
     brace_counter = 0
     deletion_mode = False
     while i < len(config_items):
         if "}" in config_items[i]:
-            config_items.pop(i)
-            brace_counter -= 1
-            if brace_counter == 0:
-                deletion_mode = False
+            # Check if this closing brace is part of an array
+            line = config_items[i]
+            # If the line contains both ] and }, it's likely ending an array with dict content
+            if "]" in line and "}" in line:
+                # Keep this line, it's array content
+                i += 1
+                brace_counter -= 1
+                if brace_counter == 0:
+                    deletion_mode = False
+            else:
+                config_items.pop(i)
+                brace_counter -= 1
+                if brace_counter == 0:
+                    deletion_mode = False
         elif deletion_mode:
-            if "{" in config_items[i]:
-                brace_counter += 1
-            config_items.pop(i)
+            # Check if this line is part of an array structure
+            line = config_items[i]
+            # If it contains array-like content or is indented (suggesting it's array content), keep it
+            if ("[" in line or "]" in line or 
+                line.startswith("    ") or line.startswith("\t") or
+                any(key in line for key in ["event:", "script_path:", "function_name:"])):
+                # This looks like array content, keep it
+                i += 1
+            else:
+                if "{" in config_items[i]:
+                    brace_counter += 1
+                config_items.pop(i)
         elif "{" in config_items[i]:
-            brace_counter += 1
-            deletion_mode = True
-            i += 1
+            # Check if this { is part of an array
+            line = config_items[i]
+            if "[" in line:  # This looks like an array with dict content
+                # Don't enter deletion mode, just continue
+                i += 1
+            else:
+                brace_counter += 1
+                deletion_mode = True
+                i += 1
         else:
             i += 1
 
@@ -407,10 +448,11 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
             array_content = value[1:-1]  # Remove [ and ]
             array_items = []
             
-            # Better parsing that respects quotes
+            # Parse array items that can be strings, dictionaries, or simple references
             current_item = ""
             in_quotes = False
             quote_char = None
+            brace_count = 0
             
             i = 0
             while i < len(array_content):
@@ -424,15 +466,50 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
                     in_quotes = False
                     current_item += char
                     quote_char = None
-                elif not in_quotes and char == ',':
+                elif not in_quotes and char == '{':
+                    brace_count += 1
+                    current_item += char
+                elif not in_quotes and char == '}':
+                    brace_count -= 1
+                    current_item += char
+                elif not in_quotes and char == ',' and brace_count == 0:
                     # End of current item
                     cleaned_item = current_item.strip()
                     if cleaned_item:
-                        # Remove outer quotes if present
-                        if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
-                            (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
-                            cleaned_item = cleaned_item[1:-1]
-                        array_items.append(cleaned_item)
+                        # Check if it's a dictionary-like structure
+                        if cleaned_item.startswith('{') and cleaned_item.endswith('}'):
+                            # Parse as dictionary
+                            dict_content = cleaned_item[1:-1].strip()  # Remove { and }
+                            parsed_dict = {}
+                            
+                            # Split by lines and parse key-value pairs
+                            dict_lines = [line.strip() for line in dict_content.split('\n') if line.strip()]
+                            for line in dict_lines:
+                                if ':' in line:
+                                    line_key, line_value = line.split(':', 1)
+                                    line_key = line_key.strip().strip('"\'')
+                                    line_value = line_value.strip().strip('"\'')
+                                    
+                                    # Map common keys for hooks and pipes
+                                    if line_key in ['event', 'script_path', 'function_name']:
+                                        parsed_dict[line_key] = line_value
+                                else:
+                                    # Handle lines without colons (might be values from multiline parsing)
+                                    # Try to extract quoted strings as values
+                                    if '"' in line or "'" in line:
+                                        parts = re.findall(r'["\']([^"\']*)["\']', line)
+                                        if len(parts) == 3:  # event, script_path, function_name
+                                            parsed_dict['event'] = parts[0]
+                                            parsed_dict['script_path'] = parts[1] 
+                                            parsed_dict['function_name'] = parts[2]
+                            
+                            array_items.append(parsed_dict)
+                        else:
+                            # Remove outer quotes if present
+                            if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
+                                (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
+                                cleaned_item = cleaned_item[1:-1]
+                            array_items.append(cleaned_item)
                     current_item = ""
                 else:
                     current_item += char
@@ -441,17 +518,32 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
             # Don't forget the last item
             if current_item.strip():
                 cleaned_item = current_item.strip()
-                if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
-                    (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
-                    cleaned_item = cleaned_item[1:-1]
-                array_items.append(cleaned_item)
+                if cleaned_item.startswith('{') and cleaned_item.endswith('}'):
+                    # Parse as dictionary
+                    dict_content = cleaned_item[1:-1].strip()
+                    parsed_dict = {}
+                    
+                    # Handle the case where we have space-separated quoted strings
+                    if '"' in dict_content or "'" in dict_content:
+                        parts = re.findall(r'["\']([^"\']*)["\']', dict_content)
+                        if len(parts) == 3:  # event, script_path, function_name
+                            parsed_dict['event'] = parts[0]
+                            parsed_dict['script_path'] = parts[1]
+                            parsed_dict['function_name'] = parts[2]
+                    
+                    array_items.append(parsed_dict)
+                else:
+                    if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
+                        (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
+                        cleaned_item = cleaned_item[1:-1]
+                    array_items.append(cleaned_item)
             
             value = array_items
             
             # Only add to dependencies if they look like simple variable references
             for item in value:
-                # Only treat as dependency if it's a simple identifier (letters, numbers, underscore only)
-                if (item and 
+                # Only treat as dependency if it's a simple string identifier
+                if (isinstance(item, str) and
                     re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', item) and
                     not item.startswith('$')):
                     depends_on.append(item)

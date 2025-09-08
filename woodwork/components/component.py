@@ -4,7 +4,7 @@ import importlib.util
 import logging
 from typing import List, Optional, Any, Dict
 from woodwork.types.workflows import Hook, Pipe
-from woodwork.events import EventEmitter, create_default_emitter
+from woodwork.events import EventManager, create_default_emitter, get_global_event_manager
 
 log = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class component:
         self.component = component
         self.type = type
         self.config = config
-        self._emitter: Optional[EventEmitter] = None
+        self._emitter: Optional[EventManager] = None
         self._hooks: List[Hook] = []
         self._pipes: List[Pipe] = []
         
@@ -24,21 +24,32 @@ class component:
     def _setup_event_system(self, config: Dict[str, Any]):
         """Initialize the event system with hooks and pipes from config."""
         try:
+            log.debug(f"[Component {self.name}] Setting up event system...")
+            log.debug(f"[Component {self.name}] Config keys: {list(config.keys())}")
+            
             # Check if hooks are configured
             hooks_config = config.get("hooks", [])
             if hooks_config:
+                log.debug(f"[Component {self.name}] Found {len(hooks_config)} hook configurations: {hooks_config}")
                 self._hooks = self._parse_hooks_config(hooks_config)
+            else:
+                log.debug(f"[Component {self.name}] No hooks configured")
             
             # Check if pipes are configured  
             pipes_config = config.get("pipes", [])
             if pipes_config:
+                log.debug(f"[Component {self.name}] Found {len(pipes_config)} pipe configurations: {pipes_config}")
                 self._pipes = self._parse_pipes_config(pipes_config)
+            else:
+                log.debug(f"[Component {self.name}] No pipes configured")
             
-            # Create EventEmitter if we have hooks or pipes
+            # Register hooks and pipes with the global event manager
             if self._hooks or self._pipes:
-                self._emitter = config.get("events") or create_default_emitter()
-                self._register_hooks()
-                self._register_pipes()
+                log.debug(f"[Component {self.name}] Registering with global event manager: {len(self._hooks)} hooks and {len(self._pipes)} pipes")
+                self._register_hooks_global()
+                self._register_pipes_global()
+            else:
+                log.debug(f"[Component {self.name}] No hooks or pipes configured")
                 
         except Exception as e:
             log.warning(f"Failed to setup event system for component {self.name}: {e}")
@@ -46,8 +57,10 @@ class component:
     def _parse_hooks_config(self, hooks_config: List[Dict[str, Any]]) -> List[Hook]:
         """Parse hook configurations from config."""
         hooks = []
-        for hook_config in hooks_config:
+        log.debug(f"[Component {self.name}] Parsing hooks_config type: {type(hooks_config)}, content: {hooks_config}")
+        for i, hook_config in enumerate(hooks_config):
             try:
+                log.debug(f"[Component {self.name}] Processing hook {i}: type={type(hook_config)}, content={hook_config}")
                 hook = Hook.from_dict(hook_config)
                 hooks.append(hook)
             except Exception as e:
@@ -57,41 +70,49 @@ class component:
     def _parse_pipes_config(self, pipes_config: List[Dict[str, Any]]) -> List[Pipe]:
         """Parse pipe configurations from config."""
         pipes = []
-        for pipe_config in pipes_config:
+        log.debug(f"[Component {self.name}] Parsing pipes_config type: {type(pipes_config)}, content: {pipes_config}")
+        for i, pipe_config in enumerate(pipes_config):
             try:
+                log.debug(f"[Component {self.name}] Processing pipe {i}: type={type(pipe_config)}, content={pipe_config}")
                 pipe = Pipe.from_dict(pipe_config)
                 pipes.append(pipe)
             except Exception as e:
                 log.warning(f"Invalid pipe config in component {self.name}: {e}")
         return pipes
     
-    def _register_hooks(self):
-        """Register all configured hooks with the EventEmitter."""
-        if not self._emitter:
-            return
-            
-        for hook in self._hooks:
+    def _register_hooks_global(self):
+        """Register all configured hooks with the global EventManager."""
+        global_manager = get_global_event_manager()
+        
+        log.debug(f"[Component {self.name}] Registering {len(self._hooks)} hooks globally...")    
+        for i, hook in enumerate(self._hooks):
             try:
+                log.debug(f"[Component {self.name}] Loading hook {i+1}: {hook.function_name} from {hook.script_path} for event '{hook.event}'")
                 func = self._load_function(hook.script_path, hook.function_name)
                 if func:
-                    self._emitter.on(hook.event, func)
-                    log.debug(f"Registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name}")
+                    global_manager.on_hook(hook.event, func)
+                    log.debug(f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name}")
+                else:
+                    log.warning(f"[Component {self.name}] Failed to load function {hook.function_name} from {hook.script_path}")
             except Exception as e:
-                log.warning(f"Failed to register hook {hook.function_name} for event {hook.event}: {e}")
+                log.warning(f"[Component {self.name}] Failed to register hook {hook.function_name} for event {hook.event}: {e}")
     
-    def _register_pipes(self):
-        """Register all configured pipes with the EventEmitter."""
-        if not self._emitter:
-            return
-            
-        for pipe in self._pipes:
+    def _register_pipes_global(self):
+        """Register all configured pipes with the global EventManager."""
+        global_manager = get_global_event_manager()
+        
+        log.debug(f"[Component {self.name}] Registering {len(self._pipes)} pipes globally...")    
+        for i, pipe in enumerate(self._pipes):
             try:
+                log.debug(f"[Component {self.name}] Loading pipe {i+1}: {pipe.function_name} from {pipe.script_path} for event '{pipe.event}'")
                 func = self._load_function(pipe.script_path, pipe.function_name)
                 if func:
-                    self._emitter.add_pipe(pipe.event, func)
-                    log.debug(f"Registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name}")
+                    global_manager.on_pipe(pipe.event, func)
+                    log.debug(f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name}")
+                else:
+                    log.warning(f"[Component {self.name}] Failed to load function {pipe.function_name} from {pipe.script_path}")
             except Exception as e:
-                log.warning(f"Failed to register pipe {pipe.function_name} for event {pipe.event}: {e}")
+                log.warning(f"[Component {self.name}] Failed to register pipe {pipe.function_name} for event {pipe.event}: {e}")
     
     def _load_function(self, script_path: str, function_name: str):
         """Load a function from a Python script file."""
@@ -135,6 +156,6 @@ class component:
             return None
     
     @property
-    def emitter(self) -> Optional[EventEmitter]:
-        """Get the EventEmitter instance for this component."""
+    def emitter(self) -> Optional[EventManager]:
+        """Get the EventManager instance for this component."""
         return self._emitter
