@@ -1,8 +1,54 @@
 coding_ag = agent llm {
     api_key: $OPENAI_API_KEY
-    planning: True
     cache: False
+    planning: True
     tools: [github_api, dev_env, kb, llm]
+    
+    hooks: [
+        {
+            event: "input.received"
+            script_path: "hooks.py"
+            function_name: "print_input_received"
+        },
+        {
+            event: "agent.thought"
+            script_path: "hooks.py"
+            function_name: "print_agent_thought"
+        },
+        {
+            event: "agent.action"
+            script_path: "hooks.py"
+            function_name: "print_agent_action"
+        },
+        {
+            event: "tool.call"
+            script_path: "hooks.py"
+            function_name: "print_tool_call"
+        },
+        {
+            event: "tool.observation"
+            script_path: "hooks.py"
+            function_name: "print_tool_observation"
+        },
+        {
+            event: "agent.step_complete"
+            script_path: "hooks.py"
+            function_name: "print_step_complete"
+        },
+        {
+            event: "agent.error"
+            script_path: "hooks.py"
+            function_name: "print_error"
+        }
+    ]
+    
+    pipes: [
+        {
+            event: "input.received"
+            script_path: "pipes.py"
+            function_name: "add_claude_md_to_input"
+        }
+    ]
 }
 
 input = input command_line {

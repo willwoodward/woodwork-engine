@@ -28,22 +28,42 @@ class coding(environment):
         self.startup_scripts = config.get("startup_scripts", [])
         self._startup_scripts_run = False
         
-        # Default dockerfile with minimal essential tools
-        default_dockerfile = """
+        # Get current user's UID and GID to run container as current user
+        import pwd
+        current_user = pwd.getpwuid(os.getuid())
+        uid = current_user.pw_uid
+        gid = current_user.pw_gid
+        username = current_user.pw_name
+        
+        # Default dockerfile with minimal essential tools, running as current user
+        default_dockerfile = f"""
         FROM ubuntu:latest
         RUN apt-get update && apt-get install -y \\
             bash git curl wget vim nano \\
-            build-essential \\
+            build-essential sudo \\
             && rm -rf /var/lib/apt/lists/*
+        
+        # Create user with same UID/GID as host user
+        RUN groupadd -g {gid} {username} || groupmod -g {gid} {username} 2>/dev/null || true
+        RUN useradd -u {uid} -g {gid} -m -s /bin/bash {username} || usermod -u {uid} -g {gid} {username} 2>/dev/null || true
+        RUN echo "{username} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+        
+        USER {username}
         WORKDIR /workspace
         CMD ["tail", "-f", "/dev/null"]
         """
+        
+        # Container arguments with user specification
+        container_args = {
+            "user": f"{uid}:{gid}",
+            "environment": config.get("environment_variables", {})
+        }
         
         self.docker = Docker(
             image_name=image_name,
             container_name=container_name,
             dockerfile=dockerfile or default_dockerfile,
-            container_args={},
+            container_args=container_args,
             volume_location=".woodwork/coding-env",
             docker_volume_location=local_path,
         )
@@ -684,6 +704,9 @@ class coding(environment):
         return """
         The `coding` environment provides a complete development environment with file system access, command-line tools, and version control.
         This environment runs in an isolated Docker container and can be configured with custom setup scripts.
+        
+        IMPORTANT: You are already in the correct repository directory. The repository has been cloned and is ready for development work.
+        Your current working directory contains the full codebase. Do not clone the repository again.
         
         FEATURES:
         - File system operations (read, write, edit, search)
