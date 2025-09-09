@@ -176,10 +176,11 @@ class llm(agent):
         self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
-        transformed = emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None), "timestamp": None})
-        if isinstance(transformed, dict) and "input" in transformed:
-            query = transformed.get("input", query)
-            inputs = transformed.get("inputs", inputs)
+        transformed = emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
+        
+        # Extract from typed payload
+        query = transformed.input
+        inputs = transformed.inputs
 
         # Build tool documentation string
         tool_documentation = ""
@@ -251,35 +252,29 @@ class llm(agent):
             print(f"Thought: {thought}")
 
             # Emit agent.thought (non-blocking hook)
-            emit("agent.thought", {"thought": thought, "timestamp": None})
+            emit("agent.thought", {"thought": thought})
 
             # Emit agent.action (pipes can transform, hooks can observe)
-            maybe = emit("agent.action", {"action": action_dict, "timestamp": None})
-            if isinstance(maybe, dict) and "action" in maybe:
-                action_dict = maybe.get("action", action_dict)
+            action_payload = emit("agent.action", {"action": action_dict})
+            action_dict = action_payload.action
 
             try:
                 # Create Action from possibly-transformed dict
                 action = Action.from_dict(action_dict)
 
                 # Emit tool.call (pipes can transform, hooks can observe)
-                maybe_call = emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs"), "timestamp": None})
-                if isinstance(maybe_call, dict):
-                    changed = False
-                    if "tool" in maybe_call and maybe_call.get("tool") != action_dict.get("tool"):
-                        action_dict["tool"] = maybe_call.get("tool")
-                        changed = True
-                    if "args" in maybe_call and maybe_call.get("args") != action_dict.get("inputs"):
-                        action_dict["inputs"] = maybe_call.get("args")
-                        changed = True
-                    if changed:
-                        # rebuild the Action if pipes modified it
-                        action = Action.from_dict(action_dict)
+                tool_call = emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")})
+                
+                # Update action if pipes modified it
+                if tool_call.tool != action_dict.get("tool") or tool_call.args != action_dict.get("inputs"):
+                    action_dict["tool"] = tool_call.tool
+                    action_dict["inputs"] = tool_call.args
+                    action = Action.from_dict(action_dict)
 
                 observation = self._task_m.execute(action)
 
                 observation_tokens = self.count_tokens(observation)
-                if observation_tokens > 5000:
+                if observation_tokens > 7500:
                     observation = f"The output from this tool was way too large, it contained {observation_tokens} tokens."
 
             except KeyError as e:
@@ -298,9 +293,8 @@ class llm(agent):
             log.debug(f"Observation: {observation}")
 
             # Emit tool.observation (pipes can transform, hooks can observe)
-            obs = emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation, "timestamp": None})
-            if obs is not None and isinstance(obs, dict) and "observation" in obs:
-                observation = obs.get("observation")
+            obs = emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
+            observation = obs.observation
 
             # Append step to ongoing prompt
             current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action_dict)}\nObservation: {observation}\n\nContinue with the next step:"

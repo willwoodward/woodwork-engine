@@ -45,28 +45,8 @@ coding_ag = agent llm {
     pipes: [
         {
             event: "input.received"
-            script_path: "claude_pipes.py"
+            script_path: "pipes.py"
             function_name: "add_claude_md_to_input"
-        },
-        {
-            event: "input.received"
-            script_path: "claude_pipes.py"
-            function_name: "add_timestamp_to_input"
-        },
-        {
-            event: "agent.action"
-            script_path: "claude_pipes.py"
-            function_name: "validate_action"
-        },
-        {
-            event: "tool.call"
-            script_path: "claude_pipes.py"
-            function_name: "log_tool_call"
-        },
-        {
-            event: "tool.observation"
-            script_path: "claude_pipes.py"
-            function_name: "process_observation"
         }
     ]
 }

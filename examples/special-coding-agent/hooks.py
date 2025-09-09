@@ -2,51 +2,50 @@
 Simple event hooks that print when called.
 """
 
-def print_input_received(payload):
+from woodwork.types import (
+    InputReceivedPayload, 
+    AgentThoughtPayload, 
+    AgentActionPayload, 
+    ToolCallPayload, 
+    ToolObservationPayload, 
+    AgentStepCompletePayload, 
+    AgentErrorPayload
+)
+
+def print_input_received(payload: InputReceivedPayload):
     """Hook that prints when agent receives input."""
-    msg = f"🔔 INPUT RECEIVED: {payload.get('input', 'No input') if isinstance(payload, dict) else payload}"
+    msg = f"🔔 INPUT RECEIVED: {payload.input}"
     print(msg, flush=True)
 
-def print_agent_thought(payload):
+def print_agent_thought(payload: AgentThoughtPayload):
     """Hook that prints agent thoughts."""
-    msg = f"💭 AGENT THOUGHT: {payload.get('thought', 'No thought') if isinstance(payload, dict) else payload}"
+    msg = f"💭 AGENT THOUGHT: {payload.thought}"
     print(msg, flush=True)
 
-def print_agent_action(payload):
+def print_agent_action(payload: AgentActionPayload):
     """Hook that prints agent actions."""
-    if isinstance(payload, dict):
-        action = payload.get('action', {})
-        tool = action.get('tool', 'unknown') if isinstance(action, dict) else 'unknown'
-    else:
-        tool = 'unknown'
+    action = payload.action
+    tool = action.get('tool', 'unknown') if isinstance(action, dict) else 'unknown'
     msg = f"🔧 AGENT ACTION: Using tool '{tool}'"
     print(msg, flush=True)
 
-def print_tool_call(payload):
+def print_tool_call(payload: ToolCallPayload):
     """Hook that prints tool calls."""
-    tool = payload.get('tool', 'unknown') if isinstance(payload, dict) else 'unknown'
-    msg = f"🚀 TOOL CALL: Executing {tool}"
+    msg = f"🚀 TOOL CALL: Executing {payload.tool}"
     print(msg, flush=True)
 
-def print_tool_observation(payload):
+def print_tool_observation(payload: ToolObservationPayload):
     """Hook that prints tool results."""
-    if isinstance(payload, dict):
-        tool = payload.get('tool', 'unknown')
-        observation = str(payload.get('observation', ''))[:100]
-    else:
-        tool = 'unknown'
-        observation = str(payload)[:100]
-    msg = f"📋 TOOL RESULT from {tool}: {observation}..."
+    observation = str(payload.observation)[:100]
+    msg = f"📋 TOOL RESULT from {payload.tool}: {observation}..."
     print(msg, flush=True)
 
-def print_step_complete(payload):
+def print_step_complete(payload: AgentStepCompletePayload):
     """Hook that prints when steps complete."""
-    step = payload.get('step', 'unknown') if isinstance(payload, dict) else 'unknown'
-    msg = f"✅ STEP {step} COMPLETE"
+    msg = f"✅ STEP {payload.step} COMPLETE"
     print(msg, flush=True)
 
-def print_error(payload):
+def print_error(payload: AgentErrorPayload):
     """Hook that prints errors."""
-    error = payload.get('error', 'Unknown error') if isinstance(payload, dict) else payload
-    msg = f"❌ AGENT ERROR: {error}"
+    msg = f"❌ AGENT ERROR: {payload.error}"
     print(msg, flush=True)

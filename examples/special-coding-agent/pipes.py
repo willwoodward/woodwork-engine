@@ -1,53 +1,71 @@
-"""
-Simple event pipes that transform data and print when called.
-"""
-from datetime import datetime
+import os
 
-def add_timestamp_to_input(payload):
-    """Pipe that adds timestamp to input."""
-    print(f"🔄 PROCESSING INPUT: Adding timestamp")
-    if isinstance(payload, dict):
-        payload = payload.copy()
-        payload['_timestamp'] = datetime.now().isoformat()
+from woodwork.types import InputReceivedPayload
+
+
+def add_claude_md_to_input(payload: InputReceivedPayload) -> InputReceivedPayload:
+    """Pipe that adds CLAUDE.md context to input payloads."""
+    print("🔄 ADDING CLAUDE.MD CONTEXT")
+    
+    # Type check - this pipe only handles InputReceivedPayload
+    if not isinstance(payload, InputReceivedPayload):
+        print(f"⚠️  Expected InputReceivedPayload, got {type(payload)}")
+        return payload
+    
+    component_info = f" from {payload.component_id}" if payload.component_id else ""
+    print(f"📥 Processing input{component_info}")
+    
+    # Look for CLAUDE.md file
+    claude_md_path = find_claude_md()
+    
+    if claude_md_path and os.path.exists(claude_md_path):
+        try:
+            with open(claude_md_path, 'r', encoding='utf-8') as f:
+                claude_content = f.read()
+            
+            enhanced_input = f"""
+<project_context>
+{claude_content}
+</project_context>
+
+{payload.input}"""
+            
+            # Create new payload with enhanced input
+            enhanced_payload = InputReceivedPayload(
+                input=enhanced_input,
+                inputs=payload.inputs,
+                session_id=payload.session_id,
+                timestamp=payload.timestamp,
+                component_id=payload.component_id,
+                component_type=payload.component_type
+            )
+            
+            print(f"✅ Added CLAUDE.md content from: {claude_md_path}")
+            return enhanced_payload
+            
+        except Exception as e:
+            print(f"⚠️  Error reading CLAUDE.md: {e}")
+    else:
+        print("⚠️  CLAUDE.md not found")
+    
     return payload
 
-def validate_action(payload):
-    """Pipe that validates actions."""
-    print(f"🔍 VALIDATING ACTION")
-    action = payload.get('action', {}) if isinstance(payload, dict) else {}
+
+def find_claude_md(start_dir: str = None) -> str | None:
+    """Find CLAUDE.md file by searching up the directory tree."""
+    if start_dir is None:
+        start_dir = os.getcwd()
     
-    if not action.get('tool'):
-        print(f"⚠️  WARNING: Action missing tool name")
-    if not action.get('action'):
-        print(f"⚠️  WARNING: Action missing action description")
+    current_dir = os.path.abspath(start_dir)
+    
+    while True:
+        claude_md_path = os.path.join(current_dir, 'CLAUDE.md')
+        if os.path.exists(claude_md_path):
+            return claude_md_path
         
-    return payload
-
-def log_tool_call(payload):
-    """Pipe that logs tool calls."""
-    tool = payload.get('tool', 'unknown') if isinstance(payload, dict) else 'unknown'
-    print(f"📞 LOGGING TOOL CALL: {tool}")
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir == current_dir:  # Reached root directory
+            break
+        current_dir = parent_dir
     
-    # Add metadata
-    if isinstance(payload, dict):
-        payload = payload.copy()
-        payload['_logged_at'] = datetime.now().isoformat()
-    
-    return payload
-
-def process_observation(payload):
-    """Pipe that processes tool observations."""
-    if isinstance(payload, dict):
-        observation = payload.get('observation', '')
-        tool = payload.get('tool', 'unknown')
-        
-        print(f"🔄 PROCESSING OBSERVATION from {tool}")
-        
-        # Truncate very long observations
-        if len(str(observation)) > 500:
-            payload = payload.copy()
-            payload['observation'] = str(observation)[:500] + "... [truncated]"
-            payload['_truncated'] = True
-            print(f"✂️  Truncated long observation")
-    
-    return payload
+    return None
