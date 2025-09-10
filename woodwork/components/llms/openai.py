@@ -19,6 +19,15 @@ class openai(llm, ParallelStartable, Startable):
         self._retriever = get_optional(config, "knowledge_base")
         if self._retriever is not None:
             self._retriever = self._retriever.retriever
+        
+        if self._model == "gpt-5-mini":
+            self._llm_value = ChatOpenAI(
+                model=self._model,
+                max_tokens=None,
+                timeout=None,
+                max_retries=2,
+                api_key=self._api_key,
+            )
 
         super().__init__(**config)
 
@@ -34,6 +43,9 @@ class openai(llm, ParallelStartable, Startable):
         time.sleep(1)
 
     def start(self, queue: multiprocessing.Queue, config: dict = {}):
+        if self._model == "gpt-5-mini":
+            log.debug("Model initialized.")
+            return
         self._llm_value = ChatOpenAI(
             model=self._model,
             temperature=0,

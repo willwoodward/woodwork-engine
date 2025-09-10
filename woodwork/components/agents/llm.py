@@ -12,38 +12,19 @@ from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
 from woodwork.events import emit
+from woodwork.components.llms.llm import llm
 
 log = logging.getLogger(__name__)
 
 
 class llm(agent):
-    def __init__(self, model, **config):
+    def __init__(self, model: llm, **config):
         # Require a model (an LLM component instance or a ChatOpenAI instance) be provided.
         format_kwargs(config, model=model, type="llm")
         super().__init__(**config)
         log.debug("Initializing agent...")
 
-        # Accept either an LLM component (which should expose a property `_llm`) or a ChatOpenAI-like object
-        self.__llm = None
-        try:
-            # If model is a component exposing the `_llm` property (as in openai llm component), use that
-            if hasattr(model, "_llm"):
-                # property access may raise if not started; allow direct attribute fallback
-                try:
-                    self.__llm = model._llm
-                except Exception:
-                    # fallback to underlying attribute if present
-                    self.__llm = getattr(model, "_llm_value", None)
-            # Or if a ChatOpenAI instance (or similar) is passed directly, use it
-            elif isinstance(model, ChatOpenAI):
-                self.__llm = model
-            else:
-                self.__llm = getattr(model, "_llm", None) or getattr(model, "_llm_value", None)
-        except Exception:
-            self.__llm = None
-
-        if self.__llm is None:
-            raise TypeError("Provided model is not a valid LLM component or ChatOpenAI instance for the llm agent.")
+        self._llm = model._llm
 
         self._is_planner = get_optional(config, "planning", False)
         self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"}))
@@ -149,7 +130,7 @@ class llm(agent):
             ]
         )
 
-        chain = prompt | self.__llm
+        chain = prompt | self._llm
         result = chain.invoke({"input": query}).content
 
         # Clean output as JSON
@@ -217,7 +198,7 @@ class llm(agent):
             ]
         )
 
-        chain = prompt | self.__llm
+        chain = prompt | self._llm
 
         current_prompt = query
 
@@ -227,7 +208,7 @@ class llm(agent):
             current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
             print(f"tokens: {current_tokens}")
 
-            if current_tokens > 100000:
+            if current_tokens > 90000:
                 log.debug("Token limit reached, summarising context...")
 
                 summariser_prompt = ChatPromptTemplate.from_messages(
@@ -237,7 +218,7 @@ class llm(agent):
                     ]
                 )
 
-                summariser_chain = summariser_prompt | self.__llm
+                summariser_chain = summariser_prompt | self._llm
 
                 summary = summariser_chain.invoke({"context": current_prompt}).content
                 log.debug(f"[SUMMARY]: {summary}")
