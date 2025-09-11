@@ -11,6 +11,14 @@ class inputs(component):
 
         self._task_master = task_master
         self._output = to
+    
+    def _can_stream_input(self) -> bool:
+        """Input components typically don't receive streams"""
+        return False
+    
+    def _can_stream_output(self) -> bool:
+        """Input components can stream output if configured"""
+        return True
 
     def stop(self):
         self._task_master.close_all()

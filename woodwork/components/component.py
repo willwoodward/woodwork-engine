@@ -5,12 +5,17 @@ import logging
 from typing import List, Optional, Any, Dict
 from woodwork.types.workflows import Hook, Pipe
 from woodwork.events import EventManager, create_default_emitter, get_global_event_manager
+from woodwork.components.streaming_mixin import StreamingMixin
+from woodwork.core.stream_manager import StreamManager
 
 log = logging.getLogger(__name__)
 
 
-class component:
+class component(StreamingMixin):
     def __init__(self, name, component, type, **config):
+        # Initialize StreamingMixin first
+        super().__init__(name=name, config=config)
+        
         self.name = name
         self.component = component
         self.type = type
@@ -20,6 +25,10 @@ class component:
         self._pipes: List[Pipe] = []
         
         self._setup_event_system(config)
+        
+        # Log streaming configuration
+        if self.streaming_enabled:
+            log.debug(f"[Component {self.name}] Streaming enabled: input={self.streaming_input}, output={self.streaming_output}")
     
     def _setup_event_system(self, config: Dict[str, Any]):
         """Initialize the event system with hooks and pipes from config."""

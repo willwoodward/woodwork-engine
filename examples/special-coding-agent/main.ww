@@ -1,8 +1,13 @@
-coding_ag = agent llm {
+llm = llm openai {
     api_key: $OPENAI_API_KEY
+    model: "gpt-5-mini"
+}
+
+coding_ag = agent llm {
+    model: llm
     cache: False
     planning: True
-    tools: [github_api, dev_env, kb, llm]
+    tools: [github_api, dev_env]
     
     hooks: [
         {
@@ -55,24 +60,13 @@ input = input command_line {
     to: coding_ag
 }
 
-llm = llm openai {
-    knowledge_base: kb
-    api_key: $OPENAI_API_KEY
-}
-
 github_api = api functions {
     path: "github_api.py"
-}
-
-kb = knowledge_base chroma {
-    api_key: $OPENAI_API_KEY
-    file_to_embed: ".woodwork/coding-env"
 }
 
 dev_env = environment coding {
     repo_url: "willwoodward/woodwork-engine"
     local_path: "/workspace"
-    vector_db: kb
     setup_scripts: [
         "/workspace/setup_env.sh"
     ]

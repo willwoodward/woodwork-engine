@@ -1231,31 +1231,139 @@ class DistributedComponent(ComponentBase):
         await super().cleanup()
 ```
 
-## Migration Strategy
+## Current Implementation Status & Task Master Issues
 
-### Phase 1: Dual-Mode Operation (Weeks 1-2)
-- Implement distributed component manager alongside existing Task Master
-- Add flag to .ww configuration: `orchestration_mode = "centralized" | "distributed"`  
-- Components can run in either mode during transition
-- Message bus integration for distributed components
+### Task Master Cross-Thread Event Loop Problem ⚠️ CRITICAL ISSUE
 
-### Phase 2: Component Migration (Weeks 2-4)
-- Migrate components one by one to distributed mode
-- Update component base classes with distributed capabilities
-- Implement service discovery and circuit breaker patterns
-- Testing with mixed centralized/distributed deployments
+**Problem Identified**: The current Task Master runs in a separate thread from component event loops, causing severe timing and coordination issues with the streaming architecture:
 
-### Phase 3: Task Master Elimination (Weeks 4-5)
-- Remove Task Master dependencies from core components
-- Update .ww parser to generate distributed deployment configs
-- Default new projects to distributed mode
-- Legacy support for existing centralized deployments
+```python
+# Current problematic architecture
+class task_master(component):
+    def __init__(self, **config):
+        # Task Master runs in main thread
+        self.cache = neo4j(...)  # Blocking operations
+        self._tools = []  # Direct tool management
+        
+    def execute(self, action: Action):
+        # Direct synchronous tool calls
+        result = tool.input(action.action, action.inputs)
+        # Cannot integrate with async streaming
+```
 
-### Phase 4: Optimization and Hardening (Weeks 5-6)
-- Performance optimization of distributed coordination
-- Advanced failure recovery and circuit breaker tuning
-- Comprehensive monitoring and metrics
-- Documentation and migration guides
+**Issues**:
+1. **Thread Isolation**: Task Master thread cannot share event loops with component threads
+2. **Blocking Operations**: Task Master uses synchronous calls while streaming needs async
+3. **Direct Dependencies**: Components are tightly coupled to Task Master lifecycle
+4. **State Management**: Centralized state in Task Master prevents horizontal scaling
+5. **Event Integration**: Cannot integrate with event system due to thread boundaries
+
+This validates the **urgent need** for decentralized orchestration to eliminate these architectural problems.
+
+### Phase 1: Distributed Foundation ✅ PARTIALLY IMPLEMENTED
+
+**✅ Implemented via Streaming Architecture**:
+- **Component Isolation**: StreamingMixin allows components to operate independently
+- **Message Bus Integration**: SimpleMessageBus provides distributed communication foundation  
+- **Event-Driven Communication**: Components communicate via streaming events
+- **Session Support**: Stream metadata includes session_id for multi-tenant operations
+
+**⏳ Still Needed**:
+- Distributed component manager implementation
+- Service discovery and component registry
+- Circuit breaker patterns for resilience
+- Full .ww configuration support for distributed mode
+
+### Phase 2: Component Migration 🔄 IN PROGRESS
+
+**Current State**: Components have **dual capability** but are blocked by Task Master:
+
+```python
+# Current component architecture (ready for distributed)
+class component(StreamingMixin):
+    def __init__(self, name, component, type, **config):
+        # Has streaming capabilities
+        super().__init__(name=name, config=config)
+        # Has event system integration
+        self._setup_event_system(config)
+        # But still coupled to Task Master for orchestration
+```
+
+**Migration Path Enabled by Streaming**:
+- Components already have streaming input/output capabilities
+- Event system integration exists but needs distributed message bus
+- Session-based routing supported in streaming layer
+- Components can operate independently when Task Master is removed
+
+### Phase 3: Task Master Elimination ⏳ BLOCKED BY DEPENDENCIES
+
+**Ready to Implement**:
+- Remove task_master.py and replace with distributed component managers
+- Update components to use StreamingMixin + DistributedComponentManager
+- Migrate from direct tool calls to message bus communication
+
+**Blocked By**:
+- Need full distributed message bus (Redis/NATS backend)
+- Need component registry and service discovery
+- Need distributed session management
+- Need build system for containerized deployment
+
+### Phase 4: Production Readiness ⏳ PENDING
+
+**Architecture Complete, Implementation Pending**:
+- Circuit breaker implementation designed
+- Component health monitoring designed  
+- Distributed metrics and observability designed
+- Production deployment patterns designed
+
+## Integration Path: Streaming → Distributed
+
+### Current Streaming Foundation
+
+The streaming implementation **provides the foundation** for distributed orchestration:
+
+```python
+# Streaming enables distributed component communication
+async def distributed_workflow():
+    # Input component streams to agent
+    input_stream = await input_component.create_output_stream("agent_component")
+    await input_component.stream_data(user_input, input_stream)
+    
+    # Agent component streams to output  
+    output_stream = await agent_component.create_output_stream("output_component")
+    async for input_chunk in agent_component.receive_input_stream(input_stream):
+        # Process and stream response
+        await agent_component.stream_response_chunk(output_stream, process(input_chunk))
+    
+    # Output component receives stream
+    async for response_chunk in output_component.receive_input_stream(output_stream):
+        await output_component.display(response_chunk)
+```
+
+### Required Evolution
+
+1. **Replace Task Master Thread** with distributed component processes
+2. **Upgrade SimpleMessageBus** to Redis/NATS distributed message bus  
+3. **Add Component Registry** for service discovery
+4. **Add Session Manager** for multi-tenant support
+5. **Add Circuit Breakers** for resilience
+
+### Migration Benefits
+
+Eliminating Task Master via distributed orchestration solves:
+
+- ✅ **Cross-Thread Issues**: No more thread boundary problems
+- ✅ **Horizontal Scaling**: Components scale independently  
+- ✅ **Reliability**: Circuit breakers and failover instead of single point of failure
+- ✅ **Streaming Integration**: Native async operation with streaming
+- ✅ **Event System Integration**: Direct message bus integration without thread issues
+- ✅ **Session Isolation**: True multi-tenancy without shared state
+
+## Next Priority: Task Master Elimination
+
+**Status**: The streaming architecture has **proven that distributed communication works** and **identified the critical Task Master limitations**. 
+
+**Recommended Action**: Prioritize implementing the distributed communication architecture (designs 02-04) to eliminate Task Master and resolve the cross-thread event loop issues that are blocking full streaming integration.
 
 ## Testing Strategy
 

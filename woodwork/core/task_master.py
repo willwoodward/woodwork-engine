@@ -11,6 +11,7 @@ from woodwork.components.outputs.outputs import outputs
 from woodwork.deployments.router import get_router
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.types import Action, Workflow
+from woodwork.core.stream_manager import StreamManager
 
 log = logging.getLogger(__name__)
 
@@ -113,6 +114,50 @@ class task_master(component):
         for tool in self._tools:
             if hasattr(tool, "close"):
                 tool.close()
+    
+    async def _handle_console_output(self, data: Any):
+        """Handle output to console, with streaming support"""
+        log.debug(f"TaskMaster handling console output: {data}")
+        if isinstance(data, str) and data.startswith("stream:"):
+            log.debug("TaskMaster detected streaming output, handling as stream")
+            await self._handle_streaming_console_output(data)
+        else:
+            # Regular non-streaming output
+            log.debug("TaskMaster handling as regular non-streaming output")
+            print(data)
+    
+    async def _handle_streaming_console_output(self, stream_data: str):
+        """Handle streaming output to console"""
+        try:
+            # Check if stream manager is available
+            if not hasattr(self, '_stream_manager') or self._stream_manager is None:
+                log.error("TaskMaster: No stream manager available for console output")
+                print(f"\nNo stream manager available. Output: {stream_data}")
+                return
+            
+            # Extract stream ID
+            stream_id = stream_data.replace("stream:", "")
+            log.debug(f"TaskMaster extracting stream ID: {stream_id}")
+            
+            # Give a tiny moment for the stream to be set up
+            await asyncio.sleep(0.001)
+            
+            # Stream output to console
+            log.debug(f"TaskMaster starting to receive stream chunks for {stream_id}")
+            chunk_count = 0
+            async for chunk in self._stream_manager.receive_stream(stream_id):
+                chunk_count += 1
+                log.debug(f"TaskMaster received chunk {chunk_count}: '{chunk.data}'")
+                print(chunk.data, end="", flush=True)
+            
+            print()  # New line at the end
+            log.debug(f"TaskMaster finished streaming {chunk_count} chunks for {stream_id}")
+            
+        except Exception as e:
+            log.error(f"TaskMaster streaming error: {e}")
+            print(f"\nError handling streaming output: {e}")
+            # Fallback to regular output
+            print(stream_data)
 
     async def _loop(self, input_object: inputs):
         router = get_router()
@@ -131,9 +176,9 @@ class task_master(component):
                     x = await deployment.input(x)
                     component = component._output
 
-                # If the last object is not an output, print the result
+                # If the last object is not an output, handle console output
                 if not isinstance(component, outputs):
-                    print(x)
+                    await self._handle_console_output(x)
 
     def start(self):
         """Starts the input and output loops and orchestrates the execution of tasks."""
@@ -141,10 +186,39 @@ class task_master(component):
         print('Input initialized, type ";" to exit.')
 
         def run():
-            asyncio.run(self._loop(self._inputs[0]))
+            # Create and set a persistent event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(self._async_start())
+            finally:
+                # Clean up pending tasks before closing
+                pending = asyncio.all_tasks(loop)
+                if pending:
+                    log.debug(f"Cancelling {len(pending)} pending tasks")
+                    for task in pending:
+                        task.cancel()
+                    # Wait for cancellation to complete
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                loop.close()
 
         thread = Thread(target=run)
         thread.start()
+    
+    async def _async_start(self):
+        """Async startup to handle streaming setup"""
+        # Set up streaming for all components
+        router = get_router()
+        stream_manager = await router.setup_streaming()
+        if stream_manager:
+            log.debug("TaskMaster: Streaming set up successfully")
+            # Store the same stream manager instance for console output
+            self._stream_manager = stream_manager
+        else:
+            log.warning("TaskMaster: Failed to set up streaming")
+        
+        # Start the main loop
+        await self._loop(self._inputs[0])
 
     def validate_workflow(self, workflow: Workflow, tools: list):
         # # Check tools exist

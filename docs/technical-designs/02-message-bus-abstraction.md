@@ -1049,28 +1049,135 @@ class MessageBusMetrics:
     backend_health_status = "message_bus.backend_health_status"
 ```
 
-## Migration Plan
+## Current Implementation Status
 
-### Phase 1: Core Implementation (Week 1-2)
-- Implement MessageBusInterface and MessageEnvelope
-- Create Redis and Memory implementations  
-- Build factory and configuration system
-- Unit tests for core functionality
+### Phase 1: Core Implementation ✅ COMPLETED (SIMPLIFIED)
+The message bus abstraction was **implemented in simplified form** to support the streaming architecture:
 
-### Phase 2: Event System Integration (Week 2-3)
-- Integrate with existing EventManager
-- Update components to use message bus adapter
-- Session-based routing implementation
-- Integration testing
+**✅ Implemented**:
+- `SimpleMessageBus`: In-memory message bus with pub/sub and direct component messaging
+- `MessageBusAdapter`: High-level interface for component integration
+- Topic-based subscriptions and component-specific message queues
+- Basic statistics and monitoring
+- Integration with streaming system
 
-### Phase 3: Production Features (Week 3-4)
-- Dead letter queue handling
-- Retry mechanisms and backpressure
-- Health monitoring and metrics
-- Performance optimization
+**⏳ Simplified vs Full Design**:
+- Current: Simple in-memory implementation for local development and streaming proof-of-concept
+- Target: Full MessageBusInterface with Redis/NATS backends, MessageEnvelope with delivery guarantees
+- Reason: Focus on streaming integration first; full distributed message bus needed for production scaling
 
-### Phase 4: Advanced Features (Week 4)
-- NATS Jetstream implementation (cloud)
-- Advanced routing and filtering
-- Message persistence options
-- Load testing and scaling verification
+### Phase 2: Streaming Integration ✅ COMPLETED
+**✅ Successfully Integrated with Streaming**:
+- StreamManager uses SimpleMessageBus for chunk delivery
+- Components communicate via message bus using StreamingMixin
+- Topic-based streaming events: `stream.created`, `stream.chunk`, `stream.completed`
+- Component registration and direct messaging support
+
+### Phase 3: Production Features ⏳ PENDING DISTRIBUTED ARCHITECTURE
+**Waiting for Distributed Communication Architecture**:
+- Redis/NATS backend implementations
+- MessageEnvelope with delivery guarantees and retry logic  
+- Dead letter queue handling for failed streams
+- Session-based message routing and isolation
+- Persistent message storage for reliability
+
+### Phase 4: Advanced Features ⏳ PENDING
+**Blocked by Task Master Cross-Thread Issues**:
+- Full event system integration (EventManager replacement)
+- Session-based multi-tenant routing
+- Health monitoring and component discovery integration
+- Load balancing and failover mechanisms
+
+## Current Architecture vs Target Architecture
+
+### Current: SimpleMessageBus for Streaming
+
+```python
+# Simple in-memory message bus
+bus = SimpleMessageBus()
+await bus.start()
+
+# Topic-based messaging for streaming
+await bus.publish("stream.chunk", chunk_data)
+bus.subscribe("stream.chunk", handle_chunk)
+
+# Direct component messaging
+await bus.send_to_component("output_component", message_data)
+bus.register_component_handler("output_component", handler)
+```
+
+**Capabilities**:
+- ✅ Pub/sub messaging for streaming events
+- ✅ Direct component messaging
+- ✅ Message queuing for unavailable components
+- ✅ Basic error handling and statistics
+- ✅ Integration with StreamManager
+
+**Limitations**:
+- ❌ No persistence (messages lost on restart)
+- ❌ No distributed operation (single process only)
+- ❌ No delivery guarantees or retry logic
+- ❌ No session isolation or multi-tenancy
+
+### Target: Full Distributed Message Bus
+
+```python
+# Distributed message bus with Redis/NATS backend
+message_bus = MessageBusFactory.create_message_bus({
+    "type": "redis",
+    "redis_url": "redis://cluster:6379"
+})
+
+# Full message envelope with guarantees
+envelope = MessageEnvelope(
+    message_id="msg-123",
+    session_id="session-456", 
+    event_type="stream.chunk",
+    delivery_mode=MessageDeliveryMode.AT_LEAST_ONCE,
+    pattern=MessagePattern.POINT_TO_POINT
+)
+
+await message_bus.publish(envelope)
+```
+
+## Integration Path with Distributed Communication
+
+### 1. Message Bus Evolution Strategy
+
+```mermaid
+graph LR
+    A[SimpleMessageBus<br/>In-Memory] --> B[Redis Implementation<br/>Local Persistence]
+    B --> C[NATS Jetstream<br/>Cloud Scale]
+    
+    A1[Streaming Only] --> B1[Streaming + Events]  
+    B1 --> C1[Full Distributed]
+```
+
+### 2. Component Integration Points
+
+The current SimpleMessageBus provides the **foundation for distributed communication**:
+
+```python
+# Current streaming integration (working)
+class StreamingComponent(StreamingMixin):
+    def __init__(self, name, config):
+        super().__init__(name=name, config=config)
+        # StreamingMixin uses SimpleMessageBus via StreamManager
+        
+# Target distributed integration  
+class DistributedComponent(StreamingMixin, DistributedComponentManager):
+    def __init__(self, name, config):
+        super().__init__(name=name, config=config)
+        # Uses full MessageBusInterface + ComponentRegistry
+```
+
+### 3. Migration Compatibility
+
+The SimpleMessageBus interface **intentionally matches** the target MessageBusInterface:
+
+- `publish()` method signature compatible
+- Topic-based subscriptions work the same way
+- Component handler registration identical
+- Message format easily upgradable to MessageEnvelope
+
+This ensures **zero code changes** in components when upgrading from SimpleMessageBus to full distributed message bus.

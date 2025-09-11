@@ -14,6 +14,15 @@ from .events import (
     PayloadRegistry
 )
 from .event_source import EventSource, track_events_from
+from .streaming_data import (
+    StreamChunk,
+    StreamMetadata, 
+    StreamBuffer,
+    StreamDataType,
+    StreamStatus,
+    generate_stream_id,
+    create_stream_chunk
+)
 
 __all__ = [
     # Data types
@@ -25,5 +34,8 @@ __all__ = [
     "AgentActionPayload", "ToolCallPayload", "ToolObservationPayload", 
     "AgentStepCompletePayload", "AgentErrorPayload", "PayloadRegistry",
     # Event source tracking
-    "EventSource", "track_events_from"
+    "EventSource", "track_events_from",
+    # Streaming data types
+    "StreamChunk", "StreamMetadata", "StreamBuffer", "StreamDataType", "StreamStatus",
+    "generate_stream_id", "create_stream_chunk"
 ]
