@@ -139,8 +139,10 @@ def create_object(command):
     if "pipes" in command:
         log.debug(f"[create_object] Found pipes: {command['pipes']}")
 
-    # Add metadata to the config
+    # Add metadata to the config (required by new component base class)
     config["name"] = variable
+    config["component"] = component
+    config["type"] = type
     
     # Include hooks and pipes in config if they exist
     if "hooks" in command:
@@ -630,9 +632,125 @@ def parse(config: str, registry=None) -> dict:
         if comp.name not in router.components:
             router.add(comp)
 
+    # Initialize message bus integration after all components are created
+    _initialize_message_bus_integration(commands)
+    
     task_m.add_tools(tools)
 
     return commands
+
+
+def _initialize_message_bus_integration(commands: dict) -> None:
+    """Synchronously initialize message bus integration with component configurations"""
+    try:
+        from woodwork.core.message_bus.integration import (
+            initialize_global_message_bus_integration,
+            initialize_global_message_bus_integration_sync,
+            get_global_message_bus_manager
+        )
+        from woodwork.core.message_bus.factory import configure_global_message_bus
+
+        log.info("[ConfigParser] Initializing message bus integration...")
+
+        # Extract component instances for routing
+        component_configs = {}
+        deployment_config = None
+
+        for name, command_data in commands.items():
+            obj = command_data.get("object")
+            if hasattr(obj, "component") and hasattr(obj, "config"):
+                # Regular component
+                component_configs[name] = {
+                    "object": obj,  # store instance
+                    **obj.config,
+                    "component": obj.component,
+                    "type": obj.type,
+                    "name": name
+                }
+            elif isinstance(obj, Deployment):
+                if name == "deployment" or obj.component == "deployment":
+                    deployment_config = command_data.get("config", {})
+
+        log.debug("[ConfigParser] Found %d components for message bus routing", len(component_configs))
+
+        # Activate message bus globally
+        import woodwork.globals as globals
+        globals.global_config["message_bus_active"] = True
+        log.info("[ConfigParser] Message bus mode activated - Task Master will be disabled")
+
+        # Configure custom message bus if specified
+        if deployment_config and "message_bus" in deployment_config:
+            message_bus_config = deployment_config["message_bus"]
+            log.info("[ConfigParser] Found custom message bus configuration: %s", message_bus_config)
+            if isinstance(message_bus_config, str):
+                if message_bus_config.startswith("redis://"):
+                    message_bus_config = {"type": "redis", "redis_url": message_bus_config}
+                elif message_bus_config.startswith("nats://"):
+                    message_bus_config = {"type": "nats", "nats_url": message_bus_config}
+                else:
+                    log.warning("[ConfigParser] Unknown message bus URL format: %s", message_bus_config)
+                    message_bus_config = {"type": "auto"}
+            configure_global_message_bus(message_bus_config)
+            log.info("[ConfigParser] Configured custom message bus")
+        else:
+            log.info("[ConfigParser] Using default message bus configuration")
+
+        # Initialize message bus integration synchronously without separate event loop
+        initialize_global_message_bus_integration_sync(component_configs)
+        log.info("[ConfigParser] Message bus integration initialized with %d components", len(component_configs))
+
+        # Ensure all components have the required integration attributes
+        for cfg in component_configs.values():
+            comp = cfg.get("object")
+            if comp:
+                if not hasattr(comp, "_integration_ready"):
+                    comp._integration_ready = True
+                if not hasattr(comp, "_message_bus"):
+                    comp._message_bus = get_global_message_bus_manager()
+                if not hasattr(comp, "_router"):
+                    comp._router = get_router()
+
+        # Log status
+        manager = get_global_message_bus_manager()
+        stats = manager.get_manager_stats()
+        log.info("[ConfigParser] Message bus status: %s", {
+            "integration_active": stats["integration_active"],
+            "registered_components": stats["registered_components"],
+            "message_bus_healthy": stats["message_bus_healthy"]
+        })
+        if stats.get("router_stats", {}).get("routing_table"):
+            log.debug("[ConfigParser] Routing table: %s", stats["router_stats"]["routing_table"])
+
+    except Exception as e:
+        log.error("[ConfigParser] Failed to initialize message bus integration: %s", e)
+        log.error("[ConfigParser] Components will work without distributed messaging")
+
+
+
+async def _async_initialize_message_bus(component_configs: dict) -> None:
+    """Async helper for message bus initialization"""
+    try:
+        from woodwork.core.message_bus.integration import initialize_global_message_bus_integration
+        
+        await initialize_global_message_bus_integration(component_configs)
+        log.info("[ConfigParser] Message bus integration initialized with %d components", len(component_configs))
+        
+        # Log routing configuration for debugging
+        from woodwork.core.message_bus.integration import get_global_message_bus_manager
+        manager = get_global_message_bus_manager()
+        stats = manager.get_manager_stats()
+        
+        log.info("[ConfigParser] Message bus status: %s", {
+            "integration_active": stats["integration_active"],
+            "registered_components": stats["registered_components"],
+            "message_bus_healthy": stats["message_bus_healthy"]
+        })
+        
+        if stats.get("router_stats", {}).get("routing_table"):
+            log.debug("[ConfigParser] Routing table: %s", stats["router_stats"]["routing_table"])
+        
+    except Exception as e:
+        log.error("[ConfigParser] Error in async message bus initialization: %s", e)
 
 
 def main_function(registry=None):

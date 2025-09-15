@@ -12,7 +12,7 @@ This document defines the technical implementation for the message bus abstracti
 - **FR3**: Message delivery guarantees (at-least-once, ordering within sessions)
 - **FR4**: Session-based message routing and isolation
 - **FR5**: Dead letter queue handling for failed messages
-- **FR6**: Pub/sub pattern for hooks and point-to-point for component chains
+- **FR6**: Pub/sub pattern for hooks and point-to-point for component-to-component communication
 - **FR7**: Automatic failover and retry mechanisms
 
 ### Non-Functional Requirements
@@ -50,9 +50,11 @@ graph TB
 
 ### Message Flow Patterns
 
-1. **Component Chain**: Input → Agent → Output (ordered, session-isolated)
-2. **Hook Broadcasting**: All components → Hooks (fanout, concurrent)
+1. **Component-to-Component**: Direct message delivery between components (ordered, session-isolated)
+2. **Hook Broadcasting**: All components → Hooks (fanout, concurrent)  
 3. **Stream Data**: Producer → Consumer (ordered chunks with backpressure)
+
+**Note**: Pipe transformations are handled **internally by each component** when it receives messages, not by the message bus itself.
 
 ## Detailed Design
 
@@ -980,40 +982,441 @@ async def setup_message_bus_integration():
     return adapter
 ```
 
-## Configuration
+## Out-of-the-Box Integration
 
-### Development Configuration
+### Seamless Integration with Existing Event System
 
-```yaml
-# config/message_bus_dev.yml
-message_bus:
-  type: memory
-  max_queue_size: 1000
+The message bus integrates **directly with the existing event system** - no separate API or name collisions:
+
+```python
+# woodwork/components/message_bus_integration.py
+from woodwork.core.message_bus import get_global_message_bus
+from woodwork.events import get_global_event_manager
+
+class MessageBusIntegration:
+    """Integration layer that connects message bus with existing event system"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._message_bus = None
+        
+    async def _ensure_message_bus(self):
+        """Lazy initialization of message bus connection"""
+        if self._message_bus is None:
+            self._message_bus = await get_global_message_bus()
+        return self._message_bus
+        
+    async def send_to_component(self, target_component: str, event_type: str, payload: dict):
+        """Send message directly to another component (bypasses local hooks/pipes)"""
+        bus = await self._ensure_message_bus()
+        await bus.send_to_component(target_component, {
+            "event_type": event_type,
+            "payload": payload,
+            "sender": self.name
+        })
+
+# Extend existing component class - NO API changes
+class component(StreamingMixin, MessageBusIntegration):
+    def __init__(self, name, component, type, **config):
+        super().__init__(name=name, config=config)
+        
+        # Setup message bus handling automatically
+        asyncio.create_task(self._setup_message_bus_integration())
+    
+    async def _setup_message_bus_integration(self):
+        """Connect message bus to existing event system"""
+        bus = await self._ensure_message_bus()
+        bus.register_component_handler(self.name, self._handle_bus_message)
+    
+    async def _handle_bus_message(self, message):
+        """Route message bus messages through existing event system"""
+        event_type = message.get("event_type")
+        payload = message.get("payload", {})
+        
+        # Route through EXISTING emit() - same API, same pipes, same hooks!
+        from woodwork.events import get_global_event_manager
+        event_manager = get_global_event_manager()
+        
+        # This triggers existing pipes and hooks automatically
+        result = await event_manager.emit(event_type, payload)
+        return result
 ```
 
-### Local Production Configuration
+### Declarative Routing via Message Bus (No Component Changes)
 
-```yaml
-# config/message_bus_local.yml
-message_bus:
-  type: redis
-  redis_url: redis://localhost:6379
-  stream_prefix: woodwork_local
-  consumer_group: woodwork_components
-  max_retries: 3
+Components **don't know where their outputs go** - the message bus handles routing based on user configuration:
+
+```python
+# LLM Component - UNCHANGED, doesn't know about routing
+class LLMComponent(component):
+    async def process(self, input_text):
+        # Process input
+        response = await self.generate_response(input_text)
+        
+        # Just emit events like before - component doesn't know routing
+        await self.emit("llm.response_generated", {
+            "response": response,
+            "tokens": len(response.split())
+        })
+        
+        # Return response - let the system handle routing
+        return response
+
+# User defines routing in .ww config (SAME AS NOW)
+agent = claude {
+    model = "claude-3-sonnet"
+    to = ["output", "websocket_hook"]  # User declares where outputs go
+}
+
+output = cli {}
+websocket_hook = websocket { endpoint = "/chat" }
 ```
 
-### Cloud Production Configuration
+### Message Bus as Distributed Router
 
-```yaml
-# config/message_bus_cloud.yml
-message_bus:
-  type: redis  # or nats
-  redis_url: ${REDIS_CLUSTER_URL}
-  stream_prefix: woodwork_prod
-  consumer_group: woodwork_components
-  max_retries: 5
+The message bus reads the `to:` configuration and routes messages automatically:
+
+```python
+# woodwork/core/message_bus/declarative_router.py
+class DeclarativeRouter:
+    """Routes messages based on component 'to:' configuration"""
+    
+    def __init__(self, component_configs: Dict[str, Dict]):
+        self.routing_table = self._build_routing_table(component_configs)
+        
+    def _build_routing_table(self, configs):
+        """Build routing table from .ww component configurations"""
+        routing = {}
+        
+        for component_name, config in configs.items():
+            targets = config.get('to', [])
+            if isinstance(targets, str):
+                targets = [targets]
+            routing[component_name] = targets
+            
+        return routing
+    
+    async def route_component_output(self, source_component: str, event_type: str, payload: dict):
+        """Route component output to configured targets"""
+        targets = self.routing_table.get(source_component, [])
+        
+        for target in targets:
+            await self.message_bus.send_to_component(target, event_type, {
+                **payload,
+                "source_component": source_component
+            })
+
+# Integration with component base class
+class component(StreamingMixin, MessageBusIntegration):
+    def __init__(self, name, component, type, **config):
+        super().__init__(name=name, config=config)
+        
+        # Store routing targets from config
+        self.output_targets = config.get('to', [])
+        if isinstance(self.output_targets, str):
+            self.output_targets = [self.output_targets]
+    
+    async def emit(self, event: str, data: Any = None) -> Any:
+        """Enhanced emit that routes to configured targets"""
+        
+        # 1. Process locally (existing behavior - hooks, pipes)
+        result = await super().emit(event, data)
+        
+        # 2. Route to configured targets (new distributed behavior)
+        if self.output_targets and event.endswith('_generated') or event.endswith('_complete'):
+            router = await self._get_router()
+            await router.route_component_output(self.name, event, {
+                "data": result,
+                "event_type": event
+            })
+        
+        return result
 ```
+
+### Smart Event Routing
+
+```python
+# Enhanced event manager integration
+class MessageBusEventManager(EventManager):
+    """Extended EventManager that can route events via message bus when needed"""
+    
+    def __init__(self):
+        super().__init__()
+        self._message_bus = None
+    
+    async def emit(self, event: str, data: Any = None, target_component: str = None) -> Any:
+        """Enhanced emit that can target specific components"""
+        
+        if target_component:
+            # Route via message bus to specific component
+            bus = await self._ensure_message_bus()
+            await bus.send_to_component(target_component, {
+                "event_type": event,
+                "payload": data,
+                "sender": self._get_current_component()
+            })
+            return data
+        else:
+            # Normal local event processing (existing behavior)
+            return await super().emit(event, data)
+
+# Components can now emit to specific targets with same API
+await self.emit("display_response", response_data, target_component="output")
+```
+
+### Default Configuration (No User Setup Required)
+
+The message bus uses intelligent defaults based on environment:
+
+```python
+# woodwork/core/message_bus/factory.py
+def create_default_message_bus():
+    """Create message bus with sensible defaults"""
+    
+    # Development: In-memory for fast iteration
+    if os.getenv('WOODWORK_ENV') == 'development':
+        return InMemoryMessageBus(max_queue_size=1000)
+    
+    # Production: Try Redis, fallback to in-memory
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+    try:
+        return RedisMessageBus(
+            redis_url=redis_url,
+            stream_prefix=os.getenv('WOODWORK_STREAM_PREFIX', 'woodwork'),
+            consumer_group=os.getenv('WOODWORK_CONSUMER_GROUP', 'components')
+        )
+    except ConnectionError:
+        log.warning("Redis unavailable, falling back to in-memory message bus")
+        return InMemoryMessageBus()
+
+# Global singleton - no configuration required
+_global_message_bus = None
+
+async def get_global_message_bus():
+    global _global_message_bus  
+    if _global_message_bus is None:
+        _global_message_bus = create_default_message_bus()
+        await _global_message_bus.start()
+    return _global_message_bus
+```
+
+### Config Parser Integration (Deployment Component)
+
+For advanced users who want to customize, add to config_parser.py:
+
+```python
+# woodwork/parser/config_parser.py (add to existing deployment initialization)
+def _initialize_deployment_components(self, config):
+    """Initialize deployment components including message bus"""
+    
+    # Existing deployment initialization...
+    
+    # Message bus deployment component (optional)
+    message_bus_config = config.get('deployment', {}).get('message_bus', {})
+    if message_bus_config:
+        from woodwork.core.message_bus import set_global_message_bus, MessageBusFactory
+        
+        custom_bus = MessageBusFactory.create_message_bus(message_bus_config)
+        set_global_message_bus(custom_bus)
+        log.info("Initialized custom message bus configuration")
+    else:
+        log.debug("Using default message bus configuration")
+```
+
+### Optional .ww Configuration (Advanced Users Only)
+
+Most users don't need to configure anything, but advanced users can customize:
+
+```python
+# main.ww (optional deployment configuration)
+deployment = local {
+    message_bus = redis {
+        redis_url = $REDIS_URL
+        stream_prefix = "my_project"
+        consumer_group = "my_components"
+        max_retries = 5
+        dead_letter_ttl = 3600
+    }
+}
+
+# Components work exactly the same - no changes needed
+agent = claude {
+    model = "claude-3-sonnet"
+    streaming = true
+}
+
+input = cli {}
+output = cli {}
+```
+
+Alternative simplified deployment config:
+
+```python
+# main.ww (minimal deployment config)
+deployment = cloud {
+    message_bus = "redis://my-cluster:6379"  # Just the URL
+}
+
+# Or even simpler - just environment variable
+deployment = local {}  # Uses REDIS_URL env var if available
+```
+
+## Zero-Configuration Component Communication
+
+## Seamless Transition from Event Loop to Distributed Routing
+
+### Current Centralized Event Loop (Task Master)
+```python
+# Current: Task Master controls routing
+task_master.add_tools([input_comp, llm_comp, output_comp])
+task_master.execute_workflow()  # Centralized orchestration
+```
+
+### New: Distributed Message Bus Routing 
+```python
+# New: Message bus routes based on user configuration
+# Components just emit events - don't know about routing
+
+# main.ww - User declares routing (SAME AS BEFORE)
+input = cli {}
+
+agent = claude {
+    model = "claude-3-sonnet"
+    to = ["output", "websocket"]  # User controls routing
+}
+
+output = cli {}
+websocket = websocket { endpoint = "/chat" }
+
+# Component code stays the same - no routing knowledge
+class LLMComponent(component):
+    async def process(self, input_text):
+        response = await self.generate_response(input_text)
+        
+        # Just emit - message bus handles routing automatically
+        await self.emit("response_generated", response)
+        return response
+```
+
+### Message Bus Replaces Event Loop Orchestration
+
+```python
+# Message bus reads .ww config and creates routing table
+routing_table = {
+    "agent": ["output", "websocket"],  # From 'to' property
+    "input": ["agent"],               # Inferred from workflow
+    "output": []                      # End of chain
+}
+
+# When agent emits "response_generated", message bus automatically routes to:
+# 1. output component -> displays response
+# 2. websocket component -> broadcasts to clients
+# 3. Local hooks/pipes -> logging, metrics, etc.
+
+class DistributedMessageBus:
+    async def handle_component_emit(self, source_component: str, event: str, data: Any):
+        """Replace event loop orchestration with distributed routing"""
+        
+        # 1. Process local hooks/pipes (same as before)
+        local_result = await self.process_local_events(event, data)
+        
+        # 2. Route to configured targets (replaces Task Master routing)
+        targets = self.routing_table.get(source_component, [])
+        for target in targets:
+            await self.send_to_component(target, event, {
+                "data": local_result,
+                "source": source_component
+            })
+```
+
+Components receive messages automatically and handle pipe transformations internally:
+
+```python
+# Example: Output component receiving messages
+class OutputComponent(component):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Register message handler automatically
+        asyncio.create_task(self._setup_message_handling())
+    
+    async def _setup_message_handling(self):
+        bus = await self._ensure_message_bus()
+        bus.register_component_handler(self.name, self._handle_message)
+    
+    async def _handle_message(self, message):
+        """
+        Message bus delivers raw message to component.
+        Component handles pipe transformations internally.
+        """
+        event_type = message.get("event_type")
+        payload = message.get("payload", {})
+        
+        # Component applies its own pipe transformations here
+        # (not handled by message bus)
+        transformed_payload = await self._apply_pipes(event_type, payload)
+        
+        if event_type == "display_response":
+            await self.display(transformed_payload.get("response"))
+    
+    async def _apply_pipes(self, event_type: str, payload: dict) -> dict:
+        """Apply component's configured pipes to the received message"""
+        # This is internal component logic, not message bus logic
+        current_payload = payload
+        
+        for pipe in self._pipes:
+            if pipe.event == event_type:
+                pipe_func = self._load_pipe_function(pipe)
+                current_payload = await pipe_func(current_payload)
+        
+        return current_payload
+```
+
+## Clear Separation of Responsibilities
+
+### Message Bus Responsibilities ✅
+- **Component-to-component delivery**: Route messages between components
+- **Hook broadcasting**: Deliver events to hooks (pub/sub pattern)
+- **Session isolation**: Ensure messages stay within correct sessions
+- **Reliability**: Handle message ordering, retries, dead letter queues
+
+### Component Responsibilities ✅  
+- **Pipe transformations**: Apply configured pipes to received messages internally
+- **Event processing**: Handle business logic for received events
+- **Message formatting**: Prepare outgoing messages for delivery
+- **Local state management**: Track component-specific state
+
+### Example: Complete Message Flow
+
+```python
+# Component A sends message
+class ComponentA(component):
+    async def process_data(self, data):
+        # Component prepares message
+        message = {"processed_data": data, "timestamp": time.time()}
+        
+        # Message bus handles delivery (no pipe transformations here)
+        await self.send_to_component("component_b", "data_processed", message)
+
+# Message bus delivers message (no transformations)
+# Raw message: {"processed_data": "hello", "timestamp": 1234567890}
+
+# Component B receives message
+class ComponentB(component):
+    async def _handle_message(self, message):
+        payload = message.get("payload", {})
+        
+        # Component B applies ITS OWN pipes internally
+        # Pipe 1: Add context
+        payload = await self._add_context_pipe(payload)
+        # Pipe 2: Format output  
+        payload = await self._format_output_pipe(payload)
+        
+        # Now process the transformed payload
+        await self._process_transformed_data(payload)
+```
+
+**Key Point**: The message bus is a **pure delivery system**. Each component handles its own pipe transformations when it receives messages, just like how it currently handles pipes in the existing event system.
 
 ## Testing Strategy
 

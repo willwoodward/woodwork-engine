@@ -2,33 +2,56 @@ import os
 import sys
 import importlib.util
 import logging
+import asyncio
 from typing import List, Optional, Any, Dict
 from woodwork.types.workflows import Hook, Pipe
 from woodwork.events import EventManager, create_default_emitter, get_global_event_manager
 from woodwork.components.streaming_mixin import StreamingMixin
 from woodwork.core.stream_manager import StreamManager
+from woodwork.core.message_bus.integration import MessageBusIntegration, register_component_with_message_bus
 
 log = logging.getLogger(__name__)
 
 
-class component(StreamingMixin):
+class component(StreamingMixin, MessageBusIntegration):
     def __init__(self, name, component, type, **config):
-        # Initialize StreamingMixin first
-        super().__init__(name=name, config=config)
+        log.debug("[component] Initializing component '%s' (type: %s, component: %s) with config keys: %s", 
+                  name, type, component, list(config.keys()))
         
+        # Set basic attributes first
         self.name = name
         self.component = component
         self.type = type
         self.config = config
+        
+        # Initialize both mixins with the full config
+        log.debug("[component] Calling super().__init__ for '%s'", name)
+        super().__init__(name=name, config=config)
+        
+        log.debug("[component] Component '%s' initialization complete, hasattr(output_targets): %s", 
+                  name, hasattr(self, 'output_targets'))
+        
         self._emitter: Optional[EventManager] = None
         self._hooks: List[Hook] = []
         self._pipes: List[Pipe] = []
         
         self._setup_event_system(config)
         
-        # Log streaming configuration
-        if self.streaming_enabled:
+        # Register with global message bus manager
+        register_component_with_message_bus(self)
+        
+        # Log configuration
+        if hasattr(self, 'streaming_enabled') and self.streaming_enabled:
             log.debug(f"[Component {self.name}] Streaming enabled: input={self.streaming_input}, output={self.streaming_output}")
+        
+        if hasattr(self, 'output_targets') and self.output_targets:
+            log.debug(f"[Component {self.name}] Message bus routing targets: {self.output_targets}")
+        
+        streaming_enabled = getattr(self, 'streaming_enabled', False)
+        self.streaming_enabled = streaming_enabled
+        self.output_targets = config.get("to", None)
+        
+        log.info(f"[Component {self.name}] Initialized with streaming={streaming_enabled}, routing={bool(self.output_targets)}")
     
     def _setup_event_system(self, config: Dict[str, Any]):
         """Initialize the event system with hooks and pipes from config."""

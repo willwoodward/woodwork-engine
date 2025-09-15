@@ -1,9 +1,12 @@
 import aiohttp
 from typing import Optional
+import logging
 
 from woodwork.components.component import component
 from woodwork.deployments.deployment import Deployment
 from woodwork.deployments.vms import LocalDeployment, ServerDeployment
+
+log = logging.getLogger(__name__)
 
 
 class DeploymentWrapper:
@@ -63,23 +66,20 @@ class Router:
             streaming_count = 0
             for component_wrapper in self.components.values():
                 component = component_wrapper.component
-                print(f"Router checking component: {component.name}, has streaming_enabled: {hasattr(component, 'streaming_enabled')}")
-                if hasattr(component, 'streaming_enabled'):
-                    print(f"Component {component.name} streaming_enabled: {component.streaming_enabled}")
                 if hasattr(component, 'streaming_enabled') and component.streaming_enabled:
                     if hasattr(component, 'set_stream_manager'):
                         component.set_stream_manager(stream_manager)
                         streaming_count += 1
-                        print(f"✅ Set up streaming for component: {component.name}")
+                        log.debug(f"✅ Set up streaming for component: {component.name}")
                     else:
-                        print(f"❌ Component {component.name} has streaming enabled but no set_stream_manager method")
+                        log.debug(f"❌ Component {component.name} has streaming enabled but no set_stream_manager method")
             
-            print(f"Router set up streaming for {streaming_count} components")
+            log.debug(f"Router set up streaming for {streaming_count} components")
             
             return stream_manager
             
         except Exception as e:
-            print(f"Error setting up streaming: {e}")
+            log.error(f"Error setting up streaming: {e}")
             return None
 
 

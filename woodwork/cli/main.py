@@ -125,6 +125,12 @@ def app_entrypoint(args):
     dependencies.activate_virtual_environment()
     config_parser.main_function()
     generate_exported_objects_file(registry=registry)
+    
+    # Debug: Show which orchestration mode is active
+    if globals.global_config.get("message_bus_active", False):
+        log.info("🚀 Woodwork running with DISTRIBUTED MESSAGE BUS orchestration")
+    else:
+        log.info("🔧 Woodwork running with TASK MASTER orchestration")
 
     deployer = Deployer()
     deployer.main()
@@ -156,7 +162,14 @@ def app_entrypoint(args):
             # ArgParse will SysExit if choice not in list
             pass
 
-    config_parser.task_m.start()
+    # Only start Task Master if message bus is not active
+    if not globals.global_config.get("message_bus_active", False):
+        config_parser.task_m.start()
+        log.info("Task Master started (message bus not active)")
+    else:
+        log.info("Skipping Task Master start - message bus is handling component orchestration")
+        # Start message bus main loop instead
+        start_message_bus_loop(config_parser.task_m._tools)
 
 
 def cli_entrypoint() -> None:
@@ -193,3 +206,134 @@ def cli_entrypoint() -> None:
     logging.config.dictConfig(config)
 
     app_entrypoint(args)
+
+
+def start_message_bus_loop(tools):
+    """Start the message bus main loop to handle input/output cycling"""
+    import asyncio
+    import threading
+    from woodwork.components.inputs.inputs import inputs
+    from woodwork.components.outputs.outputs import outputs
+    from woodwork.deployments.router import get_router
+
+    log.info("🚀 Starting message bus main loop...")
+
+    # Find input components
+    input_components = [tool for tool in tools if isinstance(tool, inputs)]
+
+    if not input_components:
+        log.error("No input components found - cannot start message bus loop")
+        return
+
+    input_component = input_components[0]  # Use first input component
+    log.info("Using input component: %s", input_component.name)
+
+    # Start message bus in background thread to ensure async tasks run properly
+    def run_message_bus_background():
+        """Background thread to run the message bus with proper async event loop"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        async def setup_and_run():
+            try:
+                # Start the message bus properly with async tasks in this event loop
+                from woodwork.core.message_bus.factory import get_global_message_bus
+                message_bus = await get_global_message_bus()
+                log.info("Message bus started with background tasks (retry processor, cleanup)")
+
+                # Also ensure the integration manager is properly set up
+                from woodwork.core.message_bus.integration import get_global_message_bus_manager
+                manager = get_global_message_bus_manager()
+
+                # Set up streaming like Task Master does
+                router = get_router()
+                stream_manager = await router.setup_streaming()
+                if stream_manager:
+                    log.debug("Message bus: Streaming set up successfully")
+                else:
+                    log.warning("Message bus: Failed to set up streaming")
+
+                # Start the main input/output loop
+                await message_bus_main_loop(input_component)
+
+            except Exception as e:
+                log.error("Error in message bus main loop: %s", e)
+                import traceback
+                traceback.print_exc()
+            finally:
+                # Clean shutdown
+                try:
+                    message_bus = await get_global_message_bus()
+                    if hasattr(message_bus, 'stop'):
+                        await message_bus.stop()
+                        log.info("Message bus stopped cleanly")
+                except Exception as e:
+                    log.error("Error stopping message bus: %s", e)
+
+        try:
+            loop.run_until_complete(setup_and_run())
+        finally:
+            loop.close()
+
+    # Start the background thread
+    message_bus_thread = threading.Thread(target=run_message_bus_background, daemon=True)
+    message_bus_thread.start()
+
+    # Wait for the thread to complete (this keeps main thread alive)
+    try:
+        message_bus_thread.join()
+    except KeyboardInterrupt:
+        log.info("Keyboard interrupt - shutting down message bus loop")
+    except Exception as e:
+        log.error("Error in message bus thread: %s", e)
+        import traceback
+        traceback.print_exc()
+
+
+async def message_bus_main_loop(input_component):
+    """Main message bus input/output loop (replaces Task Master loop)"""
+    
+    log.info("🔄 Message bus main loop started - waiting for input...")
+    
+    while True:
+        try:
+            # Get input from the input component (like Task Master does)
+            x = input_component.input_function()
+            
+            # Handle exit conditions
+            if x == "exit" or x == ";":
+                log.info("Exit command received - shutting down message bus loop")
+                break
+            
+            # Instead of Task Master's linked list traversal, emit through message bus
+            log.debug("Processing input through message bus: %s", str(x)[:100])
+            
+            # Create proper InputReceivedPayload for the event system
+            from woodwork.types import InputReceivedPayload
+            payload = InputReceivedPayload(
+                input=x,
+                inputs={},
+                session_id=getattr(input_component, 'session_id', 'default'),
+                component_id=input_component.name,
+                component_type="inputs"
+            )
+            
+            # Emit the input event - the message bus will handle routing automatically
+            await input_component.emit("input_received", payload)
+            
+            log.debug("Input processed and routed through message bus")
+            
+        except KeyboardInterrupt:
+            log.info("Keyboard interrupt - shutting down message bus loop")
+            break
+        except Exception as e:
+            log.error("Error in message bus main loop: %s", e)
+            # Continue the loop even on errors
+            continue
+    
+    # Clean up
+    log.info("Message bus main loop shutting down...")
+    
+    # Close all components like Task Master does
+    from woodwork.parser.config_parser import task_m
+    task_m.close_all()

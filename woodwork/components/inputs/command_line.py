@@ -14,3 +14,6 @@ class command_line(inputs):
 
     def input_function(self):
         return input()
+    
+    def input(self):
+        return self.input_function(self)
