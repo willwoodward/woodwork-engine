@@ -6,7 +6,6 @@ the existing event system, ensuring no API collisions while enabling distributed
 component-to-component communication that replaces Task Master orchestration.
 """
 
-import asyncio
 import logging
 import time
 from typing import Any, Dict, Optional, List
@@ -30,9 +29,6 @@ class MessageBusIntegration:
     """
     
     def __init__(self, *args, **kwargs):
-        log.debug("[MessageBusIntegration] Starting initialization with args: %s, kwargs keys: %s", 
-                  args, list(kwargs.keys()))
-        log.debug("[MessageBusIntegration] __init__ called for %s", self.__class__.__name__)
         super().__init__(*args, **kwargs)
         
         # Message bus integration state
@@ -40,16 +36,16 @@ class MessageBusIntegration:
         self._router = None
         self._integration_ready = False
         
-        # Component configuration - extract from kwargs
         config_data = kwargs.get('config', {})
-        log.debug("[MessageBusIntegration] Config data keys: %s, config_data: %s", 
-                  list(config_data.keys()), config_data)
         
         self.output_targets = self._extract_output_targets(config_data)
         self.session_id = self._extract_session_id(config_data)
-        
-        log.debug("[MessageBusIntegration] Extracted output_targets: %s, session_id: %s", 
-                  self.output_targets, self.session_id)
+
+        log.debug("[MessageBusIntegration] Extracted output_targets: %s (type: %s), session_id: %s",
+                  self.output_targets, type(self.output_targets), self.session_id)
+        to_value = config_data.get('to') if config_data else None
+        log.debug("[MessageBusIntegration] Config 'to' raw value: %s (type: %s)",
+                  to_value, type(to_value))
         
         # Integration statistics
         self.integration_stats = {
@@ -60,11 +56,14 @@ class MessageBusIntegration:
         }
         
         component_name = getattr(self, 'name', 'unknown')
-        log.debug("[MessageBusIntegration] Initialized for component '%s' with targets: %s (from config: %s)", 
-                  component_name, self.output_targets, list(config_data.keys()))
+        config_keys = list(config_data.keys()) if config_data else []
+        log.debug("[MessageBusIntegration] Initialized for component '%s' with targets: %s (from config: %s)",
+                  component_name, self.output_targets, config_keys)
     
     def _extract_output_targets(self, config: Dict[str, Any]) -> List[str]:
         """Extract 'to:' targets from component configuration"""
+        if config is None:
+            return []
         to_config = config.get('to', [])
         
         if isinstance(to_config, str):
@@ -94,6 +93,8 @@ class MessageBusIntegration:
     
     def _extract_session_id(self, config: Dict[str, Any]) -> str:
         """Extract or generate session ID for component communication"""
+        if config is None:
+            config = {}
         # Try various sources for session ID
         session_id = (
             config.get('session_id') or
@@ -106,15 +107,47 @@ class MessageBusIntegration:
     
     async def _ensure_message_bus_integration(self) -> bool:
         """Ensure message bus and router are ready"""
+        # Safety check: ensure the integration attributes exist
+        if not hasattr(self, '_integration_ready'):
+            log.warning("[MessageBusIntegration] Missing _integration_ready attribute, initializing")
+            self._integration_ready = False
+        if not hasattr(self, '_message_bus'):
+            log.warning("[MessageBusIntegration] Missing _message_bus attribute, initializing")
+            self._message_bus = None
+        if not hasattr(self, '_router'):
+            log.warning("[MessageBusIntegration] Missing _router attribute, initializing")
+            self._router = None
+
         if self._integration_ready:
             return True
-        
+
         try:
             # Get global message bus
             if self._message_bus is None:
-                self._message_bus = await get_global_message_bus()
-                log.debug("[MessageBusIntegration] Connected to message bus for '%s'", 
+                log.debug("[MessageBusIntegration] Getting global message bus for '%s'",
                           getattr(self, 'name', 'unknown'))
+                try:
+                    from .factory import get_global_message_bus, _global_message_bus
+                    log.debug("[MessageBusIntegration] Global message bus state: %s",
+                              type(_global_message_bus).__name__ if _global_message_bus else 'None')
+
+                    # SIMPLE FIX: Just create a new message bus if none exists
+                    # This avoids complex cross-thread issues
+                    self._message_bus = await get_global_message_bus()
+
+                    log.debug("[MessageBusIntegration] Connected to message bus for '%s': %s",
+                              getattr(self, 'name', 'unknown'), type(self._message_bus).__name__ if self._message_bus else 'None')
+
+                    # Double-check that we actually got a message bus
+                    if self._message_bus is None:
+                        log.error("[MessageBusIntegration] get_global_message_bus() returned None for '%s'",
+                                  getattr(self, 'name', 'unknown'))
+                        return False
+
+                except Exception as import_error:
+                    log.error("[MessageBusIntegration] Failed to import or call get_global_message_bus: %s", import_error)
+                    log.exception("[MessageBusIntegration] Import exception details:")
+                    return False
             
             # Setup component message handler
             component_name = getattr(self, 'name', 'unknown')
@@ -126,16 +159,63 @@ class MessageBusIntegration:
             return True
             
         except Exception as e:
-            log.error("[MessageBusIntegration] Failed to setup integration for '%s': %s", 
+            log.error("[MessageBusIntegration] Failed to setup integration for '%s': %s",
                       getattr(self, 'name', 'unknown'), e)
+            log.exception("[MessageBusIntegration] Full exception details:")
+            if not hasattr(self, 'integration_stats'):
+                self.integration_stats = {"integration_errors": 0}
             self.integration_stats["integration_errors"] += 1
             return False
     
     def set_router(self, router: DeclarativeRouter) -> None:
         """Set declarative router for automatic routing"""
-        self._router = router
-        log.debug("[MessageBusIntegration] Set router for component '%s'", 
-                  getattr(self, 'name', 'unknown'))
+        try:
+            self._router = router
+            component_name = getattr(self, 'name', 'unknown')
+            component_type = getattr(self, 'type', 'unknown')
+            log.debug("[MessageBusIntegration] Set router for component '%s' (type: %s)", component_name, component_type)
+
+            # Register message handler to receive responses and other messages
+            if hasattr(router, 'message_bus'):
+                async def response_handler(envelope):
+                    """Handle incoming response messages."""
+                    log.debug("[MessageBusIntegration] Component '%s' (%s) received message with payload: %s",
+                              component_name, component_type, envelope.payload)
+                    payload = envelope.payload
+                    data = payload.get("data", {})
+
+                    # Handle component responses
+                    if data.get("response_type") == "component_response":
+                        request_id = data.get("request_id")
+                        result = data.get("result")
+                        source_component = data.get("source_component")
+
+                        log.debug("[MessageBusIntegration] Processing response for component '%s': request_id=%s, source=%s",
+                                  component_name, request_id, source_component)
+
+                        if request_id:
+                            # Ensure response storage exists
+                            if not hasattr(self, '_received_responses'):
+                                self._received_responses = {}
+
+                            self._received_responses[request_id] = {
+                                "result": result,
+                                "source_component": source_component,
+                                "received_at": __import__('time').time()
+                            }
+
+                            log.debug("[MessageBusIntegration] Stored response for component '%s' (request_id: %s)",
+                                      component_name, request_id)
+                    else:
+                        log.debug("[MessageBusIntegration] Component '%s' received non-response message: %s",
+                                  component_name, data.get("response_type", "no_response_type"))
+
+                router.message_bus.register_component_handler(component_name, response_handler)
+                log.debug("[MessageBusIntegration] Registered response handler for component '%s'", component_name)
+            else:
+                log.warning("[MessageBusIntegration] Router has no message_bus attribute, cannot register handler for '%s'", component_name)
+        except Exception as e:
+            log.error("[MessageBusIntegration] Failed to set router for component '%s': %s", component_name, e, exc_info=True)
     
     async def send_to_component(self, target_component: str, event_type: str, payload: Dict[str, Any]) -> bool:
         """
@@ -279,19 +359,74 @@ class MessageBusIntegration:
             return
         
         try:
-            # Route to each configured target
+            # Route to each configured target (component objects)
             for target in self.output_targets:
-                success = await self.send_to_component(target, event, {"data": data})
-                if success:
-                    log.debug("[MessageBusIntegration] Auto-routed '%s' from %s to %s", 
-                              event, getattr(self, 'name', 'unknown'), target)
-            
-            self.integration_stats["routing_events"] += 1
+                # If target is a component object, call its input method directly
+                if hasattr(target, 'input') and hasattr(target, 'name'):
+                    try:
+                        # For input_received events, extract the actual input
+                        if event == "input_received" and hasattr(data, 'input'):
+                            result = await self._maybe_async(target.input, data.input)
+                        elif isinstance(data, dict) and 'data' in data:
+                            result = await self._maybe_async(target.input, data['data'])
+                        else:
+                            result = await self._maybe_async(target.input, data)
+
+                        log.debug("[MessageBusIntegration] Auto-routed '%s' from %s to %s",
+                                  event, getattr(self, 'name', 'unknown'), target.name)
+
+                        # If the target component produced output, route it to the message bus
+                        # The declarative router will automatically route it to _console_output
+                        if result is not None:
+                            await self._route_response_to_console(target.name, result)
+
+                        self.integration_stats["routing_events"] += 1
+                    except Exception as e:
+                        log.error("[MessageBusIntegration] Error routing to component %s: %s",
+                                  target.name, e)
+                        self.integration_stats["integration_errors"] += 1
+                else:
+                    # Fallback to message bus routing for non-component targets
+                    success = await self.send_to_component(target, event, {"data": data})
+                    if success:
+                        log.debug("[MessageBusIntegration] Auto-routed '%s' from %s to %s via message bus",
+                                  event, getattr(self, 'name', 'unknown'), target)
+                        self.integration_stats["routing_events"] += 1
             
         except Exception as e:
             log.error("[MessageBusIntegration] Error in auto-routing: %s", e)
             self.integration_stats["integration_errors"] += 1
-    
+
+    async def _maybe_async(self, func, *args, **kwargs):
+        """Helper to call either sync or async functions properly"""
+        import inspect
+        if inspect.iscoroutinefunction(func):
+            return await func(*args, **kwargs)
+        else:
+            return func(*args, **kwargs)
+
+    async def _route_response_to_console(self, component_name: str, result: str):
+        """Route component response to console output by calling its input() method"""
+        try:
+            # Get the console output component and call its input method directly
+            from woodwork.core.message_bus.integration import get_global_message_bus_manager
+            manager = get_global_message_bus_manager()
+
+            # Look for the console output component in registered components
+            if hasattr(manager, '_console_output_component') and manager._console_output_component:
+                # Call the console component's input method directly
+                await self._maybe_async(manager._console_output_component.input, result)
+                log.debug("[MessageBusIntegration] Routed response from %s to console: %s",
+                         component_name, str(result)[:100])
+            else:
+                # Fallback to direct print
+                print(result)
+
+        except Exception as e:
+            log.error("[MessageBusIntegration] Error routing response to console: %s", e)
+            # Fallback to direct print
+            print(result)
+
     async def _handle_bus_message(self, envelope) -> None:
         """
         Handle incoming messages from message bus
@@ -403,15 +538,18 @@ class GlobalMessageBusManager:
         """Setup built-in console output handler for automatic console routing"""
         try:
             from woodwork.components.outputs.console import console
-            
+
             # Create console output component
             console_output = console(name="_console_output")
-            
+
+            # Store reference for direct access
+            self._console_output_component = console_output
+
             # Register as message handler
             self.message_bus.register_component_handler("_console_output", self._handle_console_message)
-            
+
             log.info("[GlobalMessageBusManager] Console output handler registered")
-            
+
         except Exception as e:
             log.error("[GlobalMessageBusManager] Failed to setup console output handler: %s", e)
     
@@ -487,13 +625,66 @@ class GlobalMessageBusManager:
         component_name = component.name
         
         # Set router on component if it has integration
-        if hasattr(component, 'set_router') and self.router:
+        has_set_router = hasattr(component, 'set_router')
+        has_router = self.router is not None
+        log.debug("[GlobalMessageBusManager] Component '%s': has_set_router=%s, has_router=%s, router_type=%s",
+                  component_name, has_set_router, has_router, type(self.router).__name__ if self.router else 'None')
+
+        if has_set_router and has_router:
             component.set_router(self.router)
+            log.debug("[GlobalMessageBusManager] Set router on component '%s'", component_name)
+        else:
+            if not has_set_router:
+                log.warning("[GlobalMessageBusManager] Component '%s' missing set_router method", component_name)
+            if not has_router:
+                log.warning("[GlobalMessageBusManager] No router available to set on component '%s'", component_name)
         
         self.registered_components[component_name] = component
         
         log.debug("[GlobalMessageBusManager] Registered component '%s'", component_name)
     
+    async def send_to_component(self, target_component: str, event_type: str, payload: Dict[str, Any]) -> bool:
+        """
+        Send message directly to another component via the global message bus
+
+        Args:
+            target_component: Name of target component
+            event_type: Event type to send
+            payload: Message payload
+
+        Returns:
+            True if message sent successfully
+        """
+        if not self.integration_active or not self.message_bus:
+            log.error("[GlobalMessageBusManager] Cannot send message - integration not active")
+            return False
+
+        try:
+            from .interface import create_component_message
+
+            # Create message envelope
+            envelope = create_component_message(
+                session_id="global-manager",
+                event_type=event_type,
+                payload=payload,
+                target_component=target_component,
+                sender_component="global-manager"
+            )
+
+            # Send via message bus
+            success = await self.message_bus.send_to_component(envelope)
+
+            if success:
+                log.debug("[GlobalMessageBusManager] Sent '%s' to %s", event_type, target_component)
+            else:
+                log.warning("[GlobalMessageBusManager] Failed to send '%s' to %s", event_type, target_component)
+
+            return success
+
+        except Exception as e:
+            log.error("[GlobalMessageBusManager] Error sending message to %s: %s", target_component, e)
+            return False
+
     def get_manager_stats(self) -> Dict[str, Any]:
         """Get comprehensive manager statistics"""
         return {

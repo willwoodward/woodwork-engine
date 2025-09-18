@@ -2,7 +2,9 @@ import importlib
 import importlib.resources as pkg_resources
 import os
 import logging
-import tomli  # tomli since we support P3.10 and tomllib is not available until P3.11
+import tomli
+import inspect
+import asyncio
 
 from woodwork.utils.errors import WoodworkError
 from woodwork.globals import global_config as config
@@ -98,3 +100,28 @@ def get_prompt(path: str) -> str:
     with open(path) as f:
         prompt = f.read()
     return prompt
+
+def sync_async(func, *args, **kwargs):
+    """
+    Run an async function from synchronous code.
+    Falls back gracefully if already inside an event loop.
+    """
+    if inspect.iscoroutinefunction(func):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # no running loop → safe to use asyncio.run
+            return asyncio.run(func(*args, **kwargs))
+        else:
+            # already in an event loop → use create_task and wait
+            return loop.run_until_complete(func(*args, **kwargs))
+    else:
+        return func(*args, **kwargs)
+    
+
+async def maybe_async(func, *args, **kwargs):
+    """Helper to call either sync or async functions properly"""
+    if inspect.iscoroutinefunction(func):
+        return await func(*args, **kwargs)
+    else:
+        return func(*args, **kwargs)

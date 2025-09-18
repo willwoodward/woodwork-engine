@@ -120,12 +120,13 @@ class DeclarativeRouter:
         log.debug("[DeclarativeRouter] Component types detected: %s", component_types)
         
         # Find common component patterns
-        inputs = [name for name, comp_type in component_types.items() if comp_type == 'inputs']
-        agents = [name for name, comp_type in component_types.items() if comp_type in ['llms', 'agents']]
-        outputs = [name for name, comp_type in component_types.items() if comp_type == 'outputs']
+        inputs = [name for name, comp_type in component_types.items() if comp_type in ['inputs', 'command_line']]
+        agents = [name for name, comp_type in component_types.items() if comp_type in ['llms', 'agents', 'openai', 'anthropic', 'ollama']]
+        outputs = [name for name, comp_type in component_types.items() if comp_type in ['outputs', 'console', 'cli']]
+        tools = [name for name, comp_type in component_types.items() if comp_type in ['functions', 'coding', 'apis', 'environments']]
         
-        log.debug("[DeclarativeRouter] Found components - inputs: %s, agents: %s, outputs: %s", 
-                  inputs, agents, outputs)
+        log.debug("[DeclarativeRouter] Found components - inputs: %s, agents: %s, outputs: %s, tools: %s",
+                  inputs, agents, outputs, tools)
         
         # Infer input -> agent routing if not explicitly configured
         for input_comp in inputs:
@@ -155,6 +156,190 @@ class DeclarativeRouter:
         log.info("[DeclarativeRouter] Workflow inference complete: %d total routes", 
                  self.stats["active_routes"])
     
+    async def send_to_component(self, name: str, source_component_name: str, data: Dict[str, Any]):
+        """Send a message to a component, specified by its name as a string."""
+
+        # Extract response metadata from data if present
+        response_metadata = {}
+        clean_data = data.copy()
+        for key in ["_response_required", "_request_id", "_response_target"]:
+            if key in clean_data:
+                response_metadata[key] = clean_data.pop(key)
+
+        envelope = create_component_message(
+            session_id=getattr(self, 'session_id', 'default_session'),
+            event_type="component_message",
+            payload={
+                "data": clean_data,
+                "source_component": source_component_name,
+                "routed_at": time.time(),
+                **response_metadata  # Add response metadata at payload level
+            },
+            target_component=name,
+            sender_component=source_component_name
+        )
+
+        success = await self.message_bus.send_to_component(envelope)
+        return success
+
+    async def send_to_component_with_response(self, name: str, source_component_name: str, data: Dict[str, Any], timeout: float = 5.0):
+        """Send a message to a component and automatically handle response routing back to sender."""
+
+        # Generate unique request ID for response tracking
+        request_id = f"{source_component_name}_{name}_{int(time.time() * 1000)}"
+
+        # Add response routing info to the payload
+        enhanced_data = {
+            **data,
+            "_response_target": source_component_name,
+            "_request_id": request_id,
+            "_response_required": True
+        }
+
+        log.debug("[DeclarativeRouter] Sending message with response to '%s' from '%s' (request_id: %s)",
+                  name, source_component_name, request_id)
+
+        # Setup response wrapper for the target component
+        await self._setup_component_response_wrapper(name, request_id, source_component_name)
+
+        # Send the message
+        success = await self.send_to_component(name, source_component_name, enhanced_data)
+
+        return success, request_id
+
+    async def _setup_component_response_wrapper(self, component_name: str, request_id: str, response_target: str):
+        """Wrap the component's input method to automatically send response back."""
+
+        if component_name not in self.component_configs:
+            log.error("[DeclarativeRouter] Component '%s' not found for response wrapper", component_name)
+            return
+
+        component_config = self.component_configs[component_name]
+        component_obj = component_config.get('object')
+
+        if not component_obj:
+            log.error("[DeclarativeRouter] No component object found for '%s'", component_name)
+            return
+
+        # Ensure component is registered with message bus to receive messages
+        try:
+            async def message_handler(envelope):
+                """Handle incoming messages for this component."""
+                log.debug("[DeclarativeRouter] Component '%s' received message: %s", component_name, envelope.event_type)
+
+                payload = envelope.payload
+                data = payload.get("data", {})
+
+                # Call the component's wrapped input method
+                if hasattr(component_obj, 'input'):
+                    try:
+                        action = data.get("action")
+                        inputs = data.get("inputs", {})
+
+                        # Store response metadata separately to avoid passing to component
+                        response_metadata = {
+                            "_response_required": payload.get("_response_required", False),
+                            "_request_id": payload.get("_request_id"),
+                            "_response_target": payload.get("_response_target")
+                        }
+
+                        log.debug("[DeclarativeRouter] Response metadata: %s", response_metadata)
+
+                        # Keep original inputs clean for the component
+                        original_inputs = inputs
+
+                        log.debug("[DeclarativeRouter] Calling component '%s' input method", component_name)
+                        result = component_obj.input(action, original_inputs)
+                        log.debug("[DeclarativeRouter] Component '%s' completed with result: %s", component_name, str(result)[:100])
+
+                        # Send response back if needed
+                        log.debug("[DeclarativeRouter] Checking if response needed: %s", response_metadata["_response_required"])
+                        if response_metadata["_response_required"]:
+                            response_target = response_metadata["_response_target"]
+                            req_id = response_metadata["_request_id"]
+
+                            log.debug("[DeclarativeRouter] Response details: target=%s, req_id=%s", response_target, req_id)
+                            if response_target and req_id:
+                                log.debug("[DeclarativeRouter] Sending response from '%s' back to '%s' (request_id: %s)",
+                                          component_name, response_target, req_id)
+
+                                # Create response message
+                                response_data = {
+                                    "result": result,
+                                    "request_id": req_id,
+                                    "source_component": component_name,
+                                    "response_type": "component_response"
+                                }
+
+                                # Send response asynchronously (don't block the original call)
+                                async def send_response():
+                                    try:
+                                        log.debug("[DeclarativeRouter] Sending response from '%s' to '%s' with data: %s",
+                                                  component_name, response_target, response_data)
+                                        success = await self.send_to_component(response_target, component_name, response_data)
+                                        log.debug("[DeclarativeRouter] Response send result: %s", success)
+                                    except Exception as e:
+                                        log.error("[DeclarativeRouter] Failed to send response: %s", e)
+
+                                # Schedule response sending
+                                task = asyncio.create_task(send_response())
+                                log.debug("[DeclarativeRouter] Created response task for request_id: %s", req_id)
+
+                    except Exception as e:
+                        log.error("[DeclarativeRouter] Error calling component '%s' input method: %s", component_name, e)
+                else:
+                    log.error("[DeclarativeRouter] Component '%s' has no input method", component_name)
+
+            # Register the handler with the message bus
+            self.message_bus.register_component_handler(component_name, message_handler)
+            log.debug("[DeclarativeRouter] Registered message handler for component '%s'", component_name)
+
+        except Exception as e:
+            log.error("[DeclarativeRouter] Failed to register message handler for '%s': %s", component_name, e)
+
+
+        # Track this request
+        if hasattr(component_obj, '_pending_responses'):
+            component_obj._pending_responses[request_id] = {
+                "response_target": response_target,
+                "created_at": time.time()
+            }
+
+    def handle_component_response(self, component_name: str, response_data: Dict[str, Any]):
+        """Handle incoming response messages for components that sent requests."""
+
+        if response_data.get("response_type") != "component_response":
+            return False
+
+        request_id = response_data.get("request_id")
+        result = response_data.get("result")
+        source_component = response_data.get("source_component")
+
+        if not request_id:
+            log.warning("[DeclarativeRouter] Received response without request_id")
+            return False
+
+        log.debug("[DeclarativeRouter] Handling response for component '%s' from '%s' (request_id: %s)",
+                  component_name, source_component, request_id)
+
+        # Store the response for the component to retrieve
+        if component_name in self.component_configs:
+            component_config = self.component_configs[component_name]
+            component_obj = component_config.get('object')
+
+            if component_obj and hasattr(component_obj, '_received_responses'):
+                component_obj._received_responses = getattr(component_obj, '_received_responses', {})
+                component_obj._received_responses[request_id] = {
+                    "result": result,
+                    "source_component": source_component,
+                    "received_at": time.time()
+                }
+
+                log.debug("[DeclarativeRouter] Stored response for request_id: %s", request_id)
+                return True
+
+        return False
+
     async def route_component_output(
         self, 
         source_component: str, 

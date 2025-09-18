@@ -13,6 +13,7 @@ from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
 from woodwork.events import emit
 from woodwork.components.llms.llm import llm
+from woodwork.core.message_bus.interface import create_component_message
 
 log = logging.getLogger(__name__)
 
@@ -153,7 +154,7 @@ class llm(agent):
             encoding = tiktoken.get_encoding("cl100k_base")
         return len(encoding.encode(text))
 
-    def input(self, query: str, inputs: dict = None):
+    async def input(self, query: str, inputs: dict = None):
         if inputs is None:
             inputs = {}
         
@@ -266,7 +267,8 @@ class llm(agent):
                     action_dict["inputs"] = tool_call.args
                     action = Action.from_dict(action_dict)
 
-                observation = self._task_m.execute(action)
+                # Use message bus for tool execution instead of Task Master
+                observation = await self._execute_tool_via_message_bus(action)
 
                 observation_tokens = self.count_tokens(observation)
                 if observation_tokens > 7500:
@@ -300,3 +302,117 @@ class llm(agent):
         # # Cache instructions
         # if self._cache_mode:
         #     self._cache_actions(result)
+
+    async def _execute_tool_via_message_bus(self, action: Action):
+        """
+        Execute tool via TRUE message bus communication.
+
+        Sends tool execution request as message, waits for response message.
+        This implements proper distributed tool communication.
+        """
+        try:
+            # Special handling for ask_user (not a component)
+            if action.tool == "ask_user":
+                return input(f"{action.inputs.get('question', 'Please provide input:')}\n")
+            
+            # Execute tool via message bus
+            return await self._execute_tool_async(action)
+
+        except Exception as e:
+            log.error(f"[Agent] Error executing tool '{action.tool}': {e}")
+            return f"Error executing tool '{action.tool}': {e}"
+
+    async def _execute_tool_async(self, action: Action, timeout: float = 5.0) -> str:
+        """
+        Execute a tool via message bus with clean async response handling.
+
+        Args:
+            action: The tool action to execute
+            timeout: Maximum time to wait for response (seconds)
+
+        Returns:
+            Tool execution result or error message
+        """
+        if not self._has_message_bus():
+            raise RuntimeError(f"Message bus not available for tool '{action.tool}'")
+
+        try:
+            # Ensure agent can receive responses - trigger registration if needed
+            if not hasattr(self, '_received_responses'):
+                self._received_responses = {}
+                log.debug(f"[Agent] Agent '{self.name}' checking message bus registration")
+
+                # Force registration to ensure we can receive responses
+                if hasattr(self._router, 'message_bus'):
+                    from woodwork.core.message_bus.integration import GlobalMessageBusManager
+                    bus_manager = GlobalMessageBusManager()
+                    bus_manager.register_component(self)
+                    log.debug(f"[Agent] Forced registration of agent '{self.name}'")
+
+            # Send request
+            log.debug(f"[Agent] Executing tool '{action.tool}' via message bus")
+            success, request_id = await self._router.send_to_component_with_response(
+                name=action.tool,
+                source_component_name=self.name,
+                data={"action": action.action, "inputs": action.inputs}
+            )
+
+            if not success:
+                raise RuntimeError(f"Failed to send request to tool '{action.tool}'")
+
+            # Wait for response
+            log.debug(f"[Agent] Waiting for response from '{action.tool}' (request_id: {request_id})")
+            result = await self._wait_for_response(request_id, timeout)
+
+            log.debug(f"[Agent] Tool '{action.tool}' completed: {str(result)[:200]}")
+            return result
+
+        except Exception as e:
+            log.error(f"[Agent] Tool execution failed for '{action.tool}': {e}")
+            return f"Error: {e}"
+
+    def _has_message_bus(self) -> bool:
+        """Check if message bus is available for tool execution."""
+        return hasattr(self, '_router') and self._router is not None
+
+    async def _wait_for_response(self, request_id: str, timeout: float) -> str:
+        """
+        Wait for a tool response with clean timeout handling.
+
+        Args:
+            request_id: Unique request identifier
+            timeout: Maximum wait time in seconds
+
+        Returns:
+            Tool response result
+
+        Raises:
+            TimeoutError: If no response received within timeout
+        """
+        import asyncio
+
+
+        poll_interval = 0.05  # 50ms polling
+        waited = 0.0
+
+        # Ensure response storage exists
+        if not hasattr(self, '_received_responses'):
+            self._received_responses = {}
+
+        while waited < timeout:
+            if request_id in self._received_responses:
+                response_data = self._received_responses.pop(request_id)
+                log.debug(f"[Agent] Found response for request_id '{request_id}': {response_data}")
+                return response_data["result"]
+
+            if waited % 1.0 < poll_interval:  # Log every second
+                log.debug(f"[Agent] Still waiting for response '{request_id}' after {waited:.1f}s, stored responses: {list(self._received_responses.keys())}")
+
+            await asyncio.sleep(poll_interval)
+            waited += poll_interval
+
+        # Cleanup failed request
+        self._received_responses.pop(request_id, None)
+        raise TimeoutError(f"Tool response timeout after {timeout}s")
+
+

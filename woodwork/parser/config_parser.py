@@ -632,8 +632,11 @@ def parse(config: str, registry=None) -> dict:
         if comp.name not in router.components:
             router.add(comp)
 
-    # Initialize message bus integration after all components are created
-    _initialize_message_bus_integration(commands)
+    # NOTE: Just set the flag to activate message bus mode
+    # Full initialization will be handled by DistributedStartupCoordinator in proper event loop
+    import woodwork.globals as globals
+    globals.global_config["message_bus_active"] = True
+    log.info("[ConfigParser] Message bus mode activated - initialization deferred to DistributedStartupCoordinator")
     
     task_m.add_tools(tools)
 
@@ -705,10 +708,21 @@ def _initialize_message_bus_integration(commands: dict) -> None:
             if comp:
                 if not hasattr(comp, "_integration_ready"):
                     comp._integration_ready = True
-                if not hasattr(comp, "_message_bus"):
-                    comp._message_bus = get_global_message_bus_manager()
-                if not hasattr(comp, "_router"):
-                    comp._router = get_router()
+                # Let MessageBusIntegration handle _message_bus itself in _ensure_message_bus_integration
+                # Don't set _message_bus to GlobalMessageBusManager - it should be the actual bus
+
+                # Set DeclarativeRouter if not already set
+                if not hasattr(comp, "_router") or comp._router is None:
+                    from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+                    from woodwork.core.message_bus.factory import get_global_message_bus
+                    import asyncio
+                    try:
+                        # This is sync context, so we need to handle async differently
+                        log.debug("[ConfigParser] Setting DeclarativeRouter on component '%s'", comp.name)
+                        # For now, just set a placeholder - the actual router will be set in async context
+                        comp._router_pending = True
+                    except Exception as e:
+                        log.warning("[ConfigParser] Failed to prepare router for component '%s': %s", comp.name, e)
 
         # Log status
         manager = get_global_message_bus_manager()
@@ -754,6 +768,12 @@ async def _async_initialize_message_bus(component_configs: dict) -> None:
 
 
 def main_function(registry=None):
+    """
+    Parse configuration file and initialize components.
+
+    Note: Message bus initialization is now handled by DistributedStartupCoordinator
+    to ensure proper event loop ownership and clean startup sequence.
+    """
     current_directory = os.getcwd()
     with open(current_directory + "/main.ww") as f:
         lines = f.read()

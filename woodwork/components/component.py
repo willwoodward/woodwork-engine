@@ -39,6 +39,9 @@ class component(StreamingMixin, MessageBusIntegration):
         
         # Register with global message bus manager
         register_component_with_message_bus(self)
+
+        # Set up tool message handling if this is a tool component
+        self._setup_tool_message_handling()
         
         # Log configuration
         if hasattr(self, 'streaming_enabled') and self.streaming_enabled:
@@ -49,10 +52,51 @@ class component(StreamingMixin, MessageBusIntegration):
         
         streaming_enabled = getattr(self, 'streaming_enabled', False)
         self.streaming_enabled = streaming_enabled
-        self.output_targets = config.get("to", None)
+
+        # Ensure output_targets is properly set from config
+        # The parser resolves 'to: [ag]' to actual component objects
+        if not hasattr(self, 'output_targets') or self.output_targets is None:
+            self.output_targets = config.get("to", [])
+
+        # Ensure it's always a list for consistency
+        if self.output_targets and not isinstance(self.output_targets, list):
+            self.output_targets = [self.output_targets]
+
+        # Ensure required attributes exist for MessageBusIntegration
+        if not hasattr(self, 'session_id'):
+            self.session_id = 'default'
+        if not hasattr(self, 'integration_stats'):
+            self.integration_stats = {
+                "messages_sent": 0,
+                "messages_received": 0,
+                "routing_events": 0,
+                "integration_errors": 0
+            }
         
-        log.info(f"[Component {self.name}] Initialized with streaming={streaming_enabled}, routing={bool(self.output_targets)}")
-    
+        log.info(f"[Component {self.name}] Initialized with streaming={streaming_enabled}, routing={bool(self.output_targets)}, type={self.type}")
+
+    def _setup_tool_message_handling(self):
+        """Setup message bus handling for tool components."""
+        try:
+            # Check if this is a tool component (has tool_interface)
+            from woodwork.interfaces.tool_interface import tool_interface
+            if isinstance(self, tool_interface):
+                log.debug(f"[Component {self.name}] Setting up tool message handling")
+
+                # Register handler for tool.execute messages
+                async def handle_tool_execute(payload):
+                    if hasattr(self, 'handle_tool_execute_message'):
+                        return await self.handle_tool_execute_message(payload)
+                    else:
+                        log.warning(f"[Tool {self.name}] Received tool.execute message but no handler available")
+
+                # Store the handler for potential message bus registration
+                self._tool_message_handler = handle_tool_execute
+                log.info(f"[Tool {self.name}] Registered for tool.execute messages via message bus")
+
+        except Exception as e:
+            log.debug(f"[Component {self.name}] No tool interface detected: {e}")
+
     def _setup_event_system(self, config: Dict[str, Any]):
         """Initialize the event system with hooks and pipes from config."""
         try:
