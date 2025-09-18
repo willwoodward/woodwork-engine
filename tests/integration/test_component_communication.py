@@ -219,6 +219,167 @@ class TestComponentCommunicationFlow:
         assert received_order == list(range(10))
 
 
+class TestAgentToolTimeoutIssue:
+    """Test to reproduce and fix the agent-tool communication timeout issue."""
+
+    @pytest.fixture
+    async def timeout_test_setup(self):
+        """Set up components for timeout testing."""
+        message_bus = InMemoryMessageBus()
+        await message_bus.start()
+
+        router = DeclarativeRouter(message_bus)
+
+        # Create mock agent with the essential methods for timeout testing
+        class MockAgentWithTimeout:
+            def __init__(self, name):
+                self.name = name
+                self.type = "agent"
+                self._received_responses = {}
+                self._router = None
+
+            def set_router(self, router):
+                """Set router and register response handler."""
+                self._router = router
+
+            async def _wait_for_response(self, request_id, timeout=5.0):
+                """Wait for response with timeout (reproduces current broken behavior)."""
+                import asyncio
+                poll_interval = 0.05
+                waited = 0.0
+
+                while waited < timeout:
+                    if request_id in self._received_responses:
+                        response_data = self._received_responses.pop(request_id)
+                        return response_data["result"]
+
+                    await asyncio.sleep(poll_interval)
+                    waited += poll_interval
+
+                raise TimeoutError(f"Tool response timeout after {timeout}s")
+
+        # Create mock tool
+        class MockToolForTimeout:
+            def __init__(self, name):
+                self.name = name
+                self.type = "tool"
+
+            def input(self, action, inputs):
+                return f"Tool executed: {action} with {inputs}"
+
+        agent = MockAgentWithTimeout("test_agent")
+        tool = MockToolForTimeout("test_tool")
+
+        components = {
+            "test_agent": {"object": agent, "component": "agent"},
+            "test_tool": {"object": tool, "component": "tool"}
+        }
+
+        router.configure_from_components(components)
+
+        yield {
+            "router": router,
+            "message_bus": message_bus,
+            "agent": agent,
+            "tool": tool
+        }
+
+        await message_bus.stop()
+
+    async def test_agent_tool_timeout_reproduction(self, timeout_test_setup):
+        """
+        Reproduce the actual timeout issue where agent doesn't receive tool responses.
+
+        This test demonstrates the current broken behavior where:
+        1. Agent sends request to tool via router
+        2. Tool processes request and sends response back
+        3. Response gets queued but agent never processes it
+        4. Agent times out waiting for response
+        """
+        setup = timeout_test_setup
+        router = setup["router"]
+        agent = setup["agent"]
+
+        # Set router on agent to enable response handling
+        agent.set_router(router)
+
+        # Send request with response expectation
+        success, request_id = await router.send_to_component_with_response(
+            name="test_tool",
+            source_component_name="test_agent",
+            data={"action": "test_action", "inputs": {"param": "value"}}
+        )
+
+        assert success
+        assert request_id is not None
+
+        # Wait a bit for message processing
+        await asyncio.sleep(0.1)
+
+        # This should timeout with current broken implementation
+        with pytest.raises(TimeoutError) as exc_info:
+            await agent._wait_for_response(request_id, timeout=0.5)
+
+        assert "timeout" in str(exc_info.value).lower()
+
+    async def test_response_handler_registration_fix(self, timeout_test_setup):
+        """
+        Test that demonstrates the fix: proper response handler registration.
+
+        This test shows what should happen when the fix is applied:
+        - Agent registers to receive messages from the message bus
+        - Responses are properly handled and stored
+        - No timeout occurs
+        """
+        setup = timeout_test_setup
+        router = setup["router"]
+        agent = setup["agent"]
+        message_bus = setup["message_bus"]
+
+        # FIXED VERSION: Register agent to receive responses directly via message bus
+        async def agent_response_handler(envelope):
+            """Handler that properly processes response messages."""
+            payload = envelope.payload
+            data = payload.get("data", {})
+
+            if data.get("response_type") == "component_response":
+                request_id = data.get("request_id")
+                result = data.get("result")
+
+                if request_id:
+                    agent._received_responses[request_id] = {
+                        "result": result,
+                        "source_component": data.get("source_component"),
+                        "received_at": asyncio.get_event_loop().time()
+                    }
+
+        # Register the fixed handler
+        message_bus.register_component_handler("test_agent", agent_response_handler)
+
+        # Send request
+        success, request_id = await router.send_to_component_with_response(
+            name="test_tool",
+            source_component_name="test_agent",
+            data={"action": "test_action", "inputs": {"param": "value"}}
+        )
+
+        assert success
+        assert request_id is not None
+
+        # Wait for processing
+        await asyncio.sleep(0.2)  # Give more time for async processing
+
+        # With the fix, this should work without timeout
+        try:
+            result = await agent._wait_for_response(request_id, timeout=1.0)
+            assert "Tool executed" in result
+        except TimeoutError:
+            # If this still fails, check if response was actually received
+            assert request_id in agent._received_responses, f"Response not received for {request_id}"
+            result = agent._received_responses[request_id]["result"]
+            assert "Tool executed" in result
+
+
 class TestRealWorldScenarios:
     """Test real-world communication scenarios."""
 
