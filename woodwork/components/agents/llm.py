@@ -267,8 +267,8 @@ class llm(agent):
                     action_dict["inputs"] = tool_call.args
                     action = Action.from_dict(action_dict)
 
-                # Use message bus for tool execution instead of Task Master
-                observation = await self._execute_tool_via_message_bus(action)
+                # Use improved message bus API for tool execution
+                observation = await self._execute_tool_with_improved_api(action)
 
                 observation_tokens = self.count_tokens(observation)
                 if observation_tokens > 7500:
@@ -303,187 +303,24 @@ class llm(agent):
         # if self._cache_mode:
         #     self._cache_actions(result)
 
-    async def _execute_tool_via_message_bus(self, action: Action):
+    async def _execute_tool_with_improved_api(self, action: Action):
         """
-        Execute tool via TRUE message bus communication.
+        Execute tool using the clean message bus API.
 
-        Sends tool execution request as message, waits for response message.
-        This implements proper distributed tool communication.
+        This leverages the standard MessageBusIntegration methods for
+        simple, reliable component-to-component communication.
         """
         try:
             # Special handling for ask_user (not a component)
             if action.tool == "ask_user":
                 return input(f"{action.inputs.get('question', 'Please provide input:')}\n")
-            
-            # Execute tool via message bus
-            return await self._execute_tool_async(action)
+
+            # Use the clean message API - one line!
+            return await self.request(action.tool, {
+                "action": action.action,
+                "inputs": action.inputs
+            })
 
         except Exception as e:
             log.error(f"[Agent] Error executing tool '{action.tool}': {e}")
             return f"Error executing tool '{action.tool}': {e}"
-
-    async def _execute_tool_async(self, action: Action, timeout: float = 5.0) -> str:
-        """
-        Execute a tool via message bus with clean async response handling.
-
-        Args:
-            action: The tool action to execute
-            timeout: Maximum time to wait for response (seconds)
-
-        Returns:
-            Tool execution result or error message
-        """
-        if not self._has_message_bus():
-            raise RuntimeError(f"Message bus not available for tool '{action.tool}'")
-
-        try:
-            # Ensure agent can receive responses - set up proper response handling
-            await self._ensure_response_handling()
-
-            # Send request
-            log.debug(f"[Agent] Executing tool '{action.tool}' via message bus")
-            success, request_id = await self._router.send_to_component_with_response(
-                name=action.tool,
-                source_component_name=self.name,
-                data={"action": action.action, "inputs": action.inputs}
-            )
-
-            if not success:
-                raise RuntimeError(f"Failed to send request to tool '{action.tool}'")
-
-            # Wait for response with proper message processing
-            log.debug(f"[Agent] Waiting for response from '{action.tool}' (request_id: {request_id})")
-            result = await self._wait_for_response_with_processing(request_id, timeout)
-
-            log.debug(f"[Agent] Tool '{action.tool}' completed: {str(result)[:200]}")
-            return result
-
-        except Exception as e:
-            log.error(f"[Agent] Tool execution failed for '{action.tool}': {e}")
-            return f"Error: {e}"
-
-    def _has_message_bus(self) -> bool:
-        """Check if message bus is available for tool execution."""
-        return hasattr(self, '_router') and self._router is not None
-
-    async def _ensure_response_handling(self):
-        """
-        Ensure the agent is properly set up to receive and process response messages.
-
-        The key fix here is to explicitly register a message handler that processes
-        responses into the _received_responses dict that _wait_for_response polls.
-        """
-        if not hasattr(self, '_received_responses'):
-            self._received_responses = {}
-
-        # Check if we already have a response handler registered
-        if hasattr(self, '_response_handler_registered') and self._response_handler_registered:
-            return
-
-        # Ensure the agent is registered with the router to receive responses
-        if hasattr(self._router, 'message_bus'):
-            # Register a message handler specifically for processing response messages
-            async def agent_response_handler(envelope):
-                """Handle incoming response messages for this agent."""
-                try:
-                    payload = envelope.payload
-                    data = payload.get("data", {})
-
-                    log.debug(f"[Agent] {self.name} received message with response_type: {data.get('response_type')}")
-
-                    # Process component responses
-                    if data.get("response_type") == "component_response":
-                        request_id = data.get("request_id")
-                        result = data.get("result")
-                        source_component = data.get("source_component")
-
-                        if request_id:
-                            self._received_responses[request_id] = {
-                                "result": result,
-                                "source_component": source_component,
-                                "received_at": __import__('time').time()
-                            }
-                            log.debug(f"[Agent] {self.name} stored response for request_id: {request_id}")
-                        else:
-                            log.warning(f"[Agent] {self.name} received response without request_id")
-                    else:
-                        log.debug(f"[Agent] {self.name} received non-response message: {data}")
-
-                except Exception as e:
-                    log.error(f"[Agent] Error processing response message: {e}")
-
-            # Register the handler with the message bus - this will also process any queued messages
-            self._router.message_bus.register_component_handler(self.name, agent_response_handler)
-            self._response_handler_registered = True
-            log.debug(f"[Agent] Registered response handler for agent '{self.name}'")
-
-    async def _wait_for_response_with_processing(self, request_id: str, timeout: float) -> str:
-        """
-        Wait for response with proper timeout handling.
-
-        This version is simpler since the message bus automatically processes queued messages
-        when a handler is registered, and ongoing messages are processed automatically.
-        """
-        import asyncio
-
-        poll_interval = 0.05  # 50ms polling
-        waited = 0.0
-
-        while waited < timeout:
-            # Check if response has arrived
-            if request_id in self._received_responses:
-                response_data = self._received_responses.pop(request_id)
-                log.debug(f"[Agent] Found response for request_id '{request_id}': {response_data}")
-                return response_data["result"]
-
-            if waited % 1.0 < poll_interval:  # Log every second
-                log.debug(f"[Agent] Still waiting for response '{request_id}' after {waited:.1f}s, stored responses: {list(self._received_responses.keys())}")
-
-            await asyncio.sleep(poll_interval)
-            waited += poll_interval
-
-        # Cleanup failed request
-        self._received_responses.pop(request_id, None)
-        raise TimeoutError(f"Tool response timeout after {timeout}s")
-
-    async def _wait_for_response(self, request_id: str, timeout: float) -> str:
-        """
-        Wait for a tool response with clean timeout handling.
-
-        Args:
-            request_id: Unique request identifier
-            timeout: Maximum wait time in seconds
-
-        Returns:
-            Tool response result
-
-        Raises:
-            TimeoutError: If no response received within timeout
-        """
-        import asyncio
-
-
-        poll_interval = 0.05  # 50ms polling
-        waited = 0.0
-
-        # Ensure response storage exists
-        if not hasattr(self, '_received_responses'):
-            self._received_responses = {}
-
-        while waited < timeout:
-            if request_id in self._received_responses:
-                response_data = self._received_responses.pop(request_id)
-                log.debug(f"[Agent] Found response for request_id '{request_id}': {response_data}")
-                return response_data["result"]
-
-            if waited % 1.0 < poll_interval:  # Log every second
-                log.debug(f"[Agent] Still waiting for response '{request_id}' after {waited:.1f}s, stored responses: {list(self._received_responses.keys())}")
-
-            await asyncio.sleep(poll_interval)
-            waited += poll_interval
-
-        # Cleanup failed request
-        self._received_responses.pop(request_id, None)
-        raise TimeoutError(f"Tool response timeout after {timeout}s")
-
-

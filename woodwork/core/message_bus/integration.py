@@ -2,13 +2,15 @@
 Message Bus Integration Layer
 
 This module provides seamless integration between the new message bus system and
-the existing event system, ensuring no API collisions while enabling distributed
-component-to-component communication that replaces Task Master orchestration.
+the existing event system, enabling distributed component-to-component
+communication that replaces Task Master orchestration with a clean, intuitive API.
 """
 
+import asyncio
 import logging
 import time
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple, AsyncGenerator
+from dataclasses import dataclass
 
 from woodwork.events import get_global_event_manager
 from .factory import get_global_message_bus
@@ -17,15 +19,109 @@ from .declarative_router import DeclarativeRouter
 log = logging.getLogger(__name__)
 
 
+@dataclass
+class StreamingChunk:
+    """Represents a chunk in a streaming response."""
+    data: Any
+    is_final: bool = False
+    chunk_index: int = 0
+    metadata: Dict[str, Any] = None
+
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
+
+
+class ComponentNotFoundError(Exception):
+    """Raised when target component is not found."""
+    pass
+
+
+class ResponseTimeoutError(Exception):
+    """Raised when response is not received within timeout."""
+    pass
+
+
+class ComponentError(Exception):
+    """Raised when target component throws an exception."""
+    pass
+
+
+class MessageBuilder:
+    """
+    Fluent interface for building and sending messages.
+    """
+
+    def __init__(self, sender):
+        self.sender = sender
+        self._target = None
+        self._data = {}
+        self._timeout = 5.0
+
+    def to(self, target_component: str) -> 'MessageBuilder':
+        """Set the target component."""
+        self._target = target_component
+        return self
+
+    def with_data(self, data: dict) -> 'MessageBuilder':
+        """Set the message data."""
+        self._data = data
+        return self
+
+    def timeout(self, seconds: float) -> 'MessageBuilder':
+        """Set timeout for response."""
+        self._timeout = seconds
+        return self
+
+    async def send_and_wait(self) -> Any:
+        """Send message and wait for response."""
+        if not self._target:
+            raise ValueError("Target component not specified")
+
+        return await self.sender.request(self._target, self._data, self._timeout)
+
+
+class RequestContext:
+    """Context manager for request/response lifecycle management."""
+
+    def __init__(self, agent, target: str, timeout: float = 5.0):
+        self.agent = agent
+        self.target = target
+        self.timeout = timeout
+        self._request_id = None
+        self._start_time = None
+
+    async def __aenter__(self):
+        """Setup for request."""
+        self._start_time = time.time()
+        log.debug(f"[RequestContext] Starting request context for {self.target}")
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup resources."""
+        duration = time.time() - self._start_time if self._start_time else 0
+        log.debug(f"[RequestContext] Request context completed in {duration:.3f}s")
+
+        # Cleanup any pending request data if needed
+        if hasattr(self.agent, '_received_responses') and self._request_id:
+            self.agent._received_responses.pop(self._request_id, None)
+
+    async def send(self, data: dict) -> Any:
+        """Send data and return response."""
+        result = await self.agent.request(self.target, data, self.timeout)
+        return result
+
+
 class MessageBusIntegration:
     """
-    Mixin that adds distributed message bus capabilities to components
-    
-    This integrates seamlessly with the existing event system:
-    - emit() continues to work for local events with hooks/pipes
-    - send_to_component() enables direct distributed messaging
-    - Automatic routing based on 'to:' configuration
-    - No API collisions or breaking changes
+    Mixin that adds clean, distributed message bus capabilities to components.
+
+    Provides intuitive APIs for component-to-component communication:
+    - request() for simple request/response patterns
+    - message() for fluent message building
+    - request_context() for managed lifecycle
+    - request_multiple() for concurrent requests
+    - request_stream() for streaming responses
     """
     
     def __init__(self, *args, **kwargs):
@@ -477,6 +573,252 @@ class MessageBusIntegration:
             "message_bus_connected": self._message_bus is not None,
             "router_configured": self._router is not None
         }
+
+    # ============================================================================
+    # CLEAN MESSAGE API METHODS
+    # ============================================================================
+
+    async def request(self, target_component: str, data: dict, timeout: float = 5.0) -> Any:
+        """
+        Send request and wait for response in one call.
+
+        Args:
+            target_component: Name of target component
+            data: Request data to send
+            timeout: Maximum time to wait for response
+
+        Returns:
+            Response from target component
+
+        Raises:
+            ComponentNotFoundError: Target component not found
+            ResponseTimeoutError: Response not received in time
+            ComponentError: Target component threw an exception
+        """
+        try:
+            # Ensure response handling is set up
+            await self._ensure_response_handling()
+
+            # Send request
+            log.debug(f"[MessageAPI] Sending request to '{target_component}': {data}")
+            success, request_id = await self._router.send_to_component_with_response(
+                name=target_component,
+                source_component_name=self.name,
+                data=data
+            )
+
+            if not success:
+                raise ComponentNotFoundError(f"Failed to send request to component '{target_component}'")
+
+            # Wait for response
+            try:
+                result = await self._wait_for_response_with_processing(request_id, timeout)
+                log.debug(f"[MessageAPI] Request to '{target_component}' completed successfully")
+                return result
+
+            except TimeoutError as e:
+                raise ResponseTimeoutError(f"Request to '{target_component}' timed out after {timeout}s") from e
+
+        except Exception as e:
+            if isinstance(e, (ComponentNotFoundError, ResponseTimeoutError)):
+                raise
+            else:
+                raise ComponentError(f"Error communicating with '{target_component}': {e}") from e
+
+    async def request_multiple(self, requests: List[Tuple[str, dict]], timeout: float = 5.0) -> List[Any]:
+        """
+        Send multiple requests concurrently and wait for all responses.
+
+        Args:
+            requests: List of (target_component, data) tuples
+            timeout: Maximum time to wait for all responses
+
+        Returns:
+            List of responses in the same order as requests
+
+        Raises:
+            ComponentNotFoundError: One or more target components not found
+            ResponseTimeoutError: One or more responses not received in time
+            ComponentError: One or more target components threw exceptions
+        """
+        if not requests:
+            return []
+
+        log.debug(f"[MessageAPI] Sending {len(requests)} concurrent requests")
+
+        # Create tasks for all requests
+        tasks = []
+        for target, data in requests:
+            task = asyncio.create_task(self.request(target, data, timeout))
+            tasks.append(task)
+
+        try:
+            # Wait for all requests to complete
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Check for exceptions and re-raise appropriately
+            final_results = []
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    target, _ = requests[i]
+                    if isinstance(result, (ComponentNotFoundError, ResponseTimeoutError, ComponentError)):
+                        raise result
+                    else:
+                        raise ComponentError(f"Error in request to '{target}': {result}") from result
+                final_results.append(result)
+
+            log.debug(f"[MessageAPI] All {len(requests)} concurrent requests completed successfully")
+            return final_results
+
+        except Exception as e:
+            # Cancel any remaining tasks
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            raise
+
+    def message(self) -> MessageBuilder:
+        """
+        Create a fluent message builder.
+
+        Returns:
+            MessageBuilder instance for chaining
+
+        Example:
+            result = await component.message().to("tool_name").with_data({"action": "test"}).send_and_wait()
+        """
+        return MessageBuilder(self)
+
+    def request_context(self, target: str, timeout: float = 5.0) -> RequestContext:
+        """
+        Create a request context manager.
+
+        Args:
+            target: Target component name
+            timeout: Request timeout
+
+        Returns:
+            RequestContext for use with async with
+
+        Example:
+            async with component.request_context("tool_name", timeout=5.0) as ctx:
+                response = await ctx.send({"action": "test", "inputs": {...}})
+        """
+        return RequestContext(self, target, timeout)
+
+    async def request_stream(self, target: str, data: dict, timeout: float = 30.0) -> AsyncGenerator[StreamingChunk, None]:
+        """
+        Send request and yield streaming chunks as they arrive.
+
+        Args:
+            target: Target component name
+            data: Request data
+            timeout: Total timeout for the streaming operation
+
+        Yields:
+            StreamingChunk objects containing response data
+
+        Example:
+            async for chunk in component.request_stream("llm_tool", {"prompt": "Generate text..."}):
+                print(chunk.data)
+                if chunk.is_final:
+                    break
+        """
+        # For now, this converts regular responses to streaming format
+        # In a full implementation, this would integrate with the streaming architecture
+        try:
+            result = await self.request(target, data, timeout)
+
+            # Convert single response to streaming format
+            chunk = StreamingChunk(
+                data=result,
+                is_final=True,
+                chunk_index=0,
+                metadata={"response_type": "converted_to_stream"}
+            )
+
+            yield chunk
+
+        except Exception as e:
+            # Yield error as final chunk
+            error_chunk = StreamingChunk(
+                data=f"Error: {e}",
+                is_final=True,
+                chunk_index=0,
+                metadata={"error": True, "exception": str(e)}
+            )
+            yield error_chunk
+
+    async def _ensure_response_handling(self):
+        """
+        Ensure the component is properly set up to receive and process response messages.
+
+        Components that need custom response handling should override this method.
+        """
+        # Default implementation for components that have _router
+        if not hasattr(self, '_received_responses'):
+            self._received_responses = {}
+
+        # Check if we already have a response handler registered
+        if hasattr(self, '_response_handler_registered') and self._response_handler_registered:
+            return
+
+        # Set up basic response handling if we have a router
+        if hasattr(self, '_router') and self._router and hasattr(self._router, 'message_bus'):
+            async def default_response_handler(envelope):
+                """Default handler that processes response messages."""
+                try:
+                    payload = envelope.payload
+                    data = payload.get("data", {})
+
+                    if data.get("response_type") == "component_response":
+                        request_id = data.get("request_id")
+                        result = data.get("result")
+                        source_component = data.get("source_component")
+
+                        if request_id:
+                            self._received_responses[request_id] = {
+                                "result": result,
+                                "source_component": source_component,
+                                "received_at": time.time()
+                            }
+                            log.debug(f"[MessageAPI] {self.name} stored response for request_id: {request_id}")
+
+                except Exception as e:
+                    log.error(f"[MessageAPI] Error processing response message: {e}")
+
+            # Register the handler with the message bus
+            self._router.message_bus.register_component_handler(self.name, default_response_handler)
+            self._response_handler_registered = True
+            log.debug(f"[MessageAPI] Registered default response handler for '{self.name}'")
+
+    async def _wait_for_response_with_processing(self, request_id: str, timeout: float) -> str:
+        """
+        Wait for response with proper timeout handling.
+
+        Components can override this for custom response waiting logic.
+        """
+        poll_interval = 0.05  # 50ms polling
+        waited = 0.0
+
+        while waited < timeout:
+            # Check if response has arrived
+            if hasattr(self, '_received_responses') and request_id in self._received_responses:
+                response_data = self._received_responses.pop(request_id)
+                log.debug(f"[MessageAPI] Found response for request_id '{request_id}': {response_data}")
+                return response_data["result"]
+
+            if waited % 1.0 < poll_interval:  # Log every second
+                stored_responses = list(self._received_responses.keys()) if hasattr(self, '_received_responses') else []
+                log.debug(f"[MessageAPI] Still waiting for response '{request_id}' after {waited:.1f}s, stored responses: {stored_responses}")
+
+            await asyncio.sleep(poll_interval)
+            waited += poll_interval
+
+        # Cleanup failed request
+        if hasattr(self, '_received_responses'):
+            self._received_responses.pop(request_id, None)
+        raise TimeoutError(f"Tool response timeout after {timeout}s")
 
 
 class GlobalMessageBusManager:
