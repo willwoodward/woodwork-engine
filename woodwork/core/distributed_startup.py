@@ -15,15 +15,13 @@ Key responsibilities:
 import asyncio
 import logging
 import threading
-import json
 import os
-from typing import List, Dict, Any, Optional
-from pathlib import Path
+from typing import Dict, Any
 
 from woodwork.deployments.registry import get_registry
 from woodwork.deployments import Deployer
 from woodwork.deployments.router import get_router
-from woodwork.deployments.vms import LocalDeployment, ServerDeployment
+from woodwork.deployments.vms import ServerDeployment
 from woodwork.deployments.docker import Docker
 from woodwork.components.inputs.inputs import inputs
 from woodwork.utils import sync_async
@@ -385,19 +383,22 @@ CMD ["python", "-m", "woodwork", "component", "{component.name}"]
             self.event_loop = loop
 
             async def message_bus_runtime():
+                # Import at the top level to avoid scope issues
+                from woodwork.core.message_bus.factory import get_global_message_bus
+                message_bus = None
+
                 try:
                     # 1. Initialize message bus integration IN this event loop
                     log.info("🔗 Initializing message bus integration in background thread...")
                     await self._async_initialize_message_bus_integration()
 
                     # 2. Start message bus (existing integration approach)
-                    from woodwork.core.message_bus.factory import get_global_message_bus
                     message_bus = await get_global_message_bus()
                     log.info("✅ Message bus started with background tasks (retry processor, cleanup)")
 
-                    # 3. Setup integration manager
-                    from woodwork.core.message_bus.integration import get_global_message_bus_manager
-                    manager = get_global_message_bus_manager()
+                    # 3. Setup integration manager (if needed)
+                    # from woodwork.core.message_bus.integration import get_global_message_bus_manager
+                    # manager = get_global_message_bus_manager()
 
                     # 4. Setup streaming (existing Router.setup_streaming)
                     stream_manager = await self.router.setup_streaming()
@@ -416,10 +417,18 @@ CMD ["python", "-m", "woodwork", "component", "{component.name}"]
                 finally:
                     # Clean shutdown
                     try:
-                        message_bus = await get_global_message_bus()
-                        if hasattr(message_bus, 'stop'):
+                        if message_bus and hasattr(message_bus, 'stop'):
                             await message_bus.stop()
                             log.info("Message bus stopped cleanly")
+                        elif message_bus is None:
+                            # Try to get and stop global message bus if we didn't get one earlier
+                            try:
+                                message_bus = await get_global_message_bus()
+                                if hasattr(message_bus, 'stop'):
+                                    await message_bus.stop()
+                                    log.info("Message bus stopped cleanly")
+                            except Exception:
+                                log.debug("No message bus to stop during cleanup")
                     except Exception as e:
                         log.error("Error stopping message bus: %s", e)
 
@@ -444,11 +453,25 @@ CMD ["python", "-m", "woodwork", "component", "{component.name}"]
     async def _enhanced_message_bus_main_loop(self, input_component):
         """Enhanced main message bus input/output loop."""
 
+        # Check if this is an API input component that handles its own input
+        from woodwork.components.inputs.api_input import api_input
+        if isinstance(input_component, api_input):
+            log.info("🌐 API input component detected - input handled via websocket/REST, keeping alive...")
+
+            # For API input components, just keep the main thread alive
+            # Input is handled via websockets and REST endpoints
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except KeyboardInterrupt:
+                log.info("Shutdown signal received for API input component")
+            return
+
         log.info("🔄 Enhanced message bus main loop started - waiting for input...")
 
         while True:
             try:
-                # Get input from the input component
+                # Get input from the input component (non-API components)
                 x = input_component.input_function()
 
                 # Handle exit conditions

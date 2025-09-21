@@ -213,6 +213,12 @@ def create_object(command):
             config["task_master"] = task_m
             return init_object(command_line, **config)
 
+        if type == "api":
+            from woodwork.components.inputs.api_input import api_input
+
+            # API input doesn't need task_master - it uses messaging system
+            return init_object(api_input, **config)
+
     if component == "api":
         if type == "web":
             from woodwork.components.apis.web import web

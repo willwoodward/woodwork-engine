@@ -56,7 +56,7 @@ coding_ag = agent llm {
     ]
 }
 
-input = input command_line {
+input = input api {
     to: coding_ag
 }
 

@@ -231,20 +231,25 @@ async def shutdown_global_message_bus() -> None:
 def configure_global_message_bus(config: Dict[str, Any]) -> None:
     """
     Configure global message bus before first use
-    
+
     This allows deployment configurations to customize the message bus
     before any components try to use it.
-    
+
     Args:
         config: Message bus configuration
+
+    Note:
+        If called after global message bus has been created, this will log
+        a warning but not raise an error to support component initialization order.
     """
     global _bus_config
-    
+
     if _global_message_bus is not None:
-        raise RuntimeError("Cannot configure message bus after it has been created")
-    
+        log.warning("[MessageBusFactory] Global message bus already created, configuration ignored: %s", config)
+        return
+
     _bus_config = config
-    
+
     log.debug("[MessageBusFactory] Configured global message bus: %s", config)
 
 

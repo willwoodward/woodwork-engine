@@ -247,12 +247,16 @@ class llm(agent):
             log.debug(f"Action: {action_dict}")
             print(f"Thought: {thought}")
 
-            # Emit agent.thought (non-blocking hook)
+            # Emit agent.thought (non-blocking hook) and force immediate processing
             emit("agent.thought", {"thought": thought})
+            # Force immediate event processing with a tiny delay
+            import time
+            time.sleep(0.001)  # 1ms delay to allow event processing
 
             # Emit agent.action (pipes can transform, hooks can observe)
             action_payload = emit("agent.action", {"action": action_dict})
             action_dict = action_payload.action
+            time.sleep(0.001)  # 1ms delay for immediate processing
 
             try:
                 # Create Action from possibly-transformed dict
@@ -260,7 +264,8 @@ class llm(agent):
 
                 # Emit tool.call (pipes can transform, hooks can observe)
                 tool_call = emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")})
-                
+                time.sleep(0.001)  # 1ms delay for immediate processing
+
                 # Update action if pipes modified it
                 if tool_call.tool != action_dict.get("tool") or tool_call.args != action_dict.get("inputs"):
                     action_dict["tool"] = tool_call.tool
@@ -292,12 +297,14 @@ class llm(agent):
             # Emit tool.observation (pipes can transform, hooks can observe)
             obs = emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
             observation = obs.observation
+            time.sleep(0.001)  # 1ms delay for immediate processing
 
             # Append step to ongoing prompt
             current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action_dict)}\nObservation: {observation}\n\nContinue with the next step:"
 
             # Emit step complete
             emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
+            time.sleep(0.001)  # 1ms delay for immediate processing
 
         # # Cache instructions
         # if self._cache_mode:

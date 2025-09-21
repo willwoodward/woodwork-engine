@@ -9,9 +9,9 @@ the centralized Task Master orchestration with distributed routing.
 import asyncio
 import logging
 import time
-from typing import Dict, List, Any, Optional, Set, Union
+from typing import Dict, List, Any, Set
 
-from .interface import MessageBusInterface, MessageEnvelope, create_component_message, create_hook_message
+from .interface import MessageBusInterface, create_component_message, create_hook_message
 
 log = logging.getLogger(__name__)
 
@@ -72,13 +72,82 @@ class DeclarativeRouter:
         # Infer workflow chains for components without explicit 'to:' configuration
         self._infer_workflow_chains()
         
+        # Register all components with message bus to handle incoming messages
+        self._register_all_component_handlers()
+
         # Update statistics
         self.stats["components_registered"] = len(component_configs)
         self.stats["active_routes"] = sum(len(targets) for targets in self.routing_table.values())
         
-        log.info("[DeclarativeRouter] Routing configured: %d components, %d total routes", 
+        log.info("[DeclarativeRouter] Routing configured: %d components, %d total routes",
                  self.stats["components_registered"], self.stats["active_routes"])
-    
+
+    def _register_all_component_handlers(self):
+        """Register message handlers for all components to receive messages."""
+        log.debug("[DeclarativeRouter] Registering message handlers for all components")
+
+        for component_name, component_config in self.component_configs.items():
+            component_obj = component_config.get('object')
+
+            if not component_obj:
+                log.debug("[DeclarativeRouter] No component object for '%s', skipping handler registration", component_name)
+                continue
+
+            # Skip if this component doesn't have an input method
+            if not hasattr(component_obj, 'input'):
+                log.debug("[DeclarativeRouter] Component '%s' has no input method, skipping handler registration", component_name)
+                continue
+
+            try:
+                async def message_handler(envelope, comp_name=component_name, comp_obj=component_obj):
+                    """Handle incoming messages for this component."""
+                    log.debug("[DeclarativeRouter] Component '%s' received message: %s from %s",
+                             comp_name, envelope.event_type, envelope.sender_component)
+
+                    try:
+                        result = None
+
+                        # For input.received events, extract the input and call component's input method
+                        if envelope.event_type == "input.received":
+                            user_input = envelope.payload.get("input", "")
+                            if user_input:
+                                log.debug("[DeclarativeRouter] Calling '%s'.input() with: %s", comp_name, user_input[:100])
+
+                                # Check if input method is async
+                                if asyncio.iscoroutinefunction(comp_obj.input):
+                                    result = await comp_obj.input(user_input)
+                                else:
+                                    result = comp_obj.input(user_input)
+
+                                log.debug("[DeclarativeRouter] Component '%s' processed input, result: %s",
+                                         comp_name, str(result)[:100] if result else "None")
+                            else:
+                                log.warning("[DeclarativeRouter] Received empty input for component '%s'", comp_name)
+                        else:
+                            # For other event types, try to call input with the whole payload
+                            log.debug("[DeclarativeRouter] Calling '%s'.input() with payload", comp_name)
+
+                            # Check if input method is async
+                            if asyncio.iscoroutinefunction(comp_obj.input):
+                                result = await comp_obj.input(envelope.payload)
+                            else:
+                                result = comp_obj.input(envelope.payload)
+
+                            log.debug("[DeclarativeRouter] Component '%s' processed payload, result: %s",
+                                     comp_name, str(result)[:100] if result else "None")
+
+                    except Exception as e:
+                        log.error("[DeclarativeRouter] Error calling component '%s' input method: %s", comp_name, e)
+
+                # Register the handler with the message bus
+                self.message_bus.register_component_handler(component_name, message_handler)
+                log.debug("[DeclarativeRouter] Registered message handler for component '%s'", component_name)
+
+            except Exception as e:
+                log.error("[DeclarativeRouter] Failed to register message handler for '%s': %s", component_name, e)
+
+        log.info("[DeclarativeRouter] Registered message handlers for %d components", len(self.component_configs))
+
     def _extract_targets(self, to_config: Any) -> List[str]:
         """Extract routing targets from 'to:' configuration"""
         if not to_config:
@@ -120,7 +189,7 @@ class DeclarativeRouter:
         log.debug("[DeclarativeRouter] Component types detected: %s", component_types)
         
         # Find common component patterns
-        inputs = [name for name, comp_type in component_types.items() if comp_type in ['inputs', 'command_line']]
+        inputs = [name for name, comp_type in component_types.items() if comp_type in ['inputs', 'input', 'command_line', 'api']]
         agents = [name for name, comp_type in component_types.items() if comp_type in ['llms', 'agents', 'openai', 'anthropic', 'ollama']]
         outputs = [name for name, comp_type in component_types.items() if comp_type in ['outputs', 'console', 'cli']]
         tools = [name for name, comp_type in component_types.items() if comp_type in ['functions', 'coding', 'apis', 'environments']]
@@ -282,7 +351,7 @@ class DeclarativeRouter:
                                         log.error("[DeclarativeRouter] Failed to send response: %s", e)
 
                                 # Schedule response sending
-                                task = asyncio.create_task(send_response())
+                                asyncio.create_task(send_response())
                                 log.debug("[DeclarativeRouter] Created response task for request_id: %s", req_id)
 
                     except Exception as e:
