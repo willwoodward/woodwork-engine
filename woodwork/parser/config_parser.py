@@ -717,14 +717,12 @@ def _initialize_message_bus_integration(commands: dict) -> None:
                 # Let MessageBusIntegration handle _message_bus itself in _ensure_message_bus_integration
                 # Don't set _message_bus to GlobalMessageBusManager - it should be the actual bus
 
-                # Set DeclarativeRouter if not already set
+                # Set unified event bus router if not already set
                 if not hasattr(comp, "_router") or comp._router is None:
-                    from woodwork.core.message_bus.declarative_router import DeclarativeRouter
-                    from woodwork.core.message_bus.factory import get_global_message_bus
-                    import asyncio
+                    from woodwork.core.unified_event_bus import get_global_event_bus
                     try:
                         # This is sync context, so we need to handle async differently
-                        log.debug("[ConfigParser] Setting DeclarativeRouter on component '%s'", comp.name)
+                        log.debug("[ConfigParser] Setting unified event bus router on component '%s'", comp.name)
                         # For now, just set a placeholder - the actual router will be set in async context
                         comp._router_pending = True
                     except Exception as e:
@@ -828,3 +826,113 @@ def find_action_plan(query: str):
                 result = similar_prompts[i]
 
                 print(f"{result['value']} {result['nodeID']}")
+
+
+def parse_config_dict(config_dict: dict) -> dict:
+    """
+    Parse configuration dictionary for unified async runtime.
+
+    This creates components from a dictionary configuration,
+    similar to parsing .ww files but for programmatic use.
+    """
+    log.debug("[ConfigParser] Parsing config dictionary with %d entries", len(config_dict))
+
+    components = []
+    component_configs = {}
+
+    # Convert dictionary entries to component objects
+    for component_name, component_config in config_dict.items():
+        try:
+            # Extract component info
+            component_type = component_config.get("component", "unknown")
+            type_name = component_config.get("type", "unknown")
+
+            log.debug("[ConfigParser] Creating component: %s (%s/%s)",
+                     component_name, component_type, type_name)
+
+            # Create component using existing factory functions
+            config_copy = component_config.copy()
+            config_copy["name"] = component_name
+
+            component_obj = create_component_object(component_type, type_name, config_copy)
+
+            if component_obj:
+                components.append(component_obj)
+                component_configs[component_name] = {
+                    "object": component_obj,
+                    "component": component_type,
+                    "variable": component_name,
+                    "config": config_copy
+                }
+
+                log.debug("[ConfigParser] Created component: %s", component_name)
+            else:
+                log.warning("[ConfigParser] Failed to create component: %s", component_name)
+
+        except Exception as e:
+            log.error("[ConfigParser] Error creating component %s: %s", component_name, e)
+
+    log.info("[ConfigParser] Parsed %d components from dictionary", len(components))
+
+    return {
+        "components": components,
+        "component_configs": component_configs
+    }
+
+
+def create_component_object(component_type: str, type_name: str, config: dict):
+    """Create component object from type information."""
+    try:
+        if component_type == "input" or component_type == "inputs":
+            if type_name == "api":
+                from woodwork.components.inputs.api_input import api_input
+                return init_object(api_input, **config)
+            elif type_name == "command_line":
+                from woodwork.components.inputs.command_line import command_line
+                config["task_master"] = task_m
+                return init_object(command_line, **config)
+
+        elif component_type == "llm" or component_type == "llms":
+            if type_name == "openai":
+                from woodwork.components.llms.openai import openai
+                return init_object(openai, **config)
+            elif type_name == "ollama":
+                from woodwork.components.llms.ollama import ollama
+                return init_object(ollama, **config)
+
+        elif component_type == "agent" or component_type == "agents":
+            if type_name == "llm":
+                from woodwork.components.agents.llm import llm
+                config["task_m"] = task_m
+                return init_object(llm, **config)
+
+        elif component_type == "output" or component_type == "outputs":
+            if type_name == "console":
+                from woodwork.components.outputs.console import console
+                return init_object(console, **config)
+
+        # Add more component types as needed
+        log.warning("[ConfigParser] Unknown component type: %s/%s", component_type, type_name)
+        return None
+
+    except Exception as e:
+        log.error("[ConfigParser] Error creating %s/%s: %s", component_type, type_name, e)
+        return None
+
+
+def parse_config_file(file_path: str) -> dict:
+    """Parse .ww configuration file."""
+    # This is a wrapper around existing parse functionality
+    # but returns format compatible with AsyncRuntime
+
+    # Read and parse the file (use existing logic)
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    # Use existing parsing logic but adapt output format
+    # This is a simplified version - you may need to adapt based on your existing parse logic
+
+    # For now, return a basic structure
+    # You would adapt your existing parse logic here
+    log.warning("[ConfigParser] File parsing not fully implemented - returning empty config")
+    return {"components": [], "component_configs": {}}

@@ -157,34 +157,48 @@ class component(StreamingMixin, MessageBusIntegration):
         return pipes
     
     def _register_hooks_global(self):
-        """Register all configured hooks with the global EventManager."""
+        """Register all configured hooks with both the old EventManager and unified event bus."""
         global_manager = get_global_event_manager()
-        
-        log.debug(f"[Component {self.name}] Registering {len(self._hooks)} hooks globally...")    
+
+        # Also register with unified event bus
+        from woodwork.core.unified_event_bus import get_global_event_bus
+        unified_bus = get_global_event_bus()
+
+        log.debug(f"[Component {self.name}] Registering {len(self._hooks)} hooks globally...")
         for i, hook in enumerate(self._hooks):
             try:
                 log.debug(f"[Component {self.name}] Loading hook {i+1}: {hook.function_name} from {hook.script_path} for event '{hook.event}'")
                 func = self._load_function(hook.script_path, hook.function_name)
                 if func:
+                    # Register with old event manager (for backward compatibility)
                     global_manager.on_hook(hook.event, func)
-                    log.debug(f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name}")
+                    # Register with unified event bus (for new system)
+                    unified_bus.register_hook(hook.event, func)
+                    log.debug(f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name} (old + unified)")
                 else:
                     log.warning(f"[Component {self.name}] Failed to load function {hook.function_name} from {hook.script_path}")
             except Exception as e:
                 log.warning(f"[Component {self.name}] Failed to register hook {hook.function_name} for event {hook.event}: {e}")
     
     def _register_pipes_global(self):
-        """Register all configured pipes with the global EventManager."""
+        """Register all configured pipes with both the old EventManager and unified event bus."""
         global_manager = get_global_event_manager()
-        
-        log.debug(f"[Component {self.name}] Registering {len(self._pipes)} pipes globally...")    
+
+        # Also register with unified event bus
+        from woodwork.core.unified_event_bus import get_global_event_bus
+        unified_bus = get_global_event_bus()
+
+        log.debug(f"[Component {self.name}] Registering {len(self._pipes)} pipes globally...")
         for i, pipe in enumerate(self._pipes):
             try:
                 log.debug(f"[Component {self.name}] Loading pipe {i+1}: {pipe.function_name} from {pipe.script_path} for event '{pipe.event}'")
                 func = self._load_function(pipe.script_path, pipe.function_name)
                 if func:
+                    # Register with old event manager (for backward compatibility)
                     global_manager.on_pipe(pipe.event, func)
-                    log.debug(f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name}")
+                    # Register with unified event bus (for new system)
+                    unified_bus.register_pipe(pipe.event, func)
+                    log.debug(f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name} (old + unified)")
                 else:
                     log.warning(f"[Component {self.name}] Failed to load function {pipe.function_name} from {pipe.script_path}")
             except Exception as e:

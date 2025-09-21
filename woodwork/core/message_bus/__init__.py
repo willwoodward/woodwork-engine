@@ -15,7 +15,6 @@ Key Features:
 from .interface import MessageBusInterface, MessageEnvelope, MessageDeliveryMode, MessagePattern
 from .in_memory_bus import InMemoryMessageBus
 from .factory import MessageBusFactory, create_default_message_bus, get_global_message_bus, set_global_message_bus
-from .declarative_router import DeclarativeRouter
 from .integration import MessageBusIntegration
 
 __all__ = [

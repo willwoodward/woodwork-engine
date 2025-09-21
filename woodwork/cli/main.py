@@ -162,21 +162,28 @@ def app_entrypoint(args):
             # ArgParse will SysExit if choice not in list
             pass
 
-    # Use DistributedStartupCoordinator for message bus mode, TaskMaster for traditional mode
+    # Use AsyncRuntime for message bus mode, TaskMaster for traditional mode
     if globals.global_config.get("message_bus_active", False):
-        print("🚀 DEBUG: Message bus mode active - using DistributedStartupCoordinator")
-        from woodwork.core.distributed_startup import DistributedStartupCoordinator
+        print("🚀 DEBUG: Message bus mode active - using AsyncRuntime")
+        from woodwork.core.async_runtime import AsyncRuntime
+        import asyncio
 
-        # Create startup coordinator with parsed configuration and existing infrastructure
-        startup_coordinator = DistributedStartupCoordinator(
-            config={"components": config_parser.task_m._tools},
-            registry=registry,
-            deployer=deployer
-        )
+        # Create component config from parsed tools
+        component_config = {}
+        for tool in config_parser.task_m._tools:
+            component_config[tool.name] = {
+                "component": tool.__class__.__name__.lower(),
+                "type": getattr(tool, 'type', 'unknown'),
+                "object": tool
+            }
 
-        # Hand off to coordinator for clean distributed startup
-        startup_coordinator.coordinate_distributed_startup()
-        print("✅ DEBUG: DistributedStartupCoordinator completed")
+        # Start unified async runtime
+        async def start_async_runtime():
+            runtime = AsyncRuntime()
+            await runtime.start({"components": config_parser.task_m._tools, "component_configs": component_config})
+
+        asyncio.run(start_async_runtime())
+        print("✅ DEBUG: AsyncRuntime completed")
     else:
         print("🔧 DEBUG: Traditional mode - using TaskMaster orchestration")
         # Use traditional Task Master approach

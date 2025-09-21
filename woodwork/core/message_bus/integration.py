@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from woodwork.events import get_global_event_manager
 from .factory import get_global_message_bus
-from .declarative_router import DeclarativeRouter
+from woodwork.core.unified_event_bus import get_global_event_bus
 
 log = logging.getLogger(__name__)
 
@@ -263,7 +263,7 @@ class MessageBusIntegration:
             self.integration_stats["integration_errors"] += 1
             return False
     
-    def set_router(self, router: DeclarativeRouter) -> None:
+    def set_router(self, router: Any) -> None:
         """Set declarative router for automatic routing"""
         try:
             self._router = router
@@ -848,9 +848,20 @@ class GlobalMessageBusManager:
             self.message_bus = await get_global_message_bus()
             log.info("[GlobalMessageBusManager] Connected to global message bus")
             
-            # Create and configure router
-            self.router = DeclarativeRouter(self.message_bus)
-            self.router.configure_from_components(component_configs)
+            # Use unified event bus for routing (replaces DeclarativeRouter)
+            unified_event_bus = get_global_event_bus()
+
+            # Set router early so it's available for component registration
+            self.router = unified_event_bus
+
+            # Register components with unified event bus
+            for component_name, config in component_configs.items():
+                component_obj = config.get("object")
+                if component_obj:
+                    unified_event_bus.register_component(component_obj)
+
+            # Configure routing from component relationships
+            unified_event_bus.configure_routing()
             
             log.info("[GlobalMessageBusManager] Configured declarative router with %d components", 
                      len(component_configs))

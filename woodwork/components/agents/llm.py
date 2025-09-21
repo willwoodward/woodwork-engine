@@ -11,7 +11,8 @@ import tiktoken
 from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
-from woodwork.events import emit
+from woodwork.core.unified_event_bus import emit
+from woodwork.types.event_source import EventSource
 from woodwork.components.llms.llm import llm
 from woodwork.core.message_bus.interface import create_component_message
 
@@ -157,12 +158,15 @@ class llm(agent):
     async def input(self, query: str, inputs: dict = None):
         if inputs is None:
             inputs = {}
-        
+
+        # Set component context for proper event attribution
+        EventSource.set_current(getattr(self, 'name', 'unknown_agent'), 'agent')
+
         # Substitute inputs
         prompt = query
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
-        
+
         # # Search cache for similar results
         # if self._cache_mode:
         #     closest_query = self._cache_search_actions(query)
@@ -172,7 +176,7 @@ class llm(agent):
         self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
-        transformed = emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
+        transformed = await emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
         
         # Extract from typed payload
         query = transformed.input
@@ -247,24 +251,19 @@ class llm(agent):
             log.debug(f"Action: {action_dict}")
             print(f"Thought: {thought}")
 
-            # Emit agent.thought (non-blocking hook) and force immediate processing
-            emit("agent.thought", {"thought": thought})
-            # Force immediate event processing with a tiny delay
-            import time
-            time.sleep(0.001)  # 1ms delay to allow event processing
+            # Emit agent.thought (non-blocking hook)
+            await emit("agent.thought", {"thought": thought})
 
             # Emit agent.action (pipes can transform, hooks can observe)
-            action_payload = emit("agent.action", {"action": action_dict})
+            action_payload = await emit("agent.action", {"action": action_dict})
             action_dict = action_payload.action
-            time.sleep(0.001)  # 1ms delay for immediate processing
 
             try:
                 # Create Action from possibly-transformed dict
                 action = Action.from_dict(action_dict)
 
                 # Emit tool.call (pipes can transform, hooks can observe)
-                tool_call = emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")})
-                time.sleep(0.001)  # 1ms delay for immediate processing
+                tool_call = await emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")})
 
                 # Update action if pipes modified it
                 if tool_call.tool != action_dict.get("tool") or tool_call.args != action_dict.get("inputs"):
@@ -288,23 +287,21 @@ class llm(agent):
             except Exception as e:
                 log.exception("Unhandled error while executing action: %s", e)
                 # Emit agent.error for unexpected failures
-                emit("agent.error", {"error": e, "context": {"query": query}})
+                await emit("agent.error", {"error": e, "context": {"query": query}})
                 # feed back a generic observation and continue
                 observation = f"An error occurred while executing the action: {e}"
 
             log.debug(f"Observation: {observation}")
 
             # Emit tool.observation (pipes can transform, hooks can observe)
-            obs = emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
+            obs = await emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
             observation = obs.observation
-            time.sleep(0.001)  # 1ms delay for immediate processing
 
             # Append step to ongoing prompt
             current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action_dict)}\nObservation: {observation}\n\nContinue with the next step:"
 
             # Emit step complete
-            emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
-            time.sleep(0.001)  # 1ms delay for immediate processing
+            await emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
 
         # # Cache instructions
         # if self._cache_mode:
