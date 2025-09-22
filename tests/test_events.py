@@ -1,10 +1,10 @@
 import asyncio
-from woodwork.events import create_default_emitter
+from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.types import ToolObservationPayload, AgentThoughtPayload
 
 
 async def test_pipes_transform_sync_and_async():
-    emitter = create_default_emitter()
+    emitter = UnifiedEventBus()
 
     def pipe_sync(payload):
         # Create new payload with additional info
@@ -29,15 +29,14 @@ async def test_pipes_transform_sync_and_async():
         )
         return new_payload
 
-    emitter.on_pipe("tool.observation", pipe_sync)
-    emitter.on_pipe("tool.observation", pipe_async)
+    emitter.register_pipe("tool.observation", pipe_sync)
+    emitter.register_pipe("tool.observation", pipe_async)
 
-    # Create proper payload
-    initial_payload = ToolObservationPayload(
-        observation="original observation",
-        tool="test_tool"
-    )
-    result = await emitter.emit("tool.observation", initial_payload)
+    # Emit with data (unified event bus will create the payload)
+    result = await emitter.emit("tool.observation", {
+        "observation": "original observation",
+        "tool": "test_tool"
+    })
 
     assert result is not None
     assert "original observation" in result.observation
@@ -45,8 +44,8 @@ async def test_pipes_transform_sync_and_async():
     assert "[async_added]" in result.observation
 
 
-def test_hooks_on_once_off():
-    emitter = create_default_emitter()
+async def test_hooks_on_once_off():
+    emitter = UnifiedEventBus()
     calls = []
 
     def listener(payload):
@@ -55,8 +54,8 @@ def test_hooks_on_once_off():
     def once_listener(payload):
         calls.append(("once", payload.thought))
 
-    emitter.on_hook("agent.thought", listener)
-    emitter.on_hook("agent.thought", once_listener)
+    emitter.register_hook("agent.thought", listener)
+    emitter.register_hook("agent.thought", once_listener)
 
     # Create proper payloads with required fields
     payload1 = AgentThoughtPayload(
@@ -71,10 +70,10 @@ def test_hooks_on_once_off():
     )
 
     # First emit: both listeners should run
-    emitter.emit_sync("agent.thought", payload1)
+    await emitter.emit("agent.thought", {"thought": "thought 1"})
 
     # Second emit: both listeners run again
-    emitter.emit_sync("agent.thought", payload2)
+    await emitter.emit("agent.thought", {"thought": "thought 2"})
 
     # Validate calls - both hooks run for both emissions
     assert ("sync", "thought 1") in calls

@@ -10,7 +10,7 @@ import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.integration import (
     MessageBusIntegration,
     ComponentNotFoundError,
@@ -31,7 +31,7 @@ class TestMessageAPIDesign:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = DeclarativeRouter(bus)
+        router = UnifiedEventBus(bus)
 
         yield {"bus": bus, "router": router}
 
@@ -272,13 +272,13 @@ class TestMessageAPIImplementation:
     async def api_setup(self):
         """Setup with real message API implementation."""
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+        from woodwork.core.unified_event_bus import UnifiedEventBus
         from woodwork.core.message_bus.integration import MessageBusIntegration
 
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = DeclarativeRouter(bus)
+        router = UnifiedEventBus(bus)
 
         # Create test component with the real message API
         class TestComponent(MessageBusIntegration):
@@ -414,13 +414,13 @@ class TestMessageAPIErrorHandling:
     async def error_test_setup(self):
         """Setup for error testing."""
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+        from woodwork.core.unified_event_bus import UnifiedEventBus
         from woodwork.core.message_bus.integration import MessageBusIntegration
 
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = DeclarativeRouter(bus)
+        router = UnifiedEventBus(bus)
 
         class TestComponent(MessageBusIntegration):
             def __init__(self, name, router):
@@ -549,13 +549,13 @@ class TestMessageAPIEdgeCases:
     async def edge_case_setup(self):
         """Setup for edge case testing."""
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+        from woodwork.core.unified_event_bus import UnifiedEventBus
         from woodwork.core.message_bus.integration import MessageBusIntegration
 
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = DeclarativeRouter(bus)
+        router = UnifiedEventBus(bus)
 
         class TestComponent(MessageBusIntegration):
             def __init__(self, name, router):

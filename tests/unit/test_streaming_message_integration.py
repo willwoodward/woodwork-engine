@@ -9,7 +9,7 @@ import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.integration import (
     MessageBusIntegration,
     StreamingChunk
@@ -25,7 +25,7 @@ class TestStreamingMessageAPIDesign:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = DeclarativeRouter(bus)
+        router = UnifiedEventBus(bus)
 
         yield {"bus": bus, "router": router}
 
@@ -218,7 +218,7 @@ class TestStreamingMessageAPIIntegration:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = DeclarativeRouter(bus)
+        router = UnifiedEventBus(bus)
 
         # Mock StreamManager for testing
         mock_stream_manager = Mock()
@@ -353,7 +353,7 @@ class TestStreamingRouterIntegration:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = DeclarativeRouter(bus)
+        router = UnifiedEventBus(bus)
 
         yield {"bus": bus, "router": router}
 

@@ -3,7 +3,7 @@
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput, MockMessageBus
 
@@ -19,7 +19,7 @@ class TestComponentCommunicationFlow:
         await message_bus.start()
 
         # Create router
-        router = DeclarativeRouter(message_bus)
+        router = UnifiedEventBus()
 
         # Create components
         agent = MockAgent("test_agent")
@@ -32,8 +32,10 @@ class TestComponentCommunicationFlow:
             "test_output": {"object": output, "component": "console"}
         }
 
-        # Configure routing
-        router.configure_from_components(components)
+        # Register components and configure routing
+        for comp_data in components.values():
+            router.register_component(comp_data["object"])
+        router.configure_routing()
 
         yield {
             "router": router,
@@ -228,7 +230,7 @@ class TestAgentToolTimeoutIssue:
         message_bus = InMemoryMessageBus()
         await message_bus.start()
 
-        router = DeclarativeRouter(message_bus)
+        router = UnifiedEventBus()
 
         # Create mock agent with the essential methods for timeout testing
         class MockAgentWithTimeout:
@@ -275,7 +277,10 @@ class TestAgentToolTimeoutIssue:
             "test_tool": {"object": tool, "component": "tool"}
         }
 
-        router.configure_from_components(components)
+        # Register components and configure routing
+        for comp_data in components.values():
+            router.register_component(comp_data["object"])
+        router.configure_routing()
 
         yield {
             "router": router,
@@ -389,7 +394,7 @@ class TestRealWorldScenarios:
         message_bus = InMemoryMessageBus()
         await message_bus.start()
 
-        router = DeclarativeRouter(message_bus)
+        router = UnifiedEventBus()
 
         # Create realistic component setup
         coding_agent = MockAgent("coding_ag")
@@ -404,7 +409,10 @@ class TestRealWorldScenarios:
             "console_output": {"object": output, "component": "console"}
         }
 
-        router.configure_from_components(components)
+        # Register components and configure routing
+        for comp_data in components.values():
+            router.register_component(comp_data["object"])
+        router.configure_routing()
 
         yield {
             "router": router,

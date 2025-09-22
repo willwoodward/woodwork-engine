@@ -114,8 +114,8 @@ def real_message_bus():
 def real_router(real_message_bus):
     """Create a real DeclarativeRouter for integration tests."""
     try:
-        from woodwork.core.message_bus.declarative_router import DeclarativeRouter
-        return DeclarativeRouter(real_message_bus)
+        from woodwork.core.unified_event_bus import UnifiedEventBus
+        return UnifiedEventBus(real_message_bus)
     except ImportError:
         return create_mock_router(real_message_bus)
 
@@ -196,7 +196,7 @@ def streaming_component():
 @pytest.fixture
 def mock_event_manager():
     """Create a mock event manager."""
-    return MockEventManager()
+    return MockUnifiedEventBus()
 
 
 @pytest.fixture
@@ -230,7 +230,7 @@ def real_event_manager():
         from woodwork.events import create_default_emitter
         return create_default_emitter()
     except ImportError:
-        return MockEventManager()
+        return MockUnifiedEventBus()
 
 
 # Integration Test Fixtures
@@ -239,13 +239,13 @@ async def full_system():
     """Create a complete system setup for integration tests."""
     try:
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+        from woodwork.core.unified_event_bus import UnifiedEventBus
 
         # Create message bus infrastructure
         message_bus = InMemoryMessageBus()
         message_bus.start()
 
-        router = DeclarativeRouter(message_bus)
+        router = UnifiedEventBus(message_bus)
 
         # Create components
         components = create_test_components()
@@ -261,7 +261,7 @@ async def full_system():
             "message_bus": message_bus,
             "router": router,
             "components": components,
-            "event_manager": MockEventManager()
+            "event_manager": MockUnifiedEventBus()
         }
 
         # Cleanup
@@ -272,7 +272,7 @@ async def full_system():
             "message_bus": MockMessageBus(),
             "router": create_mock_router(),
             "components": create_test_components(),
-            "event_manager": MockEventManager()
+            "event_manager": MockUnifiedEventBus()
         }
 
 

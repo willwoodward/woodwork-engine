@@ -3,7 +3,7 @@
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput
 
@@ -18,7 +18,7 @@ class TestFullWorkflow:
         message_bus = InMemoryMessageBus()
         await message_bus.start()
 
-        router = DeclarativeRouter(message_bus)
+        router = UnifiedEventBus()
 
         # Create realistic components
         coding_agent = MockAgent("coding_ag")
@@ -46,11 +46,14 @@ class TestFullWorkflow:
             }
         }
 
-        router.configure_from_components(components)
+        # Register components and configure routing
+        for comp_data in components.values():
+            router.register_component(comp_data["object"])
+        router.configure_routing()
 
         # Mock event system
         from tests.unit.fixtures.event_fixtures import MockEventManager
-        event_manager = MockEventManager()
+        event_manager = MockUnifiedEventBus()
 
         yield {
             "router": router,

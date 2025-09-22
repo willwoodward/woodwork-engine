@@ -32,22 +32,21 @@ class TestAPIInputComponentDesign:
     @pytest.mark.asyncio
     async def test_api_input_should_use_messaging_not_task_master(self, message_bus_setup):
         """
-        TDD: API input component should use messaging system instead of task_master.
+        API input component should use unified event system instead of task_master.
 
-        The old implementation relied on task_master for routing. The new implementation
-        should use MessageBusIntegration for direct component-to-component communication.
+        The new implementation should use UnifiedEventBus for direct component communication.
         """
         from woodwork.components.inputs.api_input import api_input
 
         # Should be able to create without task_master
         api_component = api_input(name="test_api", to=["test_agent"], local=False)
 
-        # Should have message bus integration
-        assert hasattr(api_component, '_message_bus')
-        assert hasattr(api_component, '_handle_bus_message')
+        # Should have unified event bus integration
+        assert hasattr(api_component, 'event_bus')
+        assert hasattr(api_component, '_handle_real_time_event')
 
         # Should have configured output targets
-        assert api_component.output_targets == ["test_agent"]
+        assert api_component._output == ["test_agent"]
 
     @pytest.mark.asyncio
     async def test_api_input_websocket_connection_management(self, message_bus_setup):
