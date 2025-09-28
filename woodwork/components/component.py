@@ -2,25 +2,101 @@ import os
 import sys
 import importlib.util
 import logging
+import asyncio
 from typing import List, Optional, Any, Dict
 from woodwork.types.workflows import Hook, Pipe
 from woodwork.events import EventManager, create_default_emitter, get_global_event_manager
+from woodwork.components.streaming_mixin import StreamingMixin
+from woodwork.core.stream_manager import StreamManager
+from woodwork.core.message_bus.integration import MessageBusIntegration, register_component_with_message_bus
 
 log = logging.getLogger(__name__)
 
 
-class component:
+class component(StreamingMixin, MessageBusIntegration):
     def __init__(self, name, component, type, **config):
+        log.debug("[component] Initializing component '%s' (type: %s, component: %s) with config keys: %s", 
+                  name, type, component, list(config.keys()))
+        
+        # Set basic attributes first
         self.name = name
         self.component = component
         self.type = type
         self.config = config
+        
+        # Initialize both mixins with the full config
+        log.debug("[component] Calling super().__init__ for '%s'", name)
+        super().__init__(name=name, config=config)
+        
+        log.debug("[component] Component '%s' initialization complete, hasattr(output_targets): %s", 
+                  name, hasattr(self, 'output_targets'))
+        
         self._emitter: Optional[EventManager] = None
         self._hooks: List[Hook] = []
         self._pipes: List[Pipe] = []
         
         self._setup_event_system(config)
-    
+        
+        # Register with global message bus manager
+        register_component_with_message_bus(self)
+
+        # Set up tool message handling if this is a tool component
+        self._setup_tool_message_handling()
+        
+        # Log configuration
+        if hasattr(self, 'streaming_enabled') and self.streaming_enabled:
+            log.debug(f"[Component {self.name}] Streaming enabled: input={self.streaming_input}, output={self.streaming_output}")
+        
+        if hasattr(self, 'output_targets') and self.output_targets:
+            log.debug(f"[Component {self.name}] Message bus routing targets: {self.output_targets}")
+        
+        streaming_enabled = getattr(self, 'streaming_enabled', False)
+        self.streaming_enabled = streaming_enabled
+
+        # Ensure output_targets is properly set from config
+        # The parser resolves 'to: [ag]' to actual component objects
+        if not hasattr(self, 'output_targets') or self.output_targets is None:
+            self.output_targets = config.get("to", [])
+
+        # Ensure it's always a list for consistency
+        if self.output_targets and not isinstance(self.output_targets, list):
+            self.output_targets = [self.output_targets]
+
+        # Ensure required attributes exist for MessageBusIntegration
+        if not hasattr(self, 'session_id'):
+            self.session_id = 'default'
+        if not hasattr(self, 'integration_stats'):
+            self.integration_stats = {
+                "messages_sent": 0,
+                "messages_received": 0,
+                "routing_events": 0,
+                "integration_errors": 0
+            }
+        
+        log.info(f"[Component {self.name}] Initialized with streaming={streaming_enabled}, routing={bool(self.output_targets)}, type={self.type}")
+
+    def _setup_tool_message_handling(self):
+        """Setup message bus handling for tool components."""
+        try:
+            # Check if this is a tool component (has tool_interface)
+            from woodwork.interfaces.tool_interface import tool_interface
+            if isinstance(self, tool_interface):
+                log.debug(f"[Component {self.name}] Setting up tool message handling")
+
+                # Register handler for tool.execute messages
+                async def handle_tool_execute(payload):
+                    if hasattr(self, 'handle_tool_execute_message'):
+                        return await self.handle_tool_execute_message(payload)
+                    else:
+                        log.warning(f"[Tool {self.name}] Received tool.execute message but no handler available")
+
+                # Store the handler for potential message bus registration
+                self._tool_message_handler = handle_tool_execute
+                log.info(f"[Tool {self.name}] Registered for tool.execute messages via message bus")
+
+        except Exception as e:
+            log.debug(f"[Component {self.name}] No tool interface detected: {e}")
+
     def _setup_event_system(self, config: Dict[str, Any]):
         """Initialize the event system with hooks and pipes from config."""
         try:
@@ -81,34 +157,48 @@ class component:
         return pipes
     
     def _register_hooks_global(self):
-        """Register all configured hooks with the global EventManager."""
+        """Register all configured hooks with both the old EventManager and unified event bus."""
         global_manager = get_global_event_manager()
-        
-        log.debug(f"[Component {self.name}] Registering {len(self._hooks)} hooks globally...")    
+
+        # Also register with unified event bus
+        from woodwork.core.unified_event_bus import get_global_event_bus
+        unified_bus = get_global_event_bus()
+
+        log.debug(f"[Component {self.name}] Registering {len(self._hooks)} hooks globally...")
         for i, hook in enumerate(self._hooks):
             try:
                 log.debug(f"[Component {self.name}] Loading hook {i+1}: {hook.function_name} from {hook.script_path} for event '{hook.event}'")
                 func = self._load_function(hook.script_path, hook.function_name)
                 if func:
+                    # Register with old event manager (for backward compatibility)
                     global_manager.on_hook(hook.event, func)
-                    log.debug(f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name}")
+                    # Register with unified event bus (for new system)
+                    unified_bus.register_hook(hook.event, func)
+                    log.debug(f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name} (old + unified)")
                 else:
                     log.warning(f"[Component {self.name}] Failed to load function {hook.function_name} from {hook.script_path}")
             except Exception as e:
                 log.warning(f"[Component {self.name}] Failed to register hook {hook.function_name} for event {hook.event}: {e}")
     
     def _register_pipes_global(self):
-        """Register all configured pipes with the global EventManager."""
+        """Register all configured pipes with both the old EventManager and unified event bus."""
         global_manager = get_global_event_manager()
-        
-        log.debug(f"[Component {self.name}] Registering {len(self._pipes)} pipes globally...")    
+
+        # Also register with unified event bus
+        from woodwork.core.unified_event_bus import get_global_event_bus
+        unified_bus = get_global_event_bus()
+
+        log.debug(f"[Component {self.name}] Registering {len(self._pipes)} pipes globally...")
         for i, pipe in enumerate(self._pipes):
             try:
                 log.debug(f"[Component {self.name}] Loading pipe {i+1}: {pipe.function_name} from {pipe.script_path} for event '{pipe.event}'")
                 func = self._load_function(pipe.script_path, pipe.function_name)
                 if func:
+                    # Register with old event manager (for backward compatibility)
                     global_manager.on_pipe(pipe.event, func)
-                    log.debug(f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name}")
+                    # Register with unified event bus (for new system)
+                    unified_bus.register_pipe(pipe.event, func)
+                    log.debug(f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name} (old + unified)")
                 else:
                     log.warning(f"[Component {self.name}] Failed to load function {pipe.function_name} from {pipe.script_path}")
             except Exception as e:

@@ -15,6 +15,7 @@ dependencies = [
     "distro>=1.9.0",
     "idna>=3.10",
     "jsonpointer>=3.0.0",
+    "pytest-asyncio>=1.2.0",
     "python-dotenv>=1.1.0",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
@@ -70,3 +71,8 @@ ignore = ["E722"]
 [tool.ty.rules]
 unknown-argument = "ignore"
 unresolved-import = "ignore"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"

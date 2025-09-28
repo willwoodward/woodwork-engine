@@ -11,39 +11,22 @@ import tiktoken
 from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
-from woodwork.events import emit
+from woodwork.core.unified_event_bus import emit
+from woodwork.types.event_source import EventSource
+from woodwork.components.llms.llm import llm
+from woodwork.core.message_bus.interface import create_component_message
 
 log = logging.getLogger(__name__)
 
 
 class llm(agent):
-    def __init__(self, model, **config):
+    def __init__(self, model: llm, **config):
         # Require a model (an LLM component instance or a ChatOpenAI instance) be provided.
         format_kwargs(config, model=model, type="llm")
         super().__init__(**config)
         log.debug("Initializing agent...")
 
-        # Accept either an LLM component (which should expose a property `_llm`) or a ChatOpenAI-like object
-        self.__llm = None
-        try:
-            # If model is a component exposing the `_llm` property (as in openai llm component), use that
-            if hasattr(model, "_llm"):
-                # property access may raise if not started; allow direct attribute fallback
-                try:
-                    self.__llm = model._llm
-                except Exception:
-                    # fallback to underlying attribute if present
-                    self.__llm = getattr(model, "_llm_value", None)
-            # Or if a ChatOpenAI instance (or similar) is passed directly, use it
-            elif isinstance(model, ChatOpenAI):
-                self.__llm = model
-            else:
-                self.__llm = getattr(model, "_llm", None) or getattr(model, "_llm_value", None)
-        except Exception:
-            self.__llm = None
-
-        if self.__llm is None:
-            raise TypeError("Provided model is not a valid LLM component or ChatOpenAI instance for the llm agent.")
+        self._llm = model._llm
 
         self._is_planner = get_optional(config, "planning", False)
         self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"}))
@@ -111,7 +94,8 @@ class llm(agent):
         if thought_match:
             thought = thought_match.group(1).strip()
         
-        if final_answer_match and not thought_match and not action_match:
+        # Final Answer takes precedence over thought and action
+        if final_answer_match and not action_match:
             final_answer = final_answer_match.group(1).strip()
             return final_answer, None, True
 
@@ -149,7 +133,7 @@ class llm(agent):
             ]
         )
 
-        chain = prompt | self.__llm
+        chain = prompt | self._llm
         result = chain.invoke({"input": query}).content
 
         # Clean output as JSON
@@ -172,15 +156,18 @@ class llm(agent):
             encoding = tiktoken.get_encoding("cl100k_base")
         return len(encoding.encode(text))
 
-    def input(self, query: str, inputs: dict = None):
+    async def input(self, query: str, inputs: dict = None):
         if inputs is None:
             inputs = {}
-        
+
+        # Set component context for proper event attribution
+        EventSource.set_current(getattr(self, 'name', 'unknown_agent'), 'agent')
+
         # Substitute inputs
         prompt = query
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
-        
+
         # # Search cache for similar results
         # if self._cache_mode:
         #     closest_query = self._cache_search_actions(query)
@@ -190,7 +177,7 @@ class llm(agent):
         self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
-        transformed = emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
+        transformed = await emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
         
         # Extract from typed payload
         query = transformed.input
@@ -208,6 +195,7 @@ class llm(agent):
             "{tools}\n\n"
         ).format(tools=tool_documentation) + self._prompt
 
+        log.debug(f"[FULL_CONTEXT]:\n{system_prompt}")
         system_prompt_tokens = self.count_tokens(system_prompt)
 
         prompt = ChatPromptTemplate.from_messages(
@@ -217,7 +205,7 @@ class llm(agent):
             ]
         )
 
-        chain = prompt | self.__llm
+        chain = prompt | self._llm
 
         current_prompt = query
 
@@ -227,7 +215,7 @@ class llm(agent):
             current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
             print(f"tokens: {current_tokens}")
 
-            if current_tokens > 100000:
+            if current_tokens > 90000:
                 log.debug("Token limit reached, summarising context...")
 
                 summariser_prompt = ChatPromptTemplate.from_messages(
@@ -237,7 +225,7 @@ class llm(agent):
                     ]
                 )
 
-                summariser_chain = summariser_prompt | self.__llm
+                summariser_chain = summariser_prompt | self._llm
 
                 summary = summariser_chain.invoke({"context": current_prompt}).content
                 log.debug(f"[SUMMARY]: {summary}")
@@ -266,10 +254,10 @@ class llm(agent):
             print(f"Thought: {thought}")
 
             # Emit agent.thought (non-blocking hook)
-            emit("agent.thought", {"thought": thought})
+            await emit("agent.thought", {"thought": thought})
 
             # Emit agent.action (pipes can transform, hooks can observe)
-            action_payload = emit("agent.action", {"action": action_dict})
+            action_payload = await emit("agent.action", {"action": action_dict})
             action_dict = action_payload.action
 
             try:
@@ -277,15 +265,16 @@ class llm(agent):
                 action = Action.from_dict(action_dict)
 
                 # Emit tool.call (pipes can transform, hooks can observe)
-                tool_call = emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")})
-                
+                tool_call = await emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")})
+
                 # Update action if pipes modified it
                 if tool_call.tool != action_dict.get("tool") or tool_call.args != action_dict.get("inputs"):
                     action_dict["tool"] = tool_call.tool
                     action_dict["inputs"] = tool_call.args
                     action = Action.from_dict(action_dict)
 
-                observation = self._task_m.execute(action)
+                # Use improved message bus API for tool execution
+                observation = await self._execute_tool_with_improved_api(action)
 
                 observation_tokens = self.count_tokens(observation)
                 if observation_tokens > 7500:
@@ -300,22 +289,44 @@ class llm(agent):
             except Exception as e:
                 log.exception("Unhandled error while executing action: %s", e)
                 # Emit agent.error for unexpected failures
-                emit("agent.error", {"error": e, "context": {"query": query}})
+                await emit("agent.error", {"error": e, "context": {"query": query}})
                 # feed back a generic observation and continue
                 observation = f"An error occurred while executing the action: {e}"
 
             log.debug(f"Observation: {observation}")
 
             # Emit tool.observation (pipes can transform, hooks can observe)
-            obs = emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
+            obs = await emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
             observation = obs.observation
 
             # Append step to ongoing prompt
             current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action_dict)}\nObservation: {observation}\n\nContinue with the next step:"
 
             # Emit step complete
-            emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
+            await emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
 
         # # Cache instructions
         # if self._cache_mode:
         #     self._cache_actions(result)
+
+    async def _execute_tool_with_improved_api(self, action: Action):
+        """
+        Execute tool using the clean message bus API.
+
+        This leverages the standard MessageBusIntegration methods for
+        simple, reliable component-to-component communication.
+        """
+        try:
+            # Special handling for ask_user (not a component)
+            if action.tool == "ask_user":
+                return input(f"{action.inputs.get('question', 'Please provide input:')}\n")
+
+            # Use the clean message API - one line!
+            return await self.request(action.tool, {
+                "action": action.action,
+                "inputs": action.inputs
+            })
+
+        except Exception as e:
+            log.error(f"[Agent] Error executing tool '{action.tool}': {e}")
+            return f"Error executing tool '{action.tool}': {e}"

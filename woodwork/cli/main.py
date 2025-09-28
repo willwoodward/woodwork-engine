@@ -125,6 +125,12 @@ def app_entrypoint(args):
     dependencies.activate_virtual_environment()
     config_parser.main_function()
     generate_exported_objects_file(registry=registry)
+    
+    # Debug: Show which orchestration mode is active
+    if globals.global_config.get("message_bus_active", False):
+        log.info("🚀 Woodwork running with DISTRIBUTED MESSAGE BUS orchestration")
+    else:
+        log.info("🔧 Woodwork running with TASK MASTER orchestration")
 
     deployer = Deployer()
     deployer.main()
@@ -156,7 +162,32 @@ def app_entrypoint(args):
             # ArgParse will SysExit if choice not in list
             pass
 
-    config_parser.task_m.start()
+    # Use AsyncRuntime for message bus mode, TaskMaster for traditional mode
+    if globals.global_config.get("message_bus_active", False):
+        print("🚀 DEBUG: Message bus mode active - using AsyncRuntime")
+        from woodwork.core.async_runtime import AsyncRuntime
+        import asyncio
+
+        # Create component config from parsed tools
+        component_config = {}
+        for tool in config_parser.task_m._tools:
+            component_config[tool.name] = {
+                "component": tool.__class__.__name__.lower(),
+                "type": getattr(tool, 'type', 'unknown'),
+                "object": tool
+            }
+
+        # Start unified async runtime
+        async def start_async_runtime():
+            runtime = AsyncRuntime()
+            await runtime.start({"components": config_parser.task_m._tools, "component_configs": component_config})
+
+        asyncio.run(start_async_runtime())
+        print("✅ DEBUG: AsyncRuntime completed")
+    else:
+        print("🔧 DEBUG: Traditional mode - using TaskMaster orchestration")
+        # Use traditional Task Master approach
+        config_parser.task_m.start()
 
 
 def cli_entrypoint() -> None:
@@ -193,3 +224,8 @@ def cli_entrypoint() -> None:
     logging.config.dictConfig(config)
 
     app_entrypoint(args)
+
+
+# Note: start_message_bus_loop and message_bus_main_loop functions have been
+# replaced by the DistributedStartupCoordinator class in woodwork.core.distributed_startup
+# The new implementation provides proper event loop ownership and clean shutdown

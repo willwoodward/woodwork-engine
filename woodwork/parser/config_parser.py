@@ -139,8 +139,10 @@ def create_object(command):
     if "pipes" in command:
         log.debug(f"[create_object] Found pipes: {command['pipes']}")
 
-    # Add metadata to the config
+    # Add metadata to the config (required by new component base class)
     config["name"] = variable
+    config["component"] = component
+    config["type"] = type
     
     # Include hooks and pipes in config if they exist
     if "hooks" in command:
@@ -211,6 +213,12 @@ def create_object(command):
             config["task_master"] = task_m
             return init_object(command_line, **config)
 
+        if type == "api":
+            from woodwork.components.inputs.api_input import api_input
+
+            # API input doesn't need task_master - it uses messaging system
+            return init_object(api_input, **config)
+
     if component == "api":
         if type == "web":
             from woodwork.components.apis.web import web
@@ -246,9 +254,9 @@ def create_object(command):
     
     if component == "mcp":
         if type == "server":
-            from woodwork.components.mcp.server import mcp_server
+            from woodwork.components.mcp import MCPServer
 
-            return init_object(mcp_server, **config)
+            return init_object(MCPServer, **config)
 
     if component == "environment":
         if type == "coding":
@@ -630,12 +638,146 @@ def parse(config: str, registry=None) -> dict:
         if comp.name not in router.components:
             router.add(comp)
 
+    # NOTE: Just set the flag to activate message bus mode
+    # Full initialization will be handled by DistributedStartupCoordinator in proper event loop
+    import woodwork.globals as globals
+    globals.global_config["message_bus_active"] = True
+    log.info("[ConfigParser] Message bus mode activated - initialization deferred to DistributedStartupCoordinator")
+    
     task_m.add_tools(tools)
 
     return commands
 
 
+def _initialize_message_bus_integration(commands: dict) -> None:
+    """Synchronously initialize message bus integration with component configurations"""
+    try:
+        from woodwork.core.message_bus.integration import (
+            initialize_global_message_bus_integration,
+            initialize_global_message_bus_integration_sync,
+            get_global_message_bus_manager
+        )
+        from woodwork.core.message_bus.factory import configure_global_message_bus
+
+        log.info("[ConfigParser] Initializing message bus integration...")
+
+        # Extract component instances for routing
+        component_configs = {}
+        deployment_config = None
+
+        for name, command_data in commands.items():
+            obj = command_data.get("object")
+            if hasattr(obj, "component") and hasattr(obj, "config"):
+                # Regular component
+                component_configs[name] = {
+                    "object": obj,  # store instance
+                    **obj.config,
+                    "component": obj.component,
+                    "type": obj.type,
+                    "name": name
+                }
+            elif isinstance(obj, Deployment):
+                if name == "deployment" or obj.component == "deployment":
+                    deployment_config = command_data.get("config", {})
+
+        log.debug("[ConfigParser] Found %d components for message bus routing", len(component_configs))
+
+        # Activate message bus globally
+        import woodwork.globals as globals
+        globals.global_config["message_bus_active"] = True
+        log.info("[ConfigParser] Message bus mode activated - Task Master will be disabled")
+
+        # Configure custom message bus if specified
+        if deployment_config and "message_bus" in deployment_config:
+            message_bus_config = deployment_config["message_bus"]
+            log.info("[ConfigParser] Found custom message bus configuration: %s", message_bus_config)
+            if isinstance(message_bus_config, str):
+                if message_bus_config.startswith("redis://"):
+                    message_bus_config = {"type": "redis", "redis_url": message_bus_config}
+                elif message_bus_config.startswith("nats://"):
+                    message_bus_config = {"type": "nats", "nats_url": message_bus_config}
+                else:
+                    log.warning("[ConfigParser] Unknown message bus URL format: %s", message_bus_config)
+                    message_bus_config = {"type": "auto"}
+            configure_global_message_bus(message_bus_config)
+            log.info("[ConfigParser] Configured custom message bus")
+        else:
+            log.info("[ConfigParser] Using default message bus configuration")
+
+        # Initialize message bus integration synchronously without separate event loop
+        initialize_global_message_bus_integration_sync(component_configs)
+        log.info("[ConfigParser] Message bus integration initialized with %d components", len(component_configs))
+
+        # Ensure all components have the required integration attributes
+        for cfg in component_configs.values():
+            comp = cfg.get("object")
+            if comp:
+                if not hasattr(comp, "_integration_ready"):
+                    comp._integration_ready = True
+                # Let MessageBusIntegration handle _message_bus itself in _ensure_message_bus_integration
+                # Don't set _message_bus to GlobalMessageBusManager - it should be the actual bus
+
+                # Set unified event bus router if not already set
+                if not hasattr(comp, "_router") or comp._router is None:
+                    from woodwork.core.unified_event_bus import get_global_event_bus
+                    try:
+                        # This is sync context, so we need to handle async differently
+                        log.debug("[ConfigParser] Setting unified event bus router on component '%s'", comp.name)
+                        # For now, just set a placeholder - the actual router will be set in async context
+                        comp._router_pending = True
+                    except Exception as e:
+                        log.warning("[ConfigParser] Failed to prepare router for component '%s': %s", comp.name, e)
+
+        # Log status
+        manager = get_global_message_bus_manager()
+        stats = manager.get_manager_stats()
+        log.info("[ConfigParser] Message bus status: %s", {
+            "integration_active": stats["integration_active"],
+            "registered_components": stats["registered_components"],
+            "message_bus_healthy": stats["message_bus_healthy"]
+        })
+        if stats.get("router_stats", {}).get("routing_table"):
+            log.debug("[ConfigParser] Routing table: %s", stats["router_stats"]["routing_table"])
+
+    except Exception as e:
+        log.error("[ConfigParser] Failed to initialize message bus integration: %s", e)
+        log.error("[ConfigParser] Components will work without distributed messaging")
+
+
+
+async def _async_initialize_message_bus(component_configs: dict) -> None:
+    """Async helper for message bus initialization"""
+    try:
+        from woodwork.core.message_bus.integration import initialize_global_message_bus_integration
+        
+        await initialize_global_message_bus_integration(component_configs)
+        log.info("[ConfigParser] Message bus integration initialized with %d components", len(component_configs))
+        
+        # Log routing configuration for debugging
+        from woodwork.core.message_bus.integration import get_global_message_bus_manager
+        manager = get_global_message_bus_manager()
+        stats = manager.get_manager_stats()
+        
+        log.info("[ConfigParser] Message bus status: %s", {
+            "integration_active": stats["integration_active"],
+            "registered_components": stats["registered_components"],
+            "message_bus_healthy": stats["message_bus_healthy"]
+        })
+        
+        if stats.get("router_stats", {}).get("routing_table"):
+            log.debug("[ConfigParser] Routing table: %s", stats["router_stats"]["routing_table"])
+        
+    except Exception as e:
+        log.error("[ConfigParser] Error in async message bus initialization: %s", e)
+
+
 def main_function(registry=None):
+    """
+    Parse configuration file and initialize components.
+
+    Note: Message bus initialization is now handled by DistributedStartupCoordinator
+    to ensure proper event loop ownership and clean startup sequence.
+    """
     current_directory = os.getcwd()
     with open(current_directory + "/main.ww") as f:
         lines = f.read()
@@ -684,3 +826,113 @@ def find_action_plan(query: str):
                 result = similar_prompts[i]
 
                 print(f"{result['value']} {result['nodeID']}")
+
+
+def parse_config_dict(config_dict: dict) -> dict:
+    """
+    Parse configuration dictionary for unified async runtime.
+
+    This creates components from a dictionary configuration,
+    similar to parsing .ww files but for programmatic use.
+    """
+    log.debug("[ConfigParser] Parsing config dictionary with %d entries", len(config_dict))
+
+    components = []
+    component_configs = {}
+
+    # Convert dictionary entries to component objects
+    for component_name, component_config in config_dict.items():
+        try:
+            # Extract component info
+            component_type = component_config.get("component", "unknown")
+            type_name = component_config.get("type", "unknown")
+
+            log.debug("[ConfigParser] Creating component: %s (%s/%s)",
+                     component_name, component_type, type_name)
+
+            # Create component using existing factory functions
+            config_copy = component_config.copy()
+            config_copy["name"] = component_name
+
+            component_obj = create_component_object(component_type, type_name, config_copy)
+
+            if component_obj:
+                components.append(component_obj)
+                component_configs[component_name] = {
+                    "object": component_obj,
+                    "component": component_type,
+                    "variable": component_name,
+                    "config": config_copy
+                }
+
+                log.debug("[ConfigParser] Created component: %s", component_name)
+            else:
+                log.warning("[ConfigParser] Failed to create component: %s", component_name)
+
+        except Exception as e:
+            log.error("[ConfigParser] Error creating component %s: %s", component_name, e)
+
+    log.info("[ConfigParser] Parsed %d components from dictionary", len(components))
+
+    return {
+        "components": components,
+        "component_configs": component_configs
+    }
+
+
+def create_component_object(component_type: str, type_name: str, config: dict):
+    """Create component object from type information."""
+    try:
+        if component_type == "input" or component_type == "inputs":
+            if type_name == "api":
+                from woodwork.components.inputs.api_input import api_input
+                return init_object(api_input, **config)
+            elif type_name == "command_line":
+                from woodwork.components.inputs.command_line import command_line
+                config["task_master"] = task_m
+                return init_object(command_line, **config)
+
+        elif component_type == "llm" or component_type == "llms":
+            if type_name == "openai":
+                from woodwork.components.llms.openai import openai
+                return init_object(openai, **config)
+            elif type_name == "ollama":
+                from woodwork.components.llms.ollama import ollama
+                return init_object(ollama, **config)
+
+        elif component_type == "agent" or component_type == "agents":
+            if type_name == "llm":
+                from woodwork.components.agents.llm import llm
+                config["task_m"] = task_m
+                return init_object(llm, **config)
+
+        elif component_type == "output" or component_type == "outputs":
+            if type_name == "console":
+                from woodwork.components.outputs.console import console
+                return init_object(console, **config)
+
+        # Add more component types as needed
+        log.warning("[ConfigParser] Unknown component type: %s/%s", component_type, type_name)
+        return None
+
+    except Exception as e:
+        log.error("[ConfigParser] Error creating %s/%s: %s", component_type, type_name, e)
+        return None
+
+
+def parse_config_file(file_path: str) -> dict:
+    """Parse .ww configuration file."""
+    # This is a wrapper around existing parse functionality
+    # but returns format compatible with AsyncRuntime
+
+    # Read and parse the file (use existing logic)
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    # Use existing parsing logic but adapt output format
+    # This is a simplified version - you may need to adapt based on your existing parse logic
+
+    # For now, return a basic structure
+    # You would adapt your existing parse logic here
+    log.warning("[ConfigParser] File parsing not fully implemented - returning empty config")
+    return {"components": [], "component_configs": {}}
