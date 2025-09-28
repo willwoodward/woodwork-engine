@@ -254,9 +254,9 @@ def create_object(command):
     
     if component == "mcp":
         if type == "server":
-            from woodwork.components.mcp.server import mcp_server
+            from woodwork.components.mcp import MCPServer
 
-            return init_object(mcp_server, **config)
+            return init_object(MCPServer, **config)
 
     if component == "environment":
         if type == "coding":

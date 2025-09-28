@@ -91,7 +91,7 @@ Types are centralized in `woodwork/types/`:
 Import patterns:
 - `from woodwork.types import InputReceivedPayload, EventSource`
 - `from woodwork.events import emit, BasePayload`
-- `from woodwork.payloads import ToolCallPayload` (convenience imports)
+- `from woodwork.payloads import ToolCallPayload, AgentThoughtPayload` (convenience imports for all payload types)
 
 ### File Structure
 - `woodwork/components/` - All component implementations
@@ -99,6 +99,7 @@ Import patterns:
 - `woodwork/deployments/` - Deployment and routing systems
 - `woodwork/events/` - Event system with hooks, pipes, and typed payloads
 - `woodwork/types/` - Type definitions for events, data, and workflows
+- `woodwork/payloads.py` - Convenience imports for all event payload types
 - `woodwork/core/` - Task master and core orchestration
 - `woodwork/parser/` - .ww file parsing and configuration
 - `examples/` - Sample .ww configurations demonstrating features

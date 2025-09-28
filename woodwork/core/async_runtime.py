@@ -48,14 +48,17 @@ class AsyncRuntime:
             # 1. Parse and register components
             await self.initialize_components(config)
 
-            # 2. Configure routing
+            # 2. Wait for async component startup (e.g., MCP servers)
+            await self.startup_async_components()
+
+            # 3. Configure routing
             self.event_bus.configure_routing()
 
-            # 3. Start API server if needed (in same async context)
+            # 4. Start API server if needed (in same async context)
             if self.has_api_component():
                 await self._start_api_server()
 
-            # 4. Start main event loop
+            # 5. Start main event loop
             await self._main_loop()
 
         except Exception as e:
@@ -77,6 +80,41 @@ class AsyncRuntime:
             self.components[component.name] = component
 
         log.info("[AsyncRuntime] Initialized %d components", len(components))
+
+    async def startup_async_components(self) -> None:
+        """Start async components and wait for initialization to complete."""
+        log.info("[AsyncRuntime] Starting async component initialization")
+
+        startup_tasks = []
+
+        # Find components that need async startup
+        for component in self.components.values():
+            if hasattr(component, '_blocking_startup_task') and component._blocking_startup_task:
+                # MCP servers with blocking startup tasks
+                startup_tasks.append(component._blocking_startup_task)
+                log.debug("[AsyncRuntime] Found MCP server with blocking startup: %s", component.name)
+            elif hasattr(component, 'start') and asyncio.iscoroutinefunction(component.start):
+                # Components with async start methods
+                startup_task = asyncio.create_task(component.start())
+                startup_tasks.append(startup_task)
+                log.debug("[AsyncRuntime] Starting async component: %s", component.name)
+
+        if startup_tasks:
+            log.info("[AsyncRuntime] Waiting for %d async components to start", len(startup_tasks))
+
+            # Wait for all startup tasks to complete with timeout
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*startup_tasks, return_exceptions=True),
+                    timeout=30.0  # 30 second timeout for all components
+                )
+                log.info("[AsyncRuntime] All async components started successfully")
+            except asyncio.TimeoutError:
+                log.warning("[AsyncRuntime] Some async components did not start within 30 seconds")
+            except Exception as e:
+                log.error("[AsyncRuntime] Error during async component startup: %s", e)
+        else:
+            log.debug("[AsyncRuntime] No async components requiring startup found")
 
     async def _parse_components(self, config: Dict[str, Any]) -> List[Any]:
         """Parse components from configuration"""

@@ -94,7 +94,8 @@ class llm(agent):
         if thought_match:
             thought = thought_match.group(1).strip()
         
-        if final_answer_match and not thought_match and not action_match:
+        # Final Answer takes precedence over thought and action
+        if final_answer_match and not action_match:
             final_answer = final_answer_match.group(1).strip()
             return final_answer, None, True
 
@@ -194,6 +195,7 @@ class llm(agent):
             "{tools}\n\n"
         ).format(tools=tool_documentation) + self._prompt
 
+        log.debug(f"[FULL_CONTEXT]:\n{system_prompt}")
         system_prompt_tokens = self.count_tokens(system_prompt)
 
         prompt = ChatPromptTemplate.from_messages(

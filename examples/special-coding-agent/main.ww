@@ -60,8 +60,13 @@ input = input api {
     to: coding_ag
 }
 
-github_api = api functions {
-    path: "github_api.py"
+github_api = mcp server {
+  server: "github/mcp-server"
+  version: "latest"
+  toolsets: "repos,issues"
+  env: {
+    GITHUB_TOKEN: $GITHUB_MCP_TOKEN
+  }
 }
 
 dev_env = environment coding {
