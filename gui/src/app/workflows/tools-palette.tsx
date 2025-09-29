@@ -1,4 +1,3 @@
-import React from "react";
 import { ToolIcon } from "@/components/ui";
 
 const availableTools = [

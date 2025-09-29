@@ -7,7 +7,7 @@ coding_ag = agent llm {
     model: llm
     cache: False
     planning: True
-    tools: [github_api, dev_env]
+    tools: [github_api, dev_env, llm]
     
     hooks: [
         {

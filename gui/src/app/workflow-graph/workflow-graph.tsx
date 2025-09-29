@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -13,22 +13,33 @@ import {
 import type {
   Node,
   Edge,
+  Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useWorkflows } from "@/hooks/useWorkflows";
 import {
   SidebarSection,
   InfoDisplay,
   EmptyState,
   WorkflowCard,
   ToolIcon,
-  getToolIcon,
-  type InfoItem,
 } from "@/components/ui";
 import { useWorkflowsApi } from "@/hooks/useApiWithFallback";
 
+// Define node data types
+type NodeData = {
+  label: string;
+  step?: {
+    name?: string;
+    tool?: string;
+    description?: string;
+  };
+  workflow?: {
+    name?: string;
+  };
+};
+
 // Custom node component with icon
-const CustomNode = ({ data }: { data: any }) => {
+const CustomNode = ({ data }: { data: NodeData }) => {
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-card text-card-foreground border-2 border-border rounded-lg shadow-sm min-w-[180px]">
       <ToolIcon tool={data.step?.tool || ''} className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -100,11 +111,11 @@ export default function WorkflowGraphPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData.edges);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  const onConnect = useCallback((params) => {
+  const onConnect = useCallback((params: Connection) => {
     setEdges((eds) => addEdge(params, eds));
   }, [setEdges]);
 
-  const onNodeClick = useCallback((_, node) => {
+  const onNodeClick = useCallback((_: any, node: Node) => {
     setSelectedNode(node);
   }, []);
 
@@ -137,7 +148,7 @@ export default function WorkflowGraphPage() {
               colorMode="system"
               style={{ width: "100%", height: "100%" }}
             >
-              <Background variant="dots" style={{ backgroundColor: 'transparent' }} />
+              <Background style={{ backgroundColor: 'transparent' }} />
               <Controls />
             </ReactFlow>
           </div>
@@ -150,20 +161,20 @@ export default function WorkflowGraphPage() {
           {selectedNode ? (
             <div className="space-y-4">
               <SidebarSection
-                title={selectedNode.data?.step?.name || selectedNode.data?.label || "Unnamed Node"}
+                title={(selectedNode.data as NodeData)?.step?.name || (selectedNode.data as NodeData)?.label || "Unnamed Node"}
               >
                 <InfoDisplay
                   items={[
                     { key: "ID", value: selectedNode.id },
-                    ...(selectedNode.data?.step?.tool ? [{ key: "Tool", value: selectedNode.data.step.tool }] : []),
-                    ...(selectedNode.data?.workflow?.name ? [{ key: "Workflow", value: selectedNode.data.workflow.name }] : []),
+                    ...((selectedNode.data as NodeData)?.step?.tool ? [{ key: "Tool", value: (selectedNode.data as NodeData).step!.tool! }] : []),
+                    ...((selectedNode.data as NodeData)?.workflow?.name ? [{ key: "Workflow", value: (selectedNode.data as NodeData).workflow!.name! }] : []),
                   ]}
                 />
               </SidebarSection>
 
-              {selectedNode.data?.step?.description && (
+              {(selectedNode.data as NodeData)?.step?.description && (
                 <SidebarSection title="Description">
-                  <p className="text-sm text-muted-foreground">{selectedNode.data.step.description}</p>
+                  <p className="text-sm text-muted-foreground">{(selectedNode.data as NodeData).step!.description}</p>
                 </SidebarSection>
               )}
 

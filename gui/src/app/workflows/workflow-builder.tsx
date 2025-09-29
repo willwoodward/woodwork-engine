@@ -1,13 +1,10 @@
-import React, { useState, useMemo } from "react";
-import { Plus, Save, Play, Settings2, Trash2 } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Save, Play, Trash2 } from "lucide-react";
 import { useWorkflowsApi } from "@/hooks/useApiWithFallback";
-import { type MockWorkflow, type MockWorkflowStep } from "@/data/mock-data";
+import { type MockWorkflowStep } from "@/data/mock-data";
 import {
-  SidebarSection,
-  InfoDisplay,
   EmptyState,
   ToolIcon,
-  type InfoItem,
 } from "@/components/ui";
 import StepConfigPanel from "./step-config-panel";
 import ToolsPalette from "./tools-palette";
@@ -30,7 +27,7 @@ export default function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   }, [workflowId, mockWorkflows]);
 
   // Update local state when workflow changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (workflowId === "new") {
       setWorkflowSteps([]);
       setWorkflowName("New Workflow");

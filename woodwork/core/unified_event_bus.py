@@ -337,6 +337,13 @@ class UnifiedEventBus:
                 log.warning("[UnifiedEventBus] Target component '%s' not found", target_name)
             return None
 
+        # Only deliver input.received events to component input methods
+        # Other events are processed by hooks/pipes but not delivered as input
+        if event_type != "input.received":
+            log.debug("[UnifiedEventBus] Skipping delivery of '%s' to component '%s' (not an input event)",
+                     event_type, target_name)
+            return None
+
         # Check if component has input method
         if not hasattr(target_component, 'input'):
             log.debug("[UnifiedEventBus] Component '%s' has no input method", target_name)
@@ -345,8 +352,8 @@ class UnifiedEventBus:
         try:
             log.debug("[UnifiedEventBus] Delivering '%s' to component '%s'", event_type, target_name)
 
-            # Prepare input data
-            if event_type == "input.received" and hasattr(payload, 'input'):
+            # Prepare input data for input.received events
+            if hasattr(payload, 'input'):
                 input_data = payload.input
             else:
                 input_data = payload

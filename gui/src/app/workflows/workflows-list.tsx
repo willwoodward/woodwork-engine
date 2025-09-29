@@ -1,10 +1,6 @@
 import { Plus } from "lucide-react";
 import { useWorkflowsApi } from "@/hooks/useApiWithFallback";
 
-type WorkflowSummary = {
-  id: string;
-  name: string;
-};
 
 interface WorkflowsListProps {
   selectedWorkflowId: string | null;

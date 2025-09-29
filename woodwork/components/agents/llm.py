@@ -2,6 +2,8 @@ import json
 import re
 import logging
 import ast
+import asyncio
+import uuid
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
@@ -11,10 +13,11 @@ import tiktoken
 from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
-from woodwork.core.unified_event_bus import emit
+from woodwork.core.unified_event_bus import emit, get_global_event_bus
 from woodwork.types.event_source import EventSource
 from woodwork.components.llms.llm import llm
 from woodwork.core.message_bus.interface import create_component_message
+from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
 
 log = logging.getLogger(__name__)
 
@@ -32,9 +35,80 @@ class llm(agent):
         self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"}))
         self._prompt = get_prompt(self._prompt_config.file)
 
+        # Event-based ask_user handling
+        self._pending_user_requests: dict[str, asyncio.Future] = {}
+        self._event_bus = get_global_event_bus()
+
+        # Register for user input responses
+        self._event_bus.register_hook("user.input.response", self._handle_user_input_response)
+
         # self.__retriever = None
         # if "knowledge_base" in config:
         #     self.__retriever = config["knowledge_base"].retriever
+
+    async def _handle_user_input_response(self, payload):
+        """Handle user input response events"""
+        try:
+            if isinstance(payload, UserInputResponsePayload):
+                request_id = payload.request_id
+                if request_id in self._pending_user_requests:
+                    future = self._pending_user_requests[request_id]
+                    if not future.done():
+                        future.set_result(payload.response)
+                    del self._pending_user_requests[request_id]
+                    log.debug(f"[Agent] Received user response for request {request_id}: {payload.response}")
+                else:
+                    log.warning(f"[Agent] Received user response for unknown request {request_id}")
+            elif isinstance(payload, dict) and 'request_id' in payload:
+                # Handle dict format for compatibility
+                request_id = payload['request_id']
+                if request_id in self._pending_user_requests:
+                    future = self._pending_user_requests[request_id]
+                    if not future.done():
+                        future.set_result(payload.get('response', ''))
+                    del self._pending_user_requests[request_id]
+                    log.debug(f"[Agent] Received user response for request {request_id}: {payload.get('response', '')}")
+        except Exception as e:
+            log.error(f"[Agent] Error handling user input response: {e}")
+
+    async def _ask_user_via_events(self, question: str, timeout_seconds: int = 600) -> str:
+        """Ask user for input via event system instead of blocking input()"""
+        request_id = str(uuid.uuid4())
+
+        # Create a future to wait for the response
+        future = asyncio.Future()
+        self._pending_user_requests[request_id] = future
+
+        try:
+            # Create and emit the user input request
+            request_payload = UserInputRequestPayload(
+                question=question,
+                request_id=request_id,
+                timeout_seconds=timeout_seconds,
+                component_id=self.name,
+                component_type="agent"
+            )
+
+            log.debug(f"[Agent] Requesting user input: {question}")
+            await emit("user.input.request", request_payload)
+
+            # Wait for response with timeout
+            response = await asyncio.wait_for(future, timeout=timeout_seconds)
+            log.debug(f"[Agent] User response received: {response}")
+            return response
+
+        except asyncio.TimeoutError:
+            log.warning(f"[Agent] User input request {request_id} timed out after {timeout_seconds} seconds")
+            # Clean up
+            if request_id in self._pending_user_requests:
+                del self._pending_user_requests[request_id]
+            return f"[Timeout: No user response received within {timeout_seconds} seconds]"
+        except Exception as e:
+            log.error(f"[Agent] Error requesting user input: {e}")
+            # Clean up
+            if request_id in self._pending_user_requests:
+                del self._pending_user_requests[request_id]
+            return f"[Error requesting user input: {e}]"
 
     def __clean(self, x):
         start_index = -1
@@ -177,11 +251,24 @@ class llm(agent):
         self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
-        transformed = await emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
-        
-        # Extract from typed payload
-        query = transformed.input
-        inputs = transformed.inputs
+        from woodwork.types.events import InputReceivedPayload
+        input_payload = InputReceivedPayload(
+            input=query,
+            inputs=inputs,
+            session_id=getattr(self, "_session", None),
+            component_id=self.name,
+            component_type="agent"
+        )
+        transformed = await emit("input.received", input_payload)
+
+        # Extract from typed payload (handle fallback to GenericPayload)
+        if hasattr(transformed, 'input'):
+            query = transformed.input
+            inputs = transformed.inputs
+        else:
+            # Fallback for GenericPayload
+            query = input_payload.input
+            inputs = input_payload.inputs
 
         # Build tool documentation string
         tool_documentation = ""
@@ -317,9 +404,11 @@ class llm(agent):
         simple, reliable component-to-component communication.
         """
         try:
-            # Special handling for ask_user (not a component)
+            # Special handling for ask_user (uses event-based communication)
             if action.tool == "ask_user":
-                return input(f"{action.inputs.get('question', 'Please provide input:')}\n")
+                question = action.inputs.get('question', 'Please provide input:')
+                timeout = action.inputs.get('timeout_seconds', 60)
+                return await self._ask_user_via_events(question, timeout)
 
             # Use the clean message API - one line!
             return await self.request(action.tool, {

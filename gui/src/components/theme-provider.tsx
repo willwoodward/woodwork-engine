@@ -20,39 +20,60 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 
+function applyTheme(theme: Theme) {
+  const root = window.document.documentElement
+  root.classList.remove("light", "dark")
+
+  if (theme === "system") {
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+      .matches
+      ? "dark"
+      : "light"
+
+    root.classList.add(systemTheme)
+    return
+  }
+
+  root.classList.add(theme)
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = "system",
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  )
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Get theme from localStorage, matching the logic in index.html
+    const stored = localStorage.getItem(storageKey) as Theme
+    if (stored && (stored === 'dark' || stored === 'light' || stored === 'system')) {
+      return stored
+    }
+    return defaultTheme
+  })
 
   useEffect(() => {
-    const root = window.document.documentElement
+    // Apply theme (this should match what's already applied from index.html)
+    applyTheme(theme)
 
-    root.classList.remove("light", "dark")
-
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light"
-
-      root.classList.add(systemTheme)
-      return
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+    const handleChange = () => {
+      if (theme === "system") {
+        applyTheme("system")
+      }
     }
 
-    root.classList.add(theme)
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
   }, [theme])
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme)
-      setTheme(theme)
+    setTheme: (newTheme: Theme) => {
+      localStorage.setItem(storageKey, newTheme)
+      setTheme(newTheme)
+      applyTheme(newTheme)
     },
   }
 

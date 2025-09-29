@@ -47,7 +47,7 @@ def parse_args(args: Sequence[str] | None = None) -> argparse.Namespace:
         "--gui",
         type=str,
         nargs="?",
-        choices=["run"],
+        choices=["run", "fastapi"],
         const="run",
         default=None,
         help=("Run the developer GUI for Woodwork. If the option is not specified, the GUI will not be launched. "),

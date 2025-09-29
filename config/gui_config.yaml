@@ -1,0 +1,7 @@
+# FastAPI GUI Server Configuration
+# This file configures which API inputs the GUI server should connect to
+
+api_inputs:
+  - host: "localhost"
+    port: 8000
+    name: "default_agent_system"

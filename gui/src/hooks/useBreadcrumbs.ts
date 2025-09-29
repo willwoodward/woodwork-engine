@@ -21,6 +21,10 @@ const routeConfig: Record<string, BreadcrumbItem[]> = {
     { label: "Playground", href: "#" },
     { label: "Workflow View", isCurrentPage: true }
   ],
+  "/inbox": [
+    { label: "Playground", href: "#" },
+    { label: "Agent Requests", isCurrentPage: true }
+  ],
   // Documentation routes (external)
   "/docs": [
     { label: "Playground", href: "/" },

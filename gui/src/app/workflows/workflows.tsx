@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import WorkflowsList from "@/app/workflows/workflows-list";
 import WorkflowBuilder from "@/app/workflows/workflow-builder";
 

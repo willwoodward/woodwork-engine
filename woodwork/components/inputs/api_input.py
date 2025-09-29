@@ -87,7 +87,8 @@ class api_input(inputs):
                 "tool.call",
                 "tool.observation",
                 "agent.step_complete",
-                "agent.error"
+                "agent.error",
+                "user.input.request"
             ]
 
             # Register async hooks for real-time delivery
@@ -123,11 +124,45 @@ class api_input(inputs):
             log.debug("[api_input] Real-time event: %s from %s",
                      mapped_event_type, event_data['sender_component'])
 
+            # Special handling for user input requests - create inbox entry
+            if mapped_event_type == 'user.input.request':
+                await self._create_inbox_entry_for_user_request(payload_dict)
+
             # Forward directly to WebSocket sessions (no queues, no delays)
             await self._forward_event_to_websockets(event_data)
 
         except Exception as e:
             log.error("[api_input] Error handling real-time event: %s", e)
+
+    async def _create_inbox_entry_for_user_request(self, payload_dict: dict):
+        """Create an inbox entry for user input requests."""
+        try:
+            # Create a human input request for the inbox
+            inbox_payload = {
+                'request_id': payload_dict.get('request_id'),
+                'type': 'ask_user',
+                'title': f"User Input: {payload_dict.get('question', 'Input Required')[:50]}...",
+                'description': payload_dict.get('question', 'Agent is requesting user input'),
+                'context': f"Request from {payload_dict.get('component_id', 'unknown')}",
+                'priority': 'medium',  # Could be configurable
+                'agent_name': payload_dict.get('component_id', 'unknown'),
+                'session_id': payload_dict.get('session_id', 'default'),
+                'api_input_id': self.name,
+                'workflow_name': None,  # Could extract from payload if available
+                'created_at': time.time(),
+                'metadata': {
+                    'question': payload_dict.get('question'),
+                    'timeout_seconds': payload_dict.get('timeout_seconds', 60)
+                }
+            }
+
+            # Emit as human.input.required for inbox system
+            await self.event_bus.emit_from_component(self.name, "human.input.required", inbox_payload)
+            log.debug("[api_input] Created inbox entry for user input request: %s",
+                     payload_dict.get('request_id'))
+
+        except Exception as e:
+            log.error("[api_input] Error creating inbox entry for user request: %s", e)
 
     async def _forward_event_to_websockets(self, event_data: dict):
         """Forward event to all WebSocket sessions in real-time."""
@@ -173,28 +208,40 @@ class api_input(inputs):
             'ToolCallPayload': 'tool.call',
             'AgentErrorPayload': 'agent.error',
             'InputReceivedPayload': 'input.received',
+            'UserInputRequestPayload': 'user.input.request',
+            'UserInputResponsePayload': 'user.input.response',
             'GenericPayload': 'generic'
         }
         return mapping.get(class_name, class_name.lower())
 
-    async def handle_input(self, user_input: str) -> None:
+    async def handle_input(self, user_input: str, request_id: str = None) -> None:
         """Handle user input and emit through unified event system."""
         try:
             log.debug("[api_input] Processing user input: %s", user_input[:100])
 
-            # Create input payload
-            payload = InputReceivedPayload(
-                input=user_input,
-                inputs={},
-                session_id="api_session",
-                component_id=self.name,
-                component_type="inputs"
-            )
-
-            # Emit through unified event bus
-            await self.event_bus.emit_from_component(self.name, "input.received", payload)
-
-            log.debug("[api_input] Input processed and routed")
+            if request_id:
+                # This is a response to a user input request
+                from woodwork.types.events import UserInputResponsePayload
+                payload = UserInputResponsePayload(
+                    response=user_input,
+                    request_id=request_id,
+                    session_id="api_session",
+                    component_id=self.name,
+                    component_type="inputs"
+                )
+                await self.event_bus.emit_from_component(self.name, "user.input.response", payload)
+                log.debug("[api_input] User input response processed for request %s", request_id)
+            else:
+                # Regular input
+                payload = InputReceivedPayload(
+                    input=user_input,
+                    inputs={},
+                    session_id="api_session",
+                    component_id=self.name,
+                    component_type="inputs"
+                )
+                await self.event_bus.emit_from_component(self.name, "input.received", payload)
+                log.debug("[api_input] Input processed and routed")
 
         except Exception as e:
             log.error("[api_input] Error processing input: %s", e)
@@ -328,13 +375,15 @@ class api_input(inputs):
                         if message_type == "user_input":
                             # Old API format: {"type": "user_input", "input": "text"}
                             user_input = message.get("input", "")
+                            request_id = message.get("request_id")
                             if user_input:
-                                await self.handle_input(user_input)
+                                await self.handle_input(user_input, request_id)
                         elif message_type == "input":
                             # New API format: {"type": "input", "data": "text"}
                             user_input = message.get("data", "")
+                            request_id = message.get("request_id")
                             if user_input:
-                                await self.handle_input(user_input)
+                                await self.handle_input(user_input, request_id)
                         elif message_type == "subscribe":
                             # Handle subscription requests (old API compatibility)
                             components = message.get("components", [])
@@ -368,6 +417,7 @@ class api_input(inputs):
             try:
                 data = await request.json()
                 user_input = data.get("input", "")
+                request_id = data.get("request_id")
 
                 if not user_input:
                     return JSONResponse(
@@ -376,7 +426,7 @@ class api_input(inputs):
                     )
 
                 # Process input
-                await self.handle_input(user_input)
+                await self.handle_input(user_input, request_id)
 
                 return JSONResponse(content={"status": "success", "message": "Input processed"})
 

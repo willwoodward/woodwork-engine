@@ -1,47 +1,43 @@
-import React, { useState } from "react";
 import { ChatWindow } from "@/components/chat";
-import { useChatSessionsApi } from "@/hooks/useApiWithFallback";
-import { type MockChatMessage } from "@/data/mock-data";
-import { defaultChatResponse } from "@/data/mock-data";
+import { useChatAPI } from "@/hooks/useChatAPI";
 
 export default function Page() {
-  const { data: chatSessions = [], isLoading } = useChatSessionsApi();
-  const [currentMessages, setCurrentMessages] = useState<MockChatMessage[]>(() => {
-    // Start with the first session's messages or empty
-    return chatSessions[0]?.messages || [];
-  });
-
-  const handleSendMessage = (messageContent: string) => {
-    const userMessage: MockChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: "user",
-      content: messageContent,
-      timestamp: new Date(),
-    };
-
-    setCurrentMessages(prev => [...prev, userMessage]);
-
-    // Simulate assistant response
-    setTimeout(() => {
-      const assistantMessage: MockChatMessage = {
-        id: `msg-${Date.now()}-assistant`,
-        role: "assistant",
-        content: defaultChatResponse,
-        timestamp: new Date(),
-      };
-      setCurrentMessages(prev => [...prev, assistantMessage]);
-    }, 1000);
-  };
-
-  // Use messages from first session if available, otherwise start fresh
-  const messagesToShow = currentMessages.length > 0 ? currentMessages : (chatSessions[0]?.messages || []);
+  const {
+    messages,
+    sendMessage,
+    isLoading,
+    isConnected,
+    sessionId,
+    inputStatus,
+    clearMessages
+  } = useChatAPI();
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0 h-full">
+      {/* Connection status */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className={`w-2 h-2 rounded-full ${
+          isConnected ? 'bg-green-500' : 'bg-red-500'
+        }`} />
+        {isConnected ? 'Connected to agent' : 'Disconnected'}
+        {sessionId && (
+          <span className="ml-2">Session: {sessionId.slice(0, 8)}...</span>
+        )}
+        {inputStatus && (
+          <span className="ml-2">API Inputs: {inputStatus.api_inputs}</span>
+        )}
+        <button
+          onClick={clearMessages}
+          className="ml-auto text-xs bg-muted px-2 py-1 rounded hover:bg-muted/80"
+        >
+          Clear Chat
+        </button>
+      </div>
+
       <div className="flex-1 bg-muted/50 rounded-xl overflow-hidden">
         <ChatWindow
-          messages={messagesToShow}
-          onSendMessage={handleSendMessage}
+          messages={messages}
+          onSendMessage={sendMessage}
           isLoading={isLoading}
           className="h-full"
         />

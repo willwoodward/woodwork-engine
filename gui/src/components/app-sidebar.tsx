@@ -66,6 +66,14 @@ const data = {
           title: "Workflow View",
           url: "/workflow-graph",
         },
+        {
+          title: "Workflow Browser",
+          url: "/workflow-browser",
+        },
+        {
+          title: "Agent Requests",
+          url: "/inbox",
+        },
       ],
     },
     {

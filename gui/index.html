@@ -5,6 +5,44 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Woodwork GUI</title>
+    <script>
+      // Prevent FOUC by applying theme before React loads
+      (function() {
+        const storageKey = 'vite-ui-theme';
+        const defaultTheme = 'dark';
+
+        function getTheme() {
+          const stored = localStorage.getItem(storageKey);
+          if (stored && (stored === 'dark' || stored === 'light' || stored === 'system')) {
+            return stored;
+          }
+          return defaultTheme;
+        }
+
+        function applyTheme(theme) {
+          const root = document.documentElement;
+          root.classList.remove('light', 'dark');
+
+          if (theme === 'system') {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.classList.add(systemTheme);
+          } else {
+            root.classList.add(theme);
+          }
+        }
+
+        // Apply theme immediately
+        applyTheme(getTheme());
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addListener(function() {
+          const currentTheme = getTheme();
+          if (currentTheme === 'system') {
+            applyTheme('system');
+          }
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
