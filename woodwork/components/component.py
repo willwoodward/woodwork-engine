@@ -3,7 +3,7 @@ import sys
 import importlib.util
 import logging
 import asyncio
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Callable
 from woodwork.types.workflows import Hook, Pipe
 from woodwork.events import EventManager, create_default_emitter, get_global_event_manager
 from woodwork.components.streaming_mixin import StreamingMixin
@@ -34,7 +34,10 @@ class component(StreamingMixin, MessageBusIntegration):
         self._emitter: Optional[EventManager] = None
         self._hooks: List[Hook] = []
         self._pipes: List[Pipe] = []
-        
+
+        # Internal features are now handled by specific component types
+        # (moved to LLM agents, etc. to avoid enabling for all components)
+
         self._setup_event_system(config)
         
         # Register with global message bus manager
@@ -245,6 +248,69 @@ class component(StreamingMixin, MessageBusIntegration):
             log.error(f"Error loading function {function_name} from {script_path}: {e}")
             return None
     
+    def add_hook(self, event_name: str, hook_function, description: str = None):
+        """
+        Add a hook to this component that listens for specific events.
+
+        Any component can add hooks to listen for events in the system.
+
+        Args:
+            event_name: Event to listen for (e.g., 'agent.thought', 'input.received', 'tool.call')
+            hook_function: Function to call when event occurs
+            description: Optional description for debugging
+
+        Example:
+            # In any component's __init__ or method:
+            def log_tool_calls(payload):
+                print(f"Tool called: {payload.tool_name}")
+
+            self.add_hook("tool.call", log_tool_calls, "Log all tool calls")
+        """
+        try:
+            from woodwork.core.unified_event_bus import get_global_event_bus
+            event_bus = get_global_event_bus()
+            event_bus.register_hook(event_name, hook_function)
+
+            desc = f" ({description})" if description else ""
+            log.info(f"[{self.__class__.__name__} {self.name}] Added hook for '{event_name}'{desc}")
+        except Exception as e:
+            log.error(f"[{self.__class__.__name__} {self.name}] Failed to add hook for '{event_name}': {e}")
+
+    def add_pipe(self, event_name: str, pipe_function, description: str = None):
+        """
+        Add a pipe to this component that can transform event payloads.
+
+        Any component can add pipes to transform events flowing through the system.
+
+        Args:
+            event_name: Event to transform (e.g., 'input.received', 'agent.thought')
+            pipe_function: Function that takes payload and returns modified payload
+            description: Optional description for debugging
+
+        Example:
+            # In any component's __init__ or method:
+            def add_component_context(payload):
+                enhanced = f"[{self.name}] {payload.input}"
+                return payload._replace(input=enhanced)
+
+            self.add_pipe("input.received", add_component_context, "Add component context to input")
+        """
+        try:
+            from woodwork.core.unified_event_bus import get_global_event_bus
+            event_bus = get_global_event_bus()
+            event_bus.register_pipe(event_name, pipe_function)
+
+            desc = f" ({description})" if description else ""
+            log.info(f"[{self.__class__.__name__} {self.name}] Added pipe for '{event_name}'{desc}")
+        except Exception as e:
+            log.error(f"[{self.__class__.__name__} {self.name}] Failed to add pipe for '{event_name}': {e}")
+
+    def close(self):
+        """Clean up component resources."""
+        # Base implementation for cleanup
+        # Internal features cleanup is handled by specific component types
+        pass
+
     @property
     def emitter(self) -> Optional[EventManager]:
         """Get the EventManager instance for this component."""

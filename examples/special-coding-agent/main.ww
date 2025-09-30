@@ -5,6 +5,7 @@ llm = llm openai {
 
 coding_ag = agent llm {
     model: llm
+    graph_cache: True
     cache: False
     planning: True
     tools: [github_api, dev_env, llm]

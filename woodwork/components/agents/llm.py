@@ -1,12 +1,10 @@
 import json
 import re
 import logging
-import ast
 import asyncio
 import uuid
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from typing import Any, Tuple, Optional
 import tiktoken
 
@@ -16,8 +14,9 @@ from woodwork.types import Action, Prompt
 from woodwork.core.unified_event_bus import emit, get_global_event_bus
 from woodwork.types.event_source import EventSource
 from woodwork.components.llms.llm import llm
-from woodwork.core.message_bus.interface import create_component_message
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
+from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
+from typing import Callable
 
 log = logging.getLogger(__name__)
 
@@ -42,9 +41,10 @@ class llm(agent):
         # Register for user input responses
         self._event_bus.register_hook("user.input.response", self._handle_user_input_response)
 
-        # self.__retriever = None
-        # if "knowledge_base" in config:
-        #     self.__retriever = config["knowledge_base"].retriever
+        # Setup internal features (only for LLM agents)
+        self._internal_component_manager = InternalComponentManager()
+        self._internal_features = InternalFeatureRegistry.create_features(config)
+        self._setup_internal_features(config)
 
     async def _handle_user_input_response(self, payload):
         """Handle user input response events"""
@@ -110,44 +110,6 @@ class llm(agent):
                 del self._pending_user_requests[request_id]
             return f"[Error requesting user input: {e}]"
 
-    def __clean(self, x):
-        start_index = -1
-        end_index = -1
-
-        for i in range(len(x) - 1):
-            if x[i] == "{":
-                start_index = i
-                break
-
-        for i in range(len(x) - 1, 0, -1):
-            if x[i] == "}":
-                end_index = i
-                break
-
-        if start_index == -1:
-            return x
-
-        try:
-            return json.loads(x[start_index : end_index + 1 :])
-        except:
-            log.debug("Couldn't load array as JSON")
-            log.debug(x[start_index : end_index + 1 :])
-            return x
-
-    def _safe_json_extract(self, s: str):
-        try:
-            # First try strict JSON
-            return json.loads(s)
-        except json.JSONDecodeError:
-            try:
-                # Fallback: allow Python-style literals (True/False/None, single quotes, etc.)
-                return ast.literal_eval(s)
-            except Exception as e:
-                # If both fail, raise a clear error
-                raise ValueError(f"Invalid JSON in action: {e}\nRaw string: {repr(s)}")
-
-
-
     def _parse(self, agent_output: str) -> Tuple[str, Optional[dict], bool]:
         """
         Parse a ReAct-style agent output and extract either:
@@ -180,44 +142,11 @@ class llm(agent):
         cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
 
         try:
-            action = self._safe_json_extract(cleaned_action_str)
+            action = json.loads(cleaned_action_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
 
         return thought, action, False
-
-
-    def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, Any]:
-        """Given a prompt and the inputs to be extracted, return the input dictionary."""
-        system_prompt = (
-            "Given the following prompt from the user, and a list of inputs:"
-            "{inputs} \n"
-            "Extract these from the user's prompt, and return in the following JSON schema:"
-            "{{{{input: extracted_text}}}}\n"
-            "For example, if the user's prompt is: what are the letters in the word chicken?, given the inputs: ['word']"
-            'The output would be: {{{{"word": "chicken"}}}}\n'
-            "When including data structures other than strings for the value, do not wrap them in a string."
-            "Return only this JSON object."
-        ).format(inputs=inputs)
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("human", "{input}"),
-            ]
-        )
-
-        chain = prompt | self._llm
-        result = chain.invoke({"input": query}).content
-
-        # Clean output as JSON
-        result = self.__clean(result)
-        return result
-
-    def _generate_workflow(self, query: str, partial_workflow: dict[str, Any]):
-        input_dict = self._find_inputs(query, partial_workflow["inputs"])
-        workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
-        return workflow
     
     def count_tokens(self, text: str, model: str = "gpt-5-mini"):
         if not isinstance(text, str):
@@ -242,12 +171,6 @@ class llm(agent):
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
-        # # Search cache for similar results
-        # if self._cache_mode:
-        #     closest_query = self._cache_search_actions(query)
-        #     if closest_query["score"] > 0.90:
-        #         log.debug("Cache hit!")
-        #         return self._output.execute(self._generate_workflow(query, closest_query))
         self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
@@ -392,10 +315,6 @@ class llm(agent):
             # Emit step complete
             await emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
 
-        # # Cache instructions
-        # if self._cache_mode:
-        #     self._cache_actions(result)
-
     async def _execute_tool_with_improved_api(self, action: Action):
         """
         Execute tool using the clean message bus API.
@@ -419,3 +338,171 @@ class llm(agent):
         except Exception as e:
             log.error(f"[Agent] Error executing tool '{action.tool}': {e}")
             return f"Error executing tool '{action.tool}': {e}"
+
+    def _setup_internal_features(self, config: dict) -> None:
+        """Setup internal features, create required components, and register hooks/pipes."""
+        log.debug(f"[LLM Agent {self.name}] Setting up {len(self._internal_features)} internal features")
+
+        for feature in self._internal_features:
+            try:
+                # Create required components for this feature
+                self._create_required_components(feature)
+
+                # Setup the feature with component manager access
+                # (This automatically registers hooks and pipes via feature.setup())
+                feature.setup(self, config, self._internal_component_manager)
+
+                log.debug(f"[LLM Agent {self.name}] Successfully set up internal feature: {feature.__class__.__name__}")
+            except Exception as e:
+                log.error(f"[LLM Agent {self.name}] Failed to setup internal feature {feature.__class__.__name__}: {e}")
+
+    def _create_required_components(self, feature: InternalFeature) -> None:
+        """Create all components required by a feature."""
+        required_components = feature.get_required_components()
+
+        for component_spec in required_components:
+            component_id = component_spec["component_id"]
+            component_type = component_spec["component_type"]
+            component_config = component_spec["config"]
+            is_optional = component_spec.get("optional", False)
+
+            try:
+                self._internal_component_manager.get_or_create_component(
+                    component_id, component_type, component_config
+                )
+                log.debug(f"[LLM Agent {self.name}] Created internal component: {component_id}")
+            except Exception as e:
+                if not is_optional:
+                    raise RuntimeError(f"Failed to create required internal component {component_id}: {e}")
+                log.warning(f"[LLM Agent {self.name}] Failed to create optional internal component {component_id}: {e}")
+
+
+    def get_internal_component(self, component_id: str):
+        """Get an internal component by ID."""
+        if hasattr(self, '_internal_component_manager'):
+            return self._internal_component_manager.get_component(component_id)
+        return None
+
+    def create_component(self, component_type: str, component_id: str = None, **config):
+        """
+        Direct API to create and attach internal components at runtime.
+
+        Args:
+            component_type: Type of component to create (e.g., 'neo4j', 'redis', 'chroma')
+            component_id: Optional custom ID, auto-generated if not provided
+            **config: Component configuration parameters
+
+        Returns:
+            Created component instance
+
+        Example:
+            # Create Neo4j component directly
+            neo4j = agent.create_component(
+                "neo4j",
+                uri="bolt://localhost:7687",
+                api_key="my-key"
+            )
+
+            # Create Redis component
+            redis = agent.create_component(
+                "redis",
+                host="localhost",
+                port=6379
+            )
+        """
+        if not hasattr(self, '_internal_component_manager'):
+            raise RuntimeError("Internal component manager not available")
+
+        # Auto-generate component ID if not provided
+        if component_id is None:
+            existing_count = len([k for k in self._internal_component_manager._components.keys()
+                                if k.startswith(f"{self.name}_{component_type}")])
+            component_id = f"{self.name}_{component_type}_{existing_count}"
+
+        # Add API key from model if available and not provided
+        if 'api_key' not in config and hasattr(self, 'model') and hasattr(self.model, '_api_key'):
+            config['api_key'] = self.model._api_key
+
+        # Create component through internal manager
+        component = self._internal_component_manager.get_or_create_component(
+            component_id, component_type, config
+        )
+
+        # Auto-attach to agent with clean attribute name
+        attr_name = f"_{component_type}_{existing_count}" if existing_count > 0 else f"_{component_type}"
+        setattr(self, attr_name, component)
+
+        log.info(f"[LLM Agent {self.name}] Created {component_type} component: {component_id}")
+        return component
+
+    def add_hook(self, event_name: str, hook_function, description: str = None):
+        """
+        Add a hook to this agent that listens for specific events.
+
+        Args:
+            event_name: Event to listen for (e.g., 'agent.thought', 'input.received')
+            hook_function: Function to call when event occurs
+            description: Optional description for debugging
+
+        Example:
+            def log_thoughts(payload):
+                print(f"Agent thought: {payload.thought}")
+
+            agent.add_hook("agent.thought", log_thoughts, "Log all agent thoughts")
+        """
+        try:
+            from woodwork.core.unified_event_bus import get_global_event_bus
+            event_bus = get_global_event_bus()
+            event_bus.register_hook(event_name, hook_function)
+
+            desc = f" ({description})" if description else ""
+            log.info(f"[LLM Agent {self.name}] Added hook for '{event_name}'{desc}")
+        except Exception as e:
+            log.error(f"[LLM Agent {self.name}] Failed to add hook for '{event_name}': {e}")
+
+    def add_pipe(self, event_name: str, pipe_function, description: str = None):
+        """
+        Add a pipe to this agent that can transform event payloads.
+
+        Args:
+            event_name: Event to transform (e.g., 'input.received')
+            pipe_function: Function that takes payload and returns modified payload
+            description: Optional description for debugging
+
+        Example:
+            def enhance_input(payload):
+                enhanced = f"Enhanced: {payload.input}"
+                return payload._replace(input=enhanced)
+
+            agent.add_pipe("input.received", enhance_input, "Add enhancement prefix")
+        """
+        try:
+            from woodwork.core.unified_event_bus import get_global_event_bus
+            event_bus = get_global_event_bus()
+            event_bus.register_pipe(event_name, pipe_function)
+
+            desc = f" ({description})" if description else ""
+            log.info(f"[LLM Agent {self.name}] Added pipe for '{event_name}'{desc}")
+        except Exception as e:
+            log.error(f"[LLM Agent {self.name}] Failed to add pipe for '{event_name}': {e}")
+
+    def close(self):
+        """Clean up internal features and components, then call parent close."""
+        try:
+            # Teardown features first
+            if hasattr(self, '_internal_features'):
+                for feature in self._internal_features:
+                    try:
+                        feature.teardown(self, self._internal_component_manager)
+                    except Exception as e:
+                        log.warning(f"[LLM Agent {self.name}] Error during feature teardown: {e}")
+
+            # Then cleanup all internal components
+            if hasattr(self, '_internal_component_manager'):
+                self._internal_component_manager.cleanup_components()
+                log.debug(f"[LLM Agent {self.name}] Internal features and components cleaned up")
+        except Exception as e:
+            log.warning(f"[LLM Agent {self.name}] Error during close: {e}")
+
+        # Call parent close method
+        super().close()

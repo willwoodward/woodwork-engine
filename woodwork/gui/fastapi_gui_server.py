@@ -99,6 +99,41 @@ class FastAPIGUIServer:
                 "categories": list(set(w.get("category", "general") for w in workflows))
             }
 
+        @self.app.get("/api/workflows/get")
+        async def get_stored_workflows():
+            """Get stored workflows from Neo4j database."""
+            try:
+                workflows = await self._get_stored_workflows()
+                return workflows
+            except Exception as e:
+                logger.error(f"Error getting stored workflows: {e}")
+                # Fallback to mock data if real data unavailable
+                return [
+                    {
+                        "id": "mock-workflow-1",
+                        "name": "Example Data Processing",
+                        "steps": [
+                            {"name": "Load Data", "tool": "file_reader", "description": "Read CSV files from input directory"},
+                            {"name": "Clean Data", "tool": "data_cleaner", "description": "Remove duplicates and handle missing values"}
+                        ]
+                    }
+                ]
+
+        @self.app.get("/api/workflows/{workflow_id}")
+        async def get_workflow_detail(workflow_id: str):
+            """Get detailed workflow information including steps and dependencies."""
+            try:
+                workflow = await self._get_workflow_detail(workflow_id)
+                if workflow:
+                    return workflow
+                else:
+                    raise HTTPException(status_code=404, detail="Workflow not found")
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error getting workflow detail: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         @self.app.get("/api/agents")
         async def get_agents():
             """Get available agents from all connected API inputs."""
@@ -320,6 +355,237 @@ class FastAPIGUIServer:
             ]
 
         return agents
+
+    async def _get_stored_workflows(self) -> List[Dict]:
+        """Get stored workflows from Neo4j database."""
+        try:
+            # Try to connect to Neo4j database where workflows are stored
+            from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+
+            neo4j_client = neo4j(
+                uri="bolt://localhost:7687",
+                user="neo4j",
+                password="testpassword",
+                name="workflows_gui_query"
+            )
+
+            # Query to get all completed workflows with their basic info
+            query = """
+            MATCH (w:Workflow)-[:CONTAINS]->(p:Prompt)
+            WHERE w.status = 'completed'
+            OPTIONAL MATCH (w)-[:CONTAINS]->(a:Action)
+            WITH w, p, count(a) as action_count,
+                 collect(DISTINCT {tool: a.tool, action: a.action}) as action_types
+            RETURN w.id as id,
+                   w.created_at as created_at,
+                   w.completed_at as completed_at,
+                   w.final_step as final_step,
+                   p.text as name,
+                   action_count,
+                   action_types
+            ORDER BY w.completed_at DESC
+            LIMIT 50
+            """
+
+            results = neo4j_client.run(query)
+            workflows = []
+
+            for record in results:
+                # Create workflow entry compatible with frontend
+                workflow = {
+                    "id": record.get("id", "unknown"),
+                    "name": record.get("name", "Unnamed Workflow")[:100],  # Truncate long names
+                    "steps": []
+                }
+
+                # Convert action types to steps format expected by frontend
+                action_types = record.get("action_types", [])
+                for i, action in enumerate(action_types[:10]):  # Limit to 10 steps for display
+                    workflow["steps"].append({
+                        "name": f"{action.get('action', 'unknown')}",
+                        "tool": action.get('tool', 'unknown'),
+                        "description": f"Step {i+1}: {action.get('action', 'unknown')} using {action.get('tool', 'unknown')}"
+                    })
+
+                # Add metadata
+                workflow["metadata"] = {
+                    "created_at": record.get("created_at"),
+                    "completed_at": record.get("completed_at"),
+                    "final_step": record.get("final_step"),
+                    "action_count": record.get("action_count", 0)
+                }
+
+                workflows.append(workflow)
+
+            neo4j_client.close()
+            logger.info(f"Retrieved {len(workflows)} stored workflows from Neo4j")
+            return workflows
+
+        except Exception as e:
+            logger.warning(f"Failed to get stored workflows from Neo4j: {e}")
+            # Return empty list if Neo4j is unavailable
+            return []
+
+    async def _get_workflow_detail(self, workflow_id: str) -> Optional[Dict]:
+        """Get detailed workflow information including full step chain and dependencies."""
+        try:
+            from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+
+            neo4j_client = neo4j(
+                uri="bolt://localhost:7687",
+                user="neo4j",
+                password="testpassword",
+                name="workflow_detail_query"
+            )
+
+            # Query to get complete workflow with action chain and dependencies
+            query = """
+            MATCH (w:Workflow {id: $workflow_id})-[:CONTAINS]->(p:Prompt)
+            OPTIONAL MATCH (w)-[:CONTAINS]->(a:Action)
+            OPTIONAL MATCH (p)-[:STARTS]->(first:Action)
+            OPTIONAL MATCH path = (first)-[:NEXT*0..50]->(action:Action)
+            WITH w, p, first,
+                 CASE WHEN path IS NOT NULL
+                      THEN nodes(path)
+                      ELSE [first]
+                 END as action_sequence
+            UNWIND action_sequence as action
+            WITH w, p, action
+            OPTIONAL MATCH (action)-[:DEPENDS_ON]->(dep:Action)
+            WITH w, p, action, collect(DISTINCT {
+                id: dep.id,
+                tool: dep.tool,
+                action: dep.action,
+                output: dep.output
+            }) as dependencies
+            RETURN w.id as workflow_id,
+                   w.status as status,
+                   w.created_at as created_at,
+                   w.completed_at as completed_at,
+                   w.final_step as final_step,
+                   p.text as prompt,
+                   p.id as prompt_id,
+                   action.id as action_id,
+                   action.tool as tool,
+                   action.action as action_name,
+                   action.inputs as inputs,
+                   action.output as output,
+                   action.sequence as sequence,
+                   dependencies
+            ORDER BY action.sequence
+            """
+
+            results = neo4j_client.run(query, {"workflow_id": workflow_id})
+
+            if not results:
+                neo4j_client.close()
+                return None
+
+            # Build detailed workflow structure
+            workflow_data = None
+            actions = []
+
+            for record in results:
+                if workflow_data is None:
+                    workflow_data = {
+                        "id": record.get("workflow_id"),
+                        "name": record.get("prompt", "Unnamed Workflow"),
+                        "status": record.get("status"),
+                        "created_at": record.get("created_at"),
+                        "completed_at": record.get("completed_at"),
+                        "final_step": record.get("final_step"),
+                        "prompt": record.get("prompt"),
+                        "prompt_id": record.get("prompt_id")
+                    }
+
+                if record.get("action_id"):
+                    actions.append({
+                        "id": record.get("action_id"),
+                        "name": record.get("action_name", "unknown"),
+                        "tool": record.get("tool", "unknown"),
+                        "inputs": record.get("inputs", "{}"),
+                        "output": record.get("output", "unknown"),
+                        "sequence": record.get("sequence", 0),
+                        "dependencies": record.get("dependencies", []),
+                        "description": f"{record.get('action_name', 'unknown')} using {record.get('tool', 'unknown')}"
+                    })
+
+            # Convert to frontend format
+            if workflow_data:
+                workflow_detail = {
+                    "id": workflow_data["id"],
+                    "name": workflow_data["name"],
+                    "steps": actions,
+                    "metadata": {
+                        "status": workflow_data["status"],
+                        "created_at": workflow_data["created_at"],
+                        "completed_at": workflow_data["completed_at"],
+                        "final_step": workflow_data["final_step"],
+                        "prompt": workflow_data["prompt"],
+                        "total_actions": len(actions)
+                    },
+                    "graph": {
+                        "nodes": [
+                            {"id": workflow_data["prompt_id"], "type": "prompt", "label": workflow_data["name"][:50]}
+                        ] + [
+                            {"id": action["id"], "type": "action", "label": f"{action['tool']}: {action['name']}"}
+                            for action in actions
+                        ],
+                        "edges": self._build_workflow_edges(workflow_data["prompt_id"], actions)
+                    }
+                }
+
+                neo4j_client.close()
+                return workflow_detail
+
+            neo4j_client.close()
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to get workflow detail for {workflow_id}: {e}")
+            return None
+
+    def _build_workflow_edges(self, prompt_id: str, actions: List[Dict]) -> List[Dict]:
+        """Build edges for workflow graph visualization."""
+        edges = []
+
+        if not actions:
+            return edges
+
+        # Sort actions by sequence
+        sorted_actions = sorted(actions, key=lambda x: x.get("sequence", 0))
+
+        # Add edge from prompt to first action
+        if sorted_actions:
+            edges.append({
+                "id": f"{prompt_id}->{sorted_actions[0]['id']}",
+                "source": prompt_id,
+                "target": sorted_actions[0]["id"],
+                "type": "starts"
+            })
+
+        # Add sequential edges
+        for i in range(len(sorted_actions) - 1):
+            current = sorted_actions[i]
+            next_action = sorted_actions[i + 1]
+            edges.append({
+                "id": f"{current['id']}->{next_action['id']}",
+                "source": current["id"],
+                "target": next_action["id"],
+                "type": "next"
+            })
+
+        # Add dependency edges
+        for action in actions:
+            for dep in action.get("dependencies", []):
+                edges.append({
+                    "id": f"{action['id']}-depends-{dep['id']}",
+                    "source": action["id"],
+                    "target": dep["id"],
+                    "type": "depends_on"
+                })
+
+        return edges
 
     async def _route_workflow_execution(self, request: WorkflowTriggerRequest) -> Dict:
         """Route workflow execution to appropriate API input."""

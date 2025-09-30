@@ -51,6 +51,9 @@ class AsyncRuntime:
             # 2. Wait for async component startup (e.g., MCP servers)
             await self.startup_async_components()
 
+            # 2.5. Start internal components created by features
+            await self.startup_internal_components()
+
             # 3. Configure routing
             self.event_bus.configure_routing()
 
@@ -310,6 +313,48 @@ class AsyncRuntime:
                 log.error("[AsyncRuntime] Error closing component %s: %s", getattr(component, 'name', 'unknown'), e)
 
         log.info("[AsyncRuntime] Cleanup completed")
+
+    def register_internal_component(self, component_id: str, component: Any) -> None:
+        """Register an internal component created by features."""
+        log.debug("[AsyncRuntime] Registering internal component: %s", component_id)
+
+        # Store in components dict with internal prefix to avoid conflicts
+        internal_component_name = f"internal_{component_id}"
+        self.components[internal_component_name] = component
+
+        # Register with event bus if component supports it
+        try:
+            self.event_bus.register_component(component)
+            log.debug("[AsyncRuntime] Internal component %s registered with event bus", component_id)
+        except Exception as e:
+            log.debug("[AsyncRuntime] Internal component %s could not register with event bus: %s", component_id, e)
+
+    async def startup_internal_components(self) -> None:
+        """Start all registered internal components."""
+        log.debug("[AsyncRuntime] Starting internal components")
+
+        startup_tasks = []
+        internal_components = {name: comp for name, comp in self.components.items() if name.startswith("internal_")}
+
+        for component_name, component in internal_components.items():
+            if hasattr(component, 'start'):
+                if asyncio.iscoroutinefunction(component.start):
+                    log.debug("[AsyncRuntime] Scheduling async startup for internal component: %s", component_name)
+                    startup_tasks.append(component.start())
+                else:
+                    log.debug("[AsyncRuntime] Starting sync internal component: %s", component_name)
+                    try:
+                        component.start()
+                    except Exception as e:
+                        log.warning("[AsyncRuntime] Error starting internal component %s: %s", component_name, e)
+
+        # Wait for all async startups to complete
+        if startup_tasks:
+            try:
+                await asyncio.gather(*startup_tasks)
+                log.debug("[AsyncRuntime] All internal components started successfully")
+            except Exception as e:
+                log.error("[AsyncRuntime] Error during internal component startup: %s", e)
 
     def get_stats(self) -> Dict[str, Any]:
         """Get runtime statistics"""

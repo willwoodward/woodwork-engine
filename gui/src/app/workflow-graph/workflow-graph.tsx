@@ -212,6 +212,7 @@ export default function WorkflowGraphPage() {
                   id={wf.id}
                   name={wf.name}
                   stepCount={(wf.steps || []).length}
+                  metadata={wf.metadata}
                 />
               ))}
             </div>

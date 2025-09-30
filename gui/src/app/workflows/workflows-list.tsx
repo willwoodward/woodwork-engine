@@ -45,7 +45,18 @@ export default function WorkflowsList({ selectedWorkflowId, onSelectWorkflow }: 
                     : "hover:bg-accent"
                 }`}
               >
-                {workflow.name}
+                <div className="font-medium">{workflow.name}</div>
+                {workflow.metadata && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {workflow.steps?.length || 0} steps
+                    {workflow.metadata.action_count && (
+                      <span> • {workflow.metadata.action_count} actions</span>
+                    )}
+                    {workflow.metadata.completed_at && (
+                      <span> • completed</span>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
