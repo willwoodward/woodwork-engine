@@ -37,6 +37,7 @@ export function useApiWithFallback<T>({
       }
     },
     // Default options that prioritize showing data quickly
+    initialData: fallbackData, // Use fallback data as initial data
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 1, // Only retry once before falling back
     ...queryOptions,

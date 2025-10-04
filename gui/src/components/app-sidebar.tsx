@@ -9,6 +9,11 @@ import {
   PieChart,
   Settings2,
   SquareTerminal,
+  User,
+  CheckSquare,
+  Lightbulb,
+  BarChart3,
+  Sparkles,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -73,6 +78,28 @@ const data = {
         {
           title: "Agent Requests",
           url: "/inbox",
+        },
+      ],
+    },
+    {
+      title: "Personal",
+      url: "/personal/tasks",
+      icon: User,
+      items: [
+        {
+          title: "Tasks",
+          url: "/personal/tasks",
+          icon: CheckSquare,
+        },
+        {
+          title: "Metrics",
+          url: "/personal/metrics",
+          icon: BarChart3,
+        },
+        {
+          title: "Intelligence",
+          url: "/personal/insights",
+          icon: Sparkles,
         },
       ],
     },

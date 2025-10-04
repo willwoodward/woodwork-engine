@@ -7,6 +7,9 @@ import WorkflowsPage from "@/app/workflows/workflows"
 import WorkflowGraphPage from "@/app/workflow-graph/workflow-graph";
 import InboxPage from "@/app/inbox/page";
 import { WorkflowBrowser } from "@/components/workflows/workflow-browser";
+import TasksPage from "@/app/personal/tasks/page";
+import MetricsPage from "@/app/personal/metrics/page";
+import InsightsPage from "@/app/personal/insights/page";
 
 function App() {
   return (
@@ -18,6 +21,9 @@ function App() {
           <Route path="workflow-graph" element={<WorkflowGraphPage />} />
           <Route path="workflow-browser" element={<WorkflowBrowser />} />
           <Route path="inbox" element={<InboxPage />} />
+          <Route path="personal/tasks" element={<TasksPage />} />
+          <Route path="personal/metrics" element={<MetricsPage />} />
+          <Route path="personal/insights" element={<InsightsPage />} />
         </Route>
       </Routes>
     </ThemeProvider>
