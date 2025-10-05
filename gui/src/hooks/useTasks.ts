@@ -1,62 +1,106 @@
-import { useState, useEffect } from 'react';
-import { useBackendQuery } from '@/lib/api';
+import { useBackendQuery, useBackendMutation } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { mockTasks } from '@/data/mock-tasks';
 import type { Task, TaskPriority, TaskTag } from '@/types/task';
 
-const STORAGE_KEY = 'woodwork-tasks';
+const QUERY_KEY = ['tasks'];
 
 export function useTasks() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const queryClient = useQueryClient();
 
   // Fetch tasks from backend API with fallback to mock data
-  const { data: apiTasks } = useBackendQuery<Task[]>('/tasks', {
-    queryKey: ['tasks'],
+  const { data: tasks = [] } = useBackendQuery<Task[]>('/tasks', {
+    queryKey: QUERY_KEY,
     fallbackData: mockTasks,
   });
 
-  // Load tasks from localStorage on mount, or use API/mock data
-  useEffect(() => {
-    if (isInitialized || !apiTasks) return;
+  // Create task mutation with optimistic update
+  const createMutation = useBackendMutation<Task, Partial<Task>>('/tasks', {
+    method: 'POST',
+    onMutate: async (newTask) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
 
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && stored !== '[]') {
-      // Only use localStorage if it has actual data
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed && parsed.length > 0) {
-          // Convert date strings back to Date objects
-          const tasksWithDates = parsed.map((task: any) => ({
-            ...task,
-            dateCreated: new Date(task.dateCreated),
-            dateCompleted: task.dateCompleted ? new Date(task.dateCompleted) : undefined,
-          }));
-          setTasks(tasksWithDates);
-          setIsInitialized(true);
-          return;
-        }
-      } catch (e) {
-        console.error('Failed to parse tasks from localStorage', e);
+      // Snapshot previous value
+      const previousTasks = queryClient.getQueryData<Task[]>(QUERY_KEY);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData<Task[]>(QUERY_KEY, (old = []) => [
+        newTask as Task,
+        ...old,
+      ]);
+
+      return { previousTasks };
+    },
+    onError: (_err, _newTask, context) => {
+      // Rollback on error
+      if (context?.previousTasks) {
+        queryClient.setQueryData(QUERY_KEY, context.previousTasks);
       }
-    }
+    },
+    onSettled: () => {
+      // Refetch after mutation
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+  });
 
-    // No localStorage data or it's empty, use API/mock data
-    setTasks(apiTasks);
-    setIsInitialized(true);
-  }, [apiTasks, isInitialized]);
+  // Update task mutation with optimistic update
+  const updateMutation = useBackendMutation<Task, { id: string } & Partial<Task>>(
+    '/tasks/:id',
+    {
+      method: 'PATCH',
+      onMutate: async (updates) => {
+        await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+        const previousTasks = queryClient.getQueryData<Task[]>(QUERY_KEY);
 
-  // Save tasks to localStorage whenever they change
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+        queryClient.setQueryData<Task[]>(QUERY_KEY, (old = []) =>
+          old.map((task) =>
+            task.id === updates.id ? { ...task, ...updates } : task
+          )
+        );
+
+        return { previousTasks };
+      },
+      onError: (_err, _updates, context) => {
+        if (context?.previousTasks) {
+          queryClient.setQueryData(QUERY_KEY, context.previousTasks);
+        }
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      },
     }
-  }, [tasks, isInitialized]);
+  );
+
+  // Delete task mutation with optimistic update
+  const deleteMutation = useBackendMutation<void, { id: string }>('/tasks/:id', {
+    method: 'DELETE',
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const previousTasks = queryClient.getQueryData<Task[]>(QUERY_KEY);
+
+      queryClient.setQueryData<Task[]>(QUERY_KEY, (old = []) =>
+        old.filter((task) => task.id !== variables.id)
+      );
+
+      return { previousTasks };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(QUERY_KEY, context.previousTasks);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+  });
 
   const addTask = (
     title: string,
     tags: TaskTag[] = [],
     estimatedTime?: number,
-    priority: TaskPriority = 'medium'
+    priority: TaskPriority = 'medium',
+    notes?: string
   ) => {
     const newTask: Task = {
       id: crypto.randomUUID(),
@@ -64,17 +108,16 @@ export function useTasks() {
       tags,
       estimatedTime,
       priority,
+      notes,
       dateCreated: new Date(),
       completed: false,
     };
-    setTasks((prev) => [newTask, ...prev]);
+    createMutation.mutate(newTask);
     return newTask;
   };
 
   const updateTask = (id: string, updates: Partial<Task>) => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, ...updates } : task))
-    );
+    updateMutation.mutate({ id, ...updates });
   };
 
   const completeTask = (
@@ -84,25 +127,19 @@ export function useTasks() {
     workflowUsed?: string,
     notes?: string
   ) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              completed: true,
-              dateCompleted: new Date(),
-              actualTime,
-              effortRating,
-              workflowUsed,
-              notes,
-            }
-          : task
-      )
-    );
+    updateMutation.mutate({
+      id,
+      completed: true,
+      dateCompleted: new Date(),
+      actualTime,
+      effortRating,
+      workflowUsed,
+      notes,
+    });
   };
 
   const deleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((task) => task.id !== id));
+    deleteMutation.mutate({ id });
   };
 
   const toggleComplete = (id: string) => {
@@ -125,5 +162,6 @@ export function useTasks() {
     completeTask,
     deleteTask,
     toggleComplete,
+    isLoading: createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
   };
 }

@@ -32,6 +32,27 @@ export interface Suggestion {
   relatedTasks?: string[];
   dateCreated: Date;
   accepted?: boolean;
+  // Workflow-specific fields (when type === 'workflow')
+  workflowId?: string;
+  confidence?: number;
+  actions?: Array<{
+    id: string;
+    name: string;
+    description: string;
+  }>;
+  graph?: {
+    nodes: Array<{
+      id: string;
+      type: 'prompt' | 'action';
+      label: string;
+    }>;
+    edges: Array<{
+      id: string;
+      source: string;
+      target: string;
+      type: 'starts' | 'next' | 'depends_on';
+    }>;
+  };
 }
 
 export interface Insight {

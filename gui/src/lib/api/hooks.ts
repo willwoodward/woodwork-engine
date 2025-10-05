@@ -58,7 +58,8 @@ export function useApiQuery<TData = any>(
     enabled,
     staleTime,
     retry,
-    initialData: fallbackData,
+    // Use placeholderData instead of initialData so queries still run
+    placeholderData: fallbackData,
   } as UseQueryOptions<TData, ApiError>);
 }
 
@@ -71,14 +72,31 @@ export function useApiMutation<TData = any, TVariables = any>(
   options?: {
     method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     agentName?: string;
-    onSuccess?: (data: TData, variables: TVariables) => void;
-    onError?: (error: ApiError, variables: TVariables) => void;
+    retry?: boolean;
+    onMutate?: (variables: TVariables) => Promise<any> | any;
+    onSuccess?: (data: TData, variables: TVariables, context?: any) => void;
+    onError?: (error: ApiError, variables: TVariables, context?: any) => void;
+    onSettled?: (data: TData | undefined, error: ApiError | null, variables: TVariables, context?: any) => void;
   }
 ) {
-  const { method = 'POST', agentName, onSuccess, onError } = options || {};
+  const {
+    method = 'POST',
+    agentName,
+    retry,
+    onMutate,
+    onSuccess,
+    onError,
+    onSettled,
+  } = options || {};
 
   return useMutation<TData, ApiError, TVariables>({
     mutationFn: async (variables: TVariables) => {
+      // Handle path parameters (e.g., /tasks/:id)
+      let finalEndpoint = endpoint;
+      if (typeof variables === 'object' && variables !== null && 'id' in variables) {
+        finalEndpoint = endpoint.replace(':id', (variables as any).id);
+      }
+
       const requestOptions: ApiRequestOptions = {
         method,
         body: variables,
@@ -86,8 +104,8 @@ export function useApiMutation<TData = any, TVariables = any>(
 
       const response =
         apiType === 'backend'
-          ? await ApiClient.backend<TData>(endpoint, requestOptions)
-          : await ApiClient.agent<TData>(endpoint, {
+          ? await ApiClient.backend<TData>(finalEndpoint, requestOptions)
+          : await ApiClient.agent<TData>(finalEndpoint, {
               ...requestOptions,
               agentName,
             });
@@ -102,8 +120,11 @@ export function useApiMutation<TData = any, TVariables = any>(
 
       return response.data;
     },
+    retry,
+    onMutate,
     onSuccess,
     onError,
+    onSettled,
   } as UseMutationOptions<TData, ApiError, TVariables>);
 }
 
@@ -130,12 +151,25 @@ export const useAgentQuery = <TData = any>(
     agentId?: string;
     sessionId?: string;
   }
-) => useApiQuery<TData>('agent', endpoint, options);
+) => {
+  // Agent queries have shorter timeout and no retries (fail fast)
+  return useApiQuery<TData>('agent', endpoint, {
+    retry: false, // Don't retry agent queries - they either work or don't
+    staleTime: 0, // Always fetch fresh from agent
+    ...options,
+  });
+};
 
 export const useAgentMutation = <TData = any, TVariables = any>(
   endpoint: string,
   options?: Parameters<typeof useApiMutation<TData, TVariables>>[2]
-) => useApiMutation<TData, TVariables>('agent', endpoint, options);
+) => {
+  // Agent mutations also don't retry - graceful degradation
+  return useApiMutation<TData, TVariables>('agent', endpoint, {
+    retry: false,
+    ...options,
+  });
+};
 
 /**
  * Cross-session agent communication hook

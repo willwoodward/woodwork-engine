@@ -104,7 +104,15 @@ export class ApiClient {
       const contentType = response.headers.get('content-type');
 
       if (contentType?.includes('application/json')) {
-        data = await response.json();
+        const text = await response.text();
+        // Parse JSON and convert date strings to Date objects
+        data = JSON.parse(text, (key, value) => {
+          // Convert ISO date strings to Date objects
+          if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+            return new Date(value);
+          }
+          return value;
+        });
       } else {
         data = (await response.text()) as any;
       }
@@ -118,6 +126,13 @@ export class ApiClient {
     } catch (error: any) {
       clearTimeout(timeoutId);
 
+      // Determine if this is a connection error
+      const isConnectionError =
+        error.name === 'TypeError' &&
+        (error.message.includes('Failed to fetch') ||
+         error.message.includes('NetworkError') ||
+         error.message.includes('ERR_CONNECTION_REFUSED'));
+
       const apiError: ApiError = {
         message: error.message || 'Request failed',
         error,
@@ -127,6 +142,13 @@ export class ApiClient {
           body,
         },
       };
+
+      // Don't log connection errors to console if it's an agent endpoint
+      // (graceful degradation is expected)
+      if (!isConnectionError || !url.toString().includes(':8000')) {
+        // Only log unexpected errors or non-agent errors
+        console.debug('API request failed:', apiError);
+      }
 
       throw apiError;
     }

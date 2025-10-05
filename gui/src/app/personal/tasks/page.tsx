@@ -1,16 +1,21 @@
 import { useState } from "react";
 import { useTasks } from "@/hooks/useTasks";
-import type { Task } from "@/types/task";
+import { useTags } from "@/hooks/useTags";
+import type { Task, TaskTag } from "@/types/task";
 import { AddTaskForm } from "@/components/tasks/add-task-form";
 import { TaskItem } from "@/components/tasks/task-item";
 import { TaskCompletionModal } from "@/components/tasks/task-completion-modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, Circle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, Circle, X } from "lucide-react";
 
 export default function TasksPage() {
-  const { tasks, addTask, completeTask, updateTask } = useTasks();
+  const { tasks, addTask, completeTask, updateTask, deleteTask } = useTasks();
+  const { removeTag } = useTags();
   const [completingTask, setCompletingTask] = useState<Task | null>(null);
+  const [selectedFilterTags, setSelectedFilterTags] = useState<TaskTag[]>([]);
 
   const handleUseWorkflow = (taskTitle: string, workflowId: string) => {
     console.log("Executing workflow:", workflowId, "for task:", taskTitle);
@@ -39,8 +44,35 @@ export default function TasksPage() {
     completeTask(taskId, actualTime, effortRating, workflowUsed, notes);
   };
 
-  const activeTasks = tasks.filter((t) => !t.completed);
-  const completedTasks = tasks.filter((t) => t.completed);
+  const toggleFilterTag = (tag: TaskTag) => {
+    setSelectedFilterTags((prev) => {
+      const isCurrentlySelected = prev.includes(tag);
+      const updated = isCurrentlySelected
+        ? prev.filter((t) => t !== tag)
+        : [...prev, tag];
+      console.log('Filter toggled:', tag, 'Selected:', updated);
+      return updated;
+    });
+  };
+
+  const handleDeleteTag = (tag: TaskTag) => {
+    // Remove from active filters
+    setSelectedFilterTags((prev) => prev.filter((t) => t !== tag));
+    // Remove from available tags
+    removeTag(tag);
+  };
+
+  // Filter tasks based on selected tags
+  const filteredTasks = selectedFilterTags.length === 0
+    ? tasks
+    : tasks.filter((task) =>
+        selectedFilterTags.every((filterTag) => task.tags.includes(filterTag))
+      );
+
+  console.log('Total tasks:', tasks.length, 'Filtered tasks:', filteredTasks.length, 'Active filters:', selectedFilterTags);
+
+  const activeTasks = filteredTasks.filter((t) => !t.completed);
+  const completedTasks = filteredTasks.filter((t) => t.completed);
 
   return (
     <div className="flex flex-col h-full">
@@ -55,7 +87,41 @@ export default function TasksPage() {
           </div>
 
           {/* Add task form */}
-          <AddTaskForm onAddTask={addTask} onUseWorkflow={handleUseWorkflow} />
+          <AddTaskForm
+            onAddTask={(title, tags, estimatedTime, priority, notes) =>
+              addTask(title, tags, estimatedTime, priority, notes)
+            }
+            onUseWorkflow={handleUseWorkflow}
+            onTagClick={toggleFilterTag}
+            onTagDelete={handleDeleteTag}
+            activeFilterTags={selectedFilterTags}
+          />
+
+          {/* Active filters */}
+          {selectedFilterTags.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-muted-foreground">Filtered by:</span>
+              {selectedFilterTags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="default"
+                  className="cursor-pointer"
+                  onClick={() => toggleFilterTag(tag)}
+                >
+                  {tag}
+                  <X className="h-3 w-3 ml-1" />
+                </Badge>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedFilterTags([])}
+                className="h-6 text-xs"
+              >
+                Clear all
+              </Button>
+            </div>
+          )}
 
           <Separator />
 
@@ -80,6 +146,9 @@ export default function TasksPage() {
                     key={task.id}
                     task={task}
                     onToggle={handleToggleTask}
+                    onDelete={deleteTask}
+                    onEdit={updateTask}
+                    onTagClick={toggleFilterTag}
                   />
                 ))}
               </div>
@@ -103,6 +172,9 @@ export default function TasksPage() {
                       key={task.id}
                       task={task}
                       onToggle={handleToggleTask}
+                      onDelete={deleteTask}
+                      onEdit={updateTask}
+                      onTagClick={toggleFilterTag}
                     />
                   ))}
                 </div>

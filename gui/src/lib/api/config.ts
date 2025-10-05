@@ -6,7 +6,7 @@ import type { ApiConfig } from './types';
  */
 export const defaultApiConfig: ApiConfig = {
   backend: {
-    baseUrl: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
+    baseUrl: process.env.VITE_BACKEND_URL || 'http://localhost:8001', // Personal server
     timeout: 30000,
     headers: {
       'Content-Type': 'application/json',
@@ -14,8 +14,8 @@ export const defaultApiConfig: ApiConfig = {
   },
   agents: {
     default: {
-      baseUrl: process.env.VITE_AGENT_URL || 'http://localhost:5000',
-      wsUrl: process.env.VITE_AGENT_WS_URL || 'ws://localhost:5000',
+      baseUrl: process.env.VITE_AGENT_URL || 'http://localhost:8000', // Main Woodwork agent
+      wsUrl: process.env.VITE_AGENT_WS_URL || 'ws://localhost:8000',
       timeout: 60000, // Agents may need more time
       headers: {
         'Content-Type': 'application/json',

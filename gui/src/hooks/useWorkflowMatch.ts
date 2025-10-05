@@ -1,4 +1,5 @@
-import { useAgentMutation } from '@/lib/api';
+import { useBackendMutation } from '@/lib/api';
+import type { WorkflowGraphData } from '@/components/workflows/workflow-graph';
 
 export interface WorkflowMatchRequest {
   taskTitle: string;
@@ -16,27 +17,32 @@ export interface WorkflowMatchResponse {
     name: string;
     description: string;
   }>;
+  graph?: WorkflowGraphData;
   message?: string;
 }
 
-const FALLBACK_RESPONSE: WorkflowMatchResponse = {
-  canUseWorkflow: false,
-  message: "AI workflow matching not available",
-};
-
 /**
  * Hook to check if a task can be solved with an existing workflow
- * Sends task details to AI agent to determine workflow match
+ * Sends task details to personal server which provides mock workflow matches
+ *
+ * Gracefully handles server being down - task will be added manually
  */
 export function useWorkflowMatch() {
-  return useAgentMutation<WorkflowMatchResponse, WorkflowMatchRequest>(
+  return useBackendMutation<WorkflowMatchResponse, WorkflowMatchRequest>(
     '/tasks/match-workflow',
     {
       method: 'POST',
-      agentName: 'workflow-agent',
-      onError: (error, variables) => {
-        console.warn('Workflow match failed:', error.message);
-        // Errors are handled gracefully by returning fallback in the component
+      retry: false, // Don't retry - fail fast if server is down
+      onError: (error) => {
+        // Silently handle server connection errors
+        // The component will fall back to manual task creation
+        if (error.message.includes('Failed to fetch') ||
+            error.message.includes('ERR_CONNECTION_REFUSED')) {
+          // Server is down - this is expected and okay
+          return;
+        }
+        // Only log unexpected errors
+        console.warn('Workflow match error:', error.message);
       },
     }
   );
