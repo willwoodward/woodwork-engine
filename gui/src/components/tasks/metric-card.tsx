@@ -15,7 +15,6 @@ export function MetricCard({
   value,
   description,
   icon: Icon,
-  trend = "neutral",
   className,
 }: MetricCardProps) {
   return (

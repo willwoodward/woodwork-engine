@@ -6,7 +6,7 @@ import { InsightCard } from "@/components/tasks/insight-card";
 import { SuggestionCard } from "@/components/tasks/suggestion-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Sparkles, TrendingUp, AlertCircle, Lightbulb, Filter } from "lucide-react";
+import { Sparkles, Lightbulb, Filter } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 type ViewType = "all" | "insights" | "suggestions";
@@ -158,9 +158,7 @@ export default function InsightsPage() {
 
                 {filteredSuggestions.length === 0 ? (
                   <EmptyState
-                    icon={Lightbulb}
-                    title="No suggestions"
-                    description="Complete tasks to get workflow recommendations"
+                    message="No suggestions - Complete tasks to get workflow recommendations"
                   />
                 ) : (
                   <div className="grid gap-4">
@@ -228,9 +226,7 @@ export default function InsightsPage() {
 
                 {filteredInsights.length === 0 ? (
                   <EmptyState
-                    icon={Sparkles}
-                    title="No insights yet"
-                    description="Complete more tasks to discover patterns"
+                    message="No insights yet - Complete more tasks to discover patterns"
                   />
                 ) : (
                   <div className="grid gap-4">
@@ -251,9 +247,7 @@ export default function InsightsPage() {
             {/* Empty state when both are empty */}
             {filteredInsights.length === 0 && filteredSuggestions.length === 0 && (
               <EmptyState
-                icon={Sparkles}
-                title="No insights or suggestions yet"
-                description="Complete tasks to get personalized insights and workflow recommendations"
+                message="No insights or suggestions yet - Complete tasks to get personalized insights and workflow recommendations"
               />
             )}
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import type { Node } from "@xyflow/react";
 import { Calendar, ArrowRight } from "lucide-react";
 import { useWorkflowDetail } from "@/hooks/useWorkflowDetail";
@@ -8,11 +9,23 @@ import { SidebarSection, InfoDisplay, EmptyState } from "@/components/ui";
 import { WorkflowGraph } from "./workflow-graph";
 
 interface WorkflowDetailViewProps {
-  workflowId: string;
+  workflowId?: string;
   onBack?: () => void;
 }
 
-export default function WorkflowDetailView({ workflowId, onBack }: WorkflowDetailViewProps) {
+// Wrapper component for use with React Router
+export function WorkflowDetailView() {
+  const { workflowId } = useParams<{ workflowId: string }>();
+  const navigate = useNavigate();
+
+  if (!workflowId) {
+    return <EmptyState message="No workflow ID provided" />;
+  }
+
+  return <WorkflowDetailViewInner workflowId={workflowId} onBack={() => navigate('/workflow-browser')} />;
+}
+
+function WorkflowDetailViewInner({ workflowId, onBack }: Required<WorkflowDetailViewProps>) {
   const { data: workflow, isLoading, error } = useWorkflowDetail(workflowId);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
@@ -106,10 +119,10 @@ export default function WorkflowDetailView({ workflowId, onBack }: WorkflowDetai
             <SidebarSection title="Selected Node">
               <InfoDisplay
                 items={[
-                  { key: "Type", value: selectedNode.data.type },
+                  { key: "Type", value: String(selectedNode.data.type) },
                   { key: "ID", value: selectedNode.id },
-                  ...(selectedNode.data.tool ? [{ key: "Tool", value: selectedNode.data.tool }] : []),
-                  ...(selectedNode.data.action ? [{ key: "Action", value: selectedNode.data.action }] : []),
+                  ...(selectedNode.data.tool ? [{ key: "Tool", value: String(selectedNode.data.tool) }] : []),
+                  ...(selectedNode.data.action ? [{ key: "Action", value: String(selectedNode.data.action) }] : []),
                 ]}
               />
             </SidebarSection>
@@ -149,3 +162,6 @@ export default function WorkflowDetailView({ workflowId, onBack }: WorkflowDetai
     </div>
   );
 }
+
+// Also export as default for backwards compatibility
+export default WorkflowDetailViewInner;

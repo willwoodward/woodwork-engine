@@ -354,4 +354,4 @@ export {
   ChartStyle,
 }
 
-export type { ChartConfig }
+// ChartConfig already exported at line 9

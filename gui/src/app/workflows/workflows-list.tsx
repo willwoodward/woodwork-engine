@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useWorkflowsApi } from "@/hooks/useApiWithFallback";
+import { useWorkflows } from "@/hooks/useEnhancedAPI";
 
 
 interface WorkflowsListProps {
@@ -8,7 +8,8 @@ interface WorkflowsListProps {
 }
 
 export default function WorkflowsList({ selectedWorkflowId, onSelectWorkflow }: WorkflowsListProps) {
-  const { data, isLoading, error } = useWorkflowsApi();
+  const { data: workflowData, isLoading, error } = useWorkflows({ limit: 100 });
+  const data = workflowData?.workflows || [];
 
   const handleCreateNew = () => {
     onSelectWorkflow("new");
@@ -46,17 +47,15 @@ export default function WorkflowsList({ selectedWorkflowId, onSelectWorkflow }: 
                 }`}
               >
                 <div className="font-medium">{workflow.name}</div>
-                {workflow.metadata && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {workflow.steps?.length || 0} steps
-                    {workflow.metadata.action_count && (
-                      <span> • {workflow.metadata.action_count} actions</span>
-                    )}
-                    {workflow.metadata.completed_at && (
-                      <span> • completed</span>
-                    )}
-                  </div>
-                )}
+                <div className="text-xs text-muted-foreground mt-1">
+                  {workflow.actions?.length || workflow.steps?.length || 0} actions
+                  {workflow.status && (
+                    <span> • {workflow.status}</span>
+                  )}
+                  {workflow.completed_at && (
+                    <span> • completed</span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

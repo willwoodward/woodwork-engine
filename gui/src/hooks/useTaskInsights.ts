@@ -35,7 +35,7 @@ function useGeneratedInsights(tasks: Task[]): Insight[] {
     });
 
     // Find repeated tasks
-    titleGroups.forEach((group, title) => {
+    titleGroups.forEach((group, _title) => {
       if (group.length >= 2) {
         insights.push({
           id: crypto.randomUUID(),

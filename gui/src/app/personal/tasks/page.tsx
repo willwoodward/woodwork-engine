@@ -135,9 +135,7 @@ export default function TasksPage() {
             </div>
             {activeTasks.length === 0 ? (
               <EmptyState
-                icon={Circle}
-                title="No active tasks"
-                description="Add a task above to get started"
+                message="No active tasks - Add a task above to get started"
               />
             ) : (
               <div className="space-y-2">

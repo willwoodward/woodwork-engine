@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Workflow, Sparkles, ArrowRight, Network } from "lucide-react";
 import type { WorkflowMatchResponse } from "@/hooks/useWorkflowMatch";
-import { WorkflowGraphPreview, type WorkflowGraphData } from "@/components/workflows/workflow-graph";
+import { WorkflowGraphPreview } from "@/components/workflows/workflow-graph";
 
 interface WorkflowMatchDialogProps {
   open: boolean;

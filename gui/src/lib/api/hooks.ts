@@ -20,8 +20,8 @@ export function useApiQuery<TData = any>(
     staleTime = 5 * 60 * 1000,
     retry = 1,
     fallbackData,
-    onSuccess,
-    onError,
+    onSuccess: _onSuccess,
+    onError: _onError,
     agentName,
     agentId,
     sessionId,
@@ -154,7 +154,7 @@ export const useAgentQuery = <TData = any>(
 ) => {
   // Agent queries have shorter timeout and no retries (fail fast)
   return useApiQuery<TData>('agent', endpoint, {
-    retry: false, // Don't retry agent queries - they either work or don't
+    retry: 0, // Don't retry agent queries - they either work or don't
     staleTime: 0, // Always fetch fresh from agent
     ...options,
   });
@@ -195,7 +195,7 @@ export function useCrossSessionAgent<TData = any>(
 export function useMultiAgentQuery<TData = any>(
   endpoint: string,
   agentNames: string[],
-  options?: UseApiOptions<TData[]>
+  options?: Omit<UseApiOptions<TData>, 'fallbackData' | 'onSuccess' | 'onError'>
 ) {
   const queries = agentNames.map((agentName) =>
     useAgentQuery<TData>(endpoint, {

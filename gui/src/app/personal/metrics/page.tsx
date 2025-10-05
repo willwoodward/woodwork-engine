@@ -68,12 +68,12 @@ export default function MetricsPage() {
   );
   const timeSavedTrend = lastWeekTimeSaved === 0 ? 100 : Math.round(((thisWeekTimeSaved - lastWeekTimeSaved) / Math.abs(lastWeekTimeSaved)) * 100);
 
-  // Workflow adoption trend
-  const thisWeekWorkflowTasks = tasksCompletedThisWeek.filter(t => t.workflowUsed).length;
-  const lastWeekWorkflowTasks = tasksCompletedLastWeek.filter(t => t.workflowUsed).length;
-  const thisWeekWorkflowRate = thisWeekCount === 0 ? 0 : Math.round((thisWeekWorkflowTasks / thisWeekCount) * 100);
-  const lastWeekWorkflowRate = lastWeekCount === 0 ? 0 : Math.round((lastWeekWorkflowTasks / lastWeekCount) * 100);
-  const workflowTrend = lastWeekWorkflowRate === 0 ? 100 : Math.round(((thisWeekWorkflowRate - lastWeekWorkflowRate) / lastWeekWorkflowRate) * 100);
+  // Workflow adoption trend (reserved for future charts)
+  // const thisWeekWorkflowTasks = tasksCompletedThisWeek.filter(t => t.workflowUsed).length;
+  // const lastWeekWorkflowTasks = tasksCompletedLastWeek.filter(t => t.workflowUsed).length;
+  // const thisWeekWorkflowRate = thisWeekCount === 0 ? 0 : Math.round((thisWeekWorkflowTasks / thisWeekCount) * 100);
+  // const lastWeekWorkflowRate = lastWeekCount === 0 ? 0 : Math.round((lastWeekWorkflowTasks / lastWeekCount) * 100);
+  // const workflowTrend = lastWeekWorkflowRate === 0 ? 100 : Math.round(((thisWeekWorkflowRate - lastWeekWorkflowRate) / lastWeekWorkflowRate) * 100);
 
   // Chart data - last 7 days
   const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -215,9 +215,7 @@ export default function MetricsPage() {
 
             {!hasData ? (
               <EmptyState
-                icon={BarChart3}
-                title="No data yet"
-                description="Complete some tasks to see your metrics"
+                message="No data yet - Complete some tasks to see your metrics"
               />
             ) : (
               <>

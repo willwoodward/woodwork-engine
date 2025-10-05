@@ -46,6 +46,9 @@ class llm(agent):
         self._internal_features = InternalFeatureRegistry.create_features(config)
         self._setup_internal_features(config)
 
+        # Workflow variables for action output tracking
+        self._workflow_variables: dict[str, Any] = {}
+
     async def _handle_user_input_response(self, payload):
         """Handle user input response events"""
         try:
@@ -162,6 +165,10 @@ class llm(agent):
     async def input(self, query: str, inputs: dict = None):
         if inputs is None:
             inputs = {}
+
+        # Reset workflow variables for new query and initialize with input variables
+        self._workflow_variables = inputs.copy()
+        log.debug(f"Initialized workflow variables with inputs: {list(inputs.keys())}")
 
         # Set component context for proper event attribution
         EventSource.set_current(getattr(self, 'name', 'unknown_agent'), 'agent')
@@ -284,7 +291,13 @@ class llm(agent):
                     action = Action.from_dict(action_dict)
 
                 # Use improved message bus API for tool execution
-                observation = await self._execute_tool_with_improved_api(action)
+                result = await self._execute_tool_with_improved_api(action)
+
+                # Ensure observation is a string (tools might return dicts, lists, etc.)
+                if isinstance(result, str):
+                    observation = result
+                else:
+                    observation = json.dumps(result) if result is not None else "No output"
 
                 observation_tokens = self.count_tokens(observation)
                 if observation_tokens > 7500:
@@ -315,6 +328,24 @@ class llm(agent):
             # Emit step complete
             await emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
 
+    def _resolve_action_inputs(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        """
+        Resolve variable references in action inputs.
+
+        If an input value is a string that matches a workflow variable name,
+        replace it with the actual variable value.
+        """
+        resolved = {}
+        for key, value in inputs.items():
+            if isinstance(value, str) and value in self._workflow_variables:
+                # This is a variable reference - substitute with actual value
+                resolved[key] = self._workflow_variables[value]
+                log.debug(f"Resolved variable '{value}' to: {resolved[key]}")
+            else:
+                # Keep as literal value
+                resolved[key] = value
+        return resolved
+
     async def _execute_tool_with_improved_api(self, action: Action):
         """
         Execute tool using the clean message bus API.
@@ -329,11 +360,23 @@ class llm(agent):
                 timeout = action.inputs.get('timeout_seconds', 60)
                 return await self._ask_user_via_events(question, timeout)
 
-            # Use the clean message API - one line!
-            return await self.request(action.tool, {
+            # Resolve variable references in inputs
+            resolved_inputs = self._resolve_action_inputs(action.inputs)
+
+            # Use the clean message API with resolved inputs
+            result = await self.request(action.tool, {
                 "action": action.action,
-                "inputs": action.inputs
+                "inputs": resolved_inputs
             })
+
+            # Store output in workflow variables if action has output variable
+            # NOTE: We store the raw result (could be dict, list, etc.) so subsequent
+            # actions can use the structured data. The observation converts to string separately.
+            if action.output:
+                self._workflow_variables[action.output] = result
+                log.debug(f"Stored output in variable '{action.output}': {result}")
+
+            return result
 
         except Exception as e:
             log.error(f"[Agent] Error executing tool '{action.tool}': {e}")

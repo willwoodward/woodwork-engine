@@ -1,22 +1,26 @@
 import { useState } from 'react';
-import { Play, Search, Bot, Clock } from 'lucide-react';
+import { Play, Search, Bot, Clock, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui';
 
-import { useWorkflows, useAgents, useTriggerWorkflow } from '@/hooks/useEnhancedAPI';
+import { useWorkflows, useAgents } from '@/hooks/useEnhancedAPI';
+import { useWorkflowManagement } from '@/hooks/useWorkflowManagement';
 import type { Workflow, Agent } from '@/types/api-types';
 
 interface WorkflowCardProps {
   workflow: Workflow;
   availableAgents: Agent[];
   onTrigger: (inputs: any, targetAgent?: string) => void;
+  onEdit: () => void;
+  onDelete: () => void;
   isTriggering?: boolean;
+  isDeleting?: boolean;
 }
 
-function WorkflowCard({ workflow, availableAgents, onTrigger, isTriggering }: WorkflowCardProps) {
+function WorkflowCard({ workflow, availableAgents, onTrigger, onEdit, onDelete, isTriggering, isDeleting }: WorkflowCardProps) {
   const [selectedAgent, setSelectedAgent] = useState<string>('');
   const [inputs, setInputs] = useState<Record<string, string>>({});
 
@@ -45,6 +49,21 @@ function WorkflowCard({ workflow, availableAgents, onTrigger, isTriggering }: Wo
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">{workflow.name}</CardTitle>
           <div className="flex items-center gap-2">
+            <button
+              onClick={onEdit}
+              className="p-1 rounded hover:bg-muted transition-colors"
+              title="Edit workflow"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onDelete}
+              disabled={isDeleting}
+              className="p-1 rounded hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+              title="Delete workflow"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
             {workflow.category && (
               <Badge variant="outline">{workflow.category}</Badge>
             )}
@@ -142,21 +161,31 @@ function WorkflowCard({ workflow, availableAgents, onTrigger, isTriggering }: Wo
 export function WorkflowBrowser() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [sourceFilter, setSourceFilter] = useState<string>('');
 
   const { data: workflowData, isLoading: workflowsLoading, error: workflowsError } = useWorkflows({
     search: searchTerm,
     category: categoryFilter,
+    status: statusFilter,
     limit: 50
   });
 
   const { data: agentData, isLoading: agentsLoading } = useAgents();
-  const triggerWorkflow = useTriggerWorkflow();
+  // const triggerWorkflow = useTriggerWorkflow(); // Reserved for future use
+  const { executeWorkflow, deleteWorkflow } = useWorkflowManagement();
 
   const workflows = workflowData?.workflows || [];
   const agents = agentData?.agents || [];
   const categories = workflowData?.categories || [];
 
-  const handleTriggerWorkflow = async (workflow: Workflow, inputs: any, targetAgent?: string) => {
+  // Apply client-side source filter
+  const filteredWorkflows = workflows.filter(workflow => {
+    if (sourceFilter && workflow.source !== sourceFilter) return false;
+    return true;
+  });
+
+  const handleTriggerWorkflow = async (workflow: Workflow, inputs: any, _targetAgent?: string) => {
     try {
       // Parse JSON inputs if provided as string
       let processedInputs = inputs;
@@ -169,14 +198,28 @@ export function WorkflowBrowser() {
         }
       }
 
-      await triggerWorkflow.mutateAsync({
+      await executeWorkflow.mutateAsync({
         workflowId: workflow.id,
         inputs: processedInputs,
-        targetAgent,
-        priority: 'medium'
+        sessionId: `session_${Date.now()}`
       });
     } catch (error) {
       console.error('Failed to trigger workflow:', error);
+    }
+  };
+
+  const handleEditWorkflow = (workflowId: string) => {
+    // Navigate to workflow builder with this workflow ID
+    window.location.href = `/workflows/${workflowId}`;
+  };
+
+  const handleDeleteWorkflow = async (workflowId: string) => {
+    if (!confirm('Are you sure you want to delete this workflow?')) return;
+
+    try {
+      await deleteWorkflow.mutateAsync(workflowId);
+    } catch (error) {
+      console.error('Failed to delete workflow:', error);
     }
   };
 
@@ -223,8 +266,33 @@ export function WorkflowBrowser() {
           </div>
         </div>
 
+        <div className="w-40">
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
+          >
+            <option value="">All Sources</option>
+            <option value="auto">Auto-captured</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+
+        <div className="w-40">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
+          >
+            <option value="">All Status</option>
+            <option value="completed">Completed</option>
+            <option value="in_progress">In Progress</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+
         {categories.length > 0 && (
-          <div className="w-48">
+          <div className="w-40">
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -260,17 +328,17 @@ export function WorkflowBrowser() {
       </div>
 
       {/* Workflow Grid */}
-      {workflows.length === 0 ? (
+      {filteredWorkflows.length === 0 ? (
         <EmptyState
           message={
-            searchTerm || categoryFilter
+            searchTerm || categoryFilter || statusFilter || sourceFilter
               ? "No workflows match your filters"
               : "No workflows available"
           }
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {workflows.map(workflow => (
+          {filteredWorkflows.map(workflow => (
             <WorkflowCard
               key={workflow.id}
               workflow={workflow}
@@ -278,7 +346,10 @@ export function WorkflowBrowser() {
               onTrigger={(inputs, targetAgent) =>
                 handleTriggerWorkflow(workflow, inputs, targetAgent)
               }
-              isTriggering={triggerWorkflow.isPending}
+              onEdit={() => handleEditWorkflow(workflow.id)}
+              onDelete={() => handleDeleteWorkflow(workflow.id)}
+              isTriggering={executeWorkflow.isPending}
+              isDeleting={deleteWorkflow.isPending}
             />
           ))}
         </div>

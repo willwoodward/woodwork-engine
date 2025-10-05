@@ -17,10 +17,14 @@ export interface Workflow {
   name: string;
   description?: string;
   category?: string;
-  status?: 'active' | 'cached' | 'archived';
+  status?: 'active' | 'cached' | 'archived' | 'completed' | 'in_progress' | 'failed';
+  source?: 'auto' | 'manual';
   requiredCapabilities?: string[];
   steps?: WorkflowStep[];
+  actions?: any[];
   metadata?: Record<string, any>;
+  created_at?: string;
+  completed_at?: string;
 }
 
 export interface WorkflowStep {

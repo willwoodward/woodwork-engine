@@ -1,6 +1,7 @@
 // Enhanced API hooks for the FastAPI GUI server backend
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { api } from '@/lib/api/client';
 import type {
   WorkflowTriggerRequest,
   WorkflowExecutionResult,
@@ -123,11 +124,9 @@ export function useWorkflows(filters?: {
       if (filters?.status) params.append('status', filters.status);
       if (filters?.limit) params.append('limit', filters.limit.toString());
 
-      const response = await fetch(`${API_BASE_URL}/api/workflows?${params}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch workflows: ${response.statusText}`);
-      }
-      return response.json();
+      // Use the agent API client (port 8000) to get workflows from Neo4j
+      const response = await api.agent.get<WorkflowsResponse>(`/api/workflows?${params}`);
+      return response.data as WorkflowsResponse;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -138,11 +137,9 @@ export function useAgents() {
   return useQuery<AgentsResponse>({
     queryKey: ['agents'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/api/agents`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch agents: ${response.statusText}`);
-      }
-      return response.json();
+      // Use the agent API client (port 8000) to get agents
+      const response = await api.agent.get<AgentsResponse>('/api/agents');
+      return response.data as AgentsResponse;
     },
     refetchInterval: 30 * 1000, // Refresh every 30 seconds for live status
   });

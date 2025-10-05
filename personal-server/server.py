@@ -268,9 +268,31 @@ async def match_workflow(request: WorkflowMatchRequest):
     """
     Check if a task can be solved with an existing workflow.
 
-    For testing: Returns mock workflow matches with graph data.
-    TODO: Integrate with Woodwork agents and Neo4j for real workflow matching.
+    Queries the Woodwork agent backend for real workflow matches from Neo4j.
+    Falls back to mock data if agent is not available.
     """
+    # Try to query real workflows from the agent backend
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "http://localhost:8000/api/workflows/match",
+                json={
+                    "task_title": request.taskTitle,
+                    "task_description": request.taskDescription,
+                    "tags": request.tags or []
+                },
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Found workflow match from agent: {data.get('workflowId')}")
+                return WorkflowMatchResponse(**data)
+    except Exception as e:
+        logger.warning(f"Could not connect to agent backend on port 8000: {e}")
+        logger.info("Falling back to mock workflow matching")
+
+    # Fallback: Mock workflow matching based on keywords
     task_lower = request.taskTitle.lower()
 
     # Mock workflow matching based on keywords

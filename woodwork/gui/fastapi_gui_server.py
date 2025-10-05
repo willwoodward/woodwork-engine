@@ -90,14 +90,34 @@ class FastAPIGUIServer:
         """Setup FastAPI routes."""
 
         @self.app.get("/api/workflows")
-        async def get_workflows():
-            """Get available workflows from all connected API inputs."""
-            workflows = await self._discover_workflows()
-            return {
-                "workflows": workflows,
-                "total": len(workflows),
-                "categories": list(set(w.get("category", "general") for w in workflows))
-            }
+        async def get_workflows(
+            status: Optional[str] = None,
+            category: Optional[str] = None,
+            search: Optional[str] = None,
+            limit: Optional[int] = 50
+        ):
+            """Get workflows from Neo4j database with optional filters."""
+            try:
+                workflows = await self._get_stored_workflows(
+                    status=status,
+                    category=category,
+                    search=search,
+                    limit=limit
+                )
+                return {
+                    "workflows": workflows,
+                    "total": len(workflows),
+                    "categories": list(set(w.get("category", "general") for w in workflows))
+                }
+            except Exception as e:
+                logger.error(f"Error getting workflows: {e}")
+                # Fallback to discover from API inputs
+                workflows = await self._discover_workflows()
+                return {
+                    "workflows": workflows,
+                    "total": len(workflows),
+                    "categories": []
+                }
 
         @self.app.get("/api/workflows/get")
         async def get_stored_workflows():
@@ -227,16 +247,20 @@ class FastAPIGUIServer:
             await self._handle_frontend_websocket(websocket)
 
         # Serve React app
-        @self.app.get("/")
-        async def serve_react_app():
-            """Serve the React app."""
-            # Use the same path as Flask GUI - relative to this file's location
-            dist_path = Path(__file__).parent / "dist"
-            return FileResponse(dist_path / "index.html")
-
-        # Mount static files using correct path
+        # Mount static files for assets (js, css, etc) first
         dist_path = Path(__file__).parent / "dist"
-        self.app.mount("/", StaticFiles(directory=str(dist_path), html=True), name="static")
+        self.app.mount("/assets", StaticFiles(directory=str(dist_path / "assets")), name="assets")
+
+        # Catch-all route for SPA - must be last to not override API routes
+        @self.app.get("/{full_path:path}")
+        async def serve_react_spa(full_path: str):
+            """Serve the React SPA for all non-API routes."""
+            # Check if it's a static file request
+            file_path = dist_path / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+            # Otherwise return index.html for SPA routing
+            return FileResponse(dist_path / "index.html")
 
     async def _discover_workflows(self) -> List[Dict]:
         """Discover workflows from all connected API inputs."""
@@ -356,68 +380,99 @@ class FastAPIGUIServer:
 
         return agents
 
-    async def _get_stored_workflows(self) -> List[Dict]:
-        """Get stored workflows from Neo4j database."""
+    async def _get_stored_workflows(
+        self,
+        status: Optional[str] = None,
+        category: Optional[str] = None,
+        search: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict]:
+        """Get stored workflows from Neo4j database with optional filters."""
         try:
-            # Try to connect to Neo4j database where workflows are stored
-            from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+            # Use raw Neo4j driver to avoid creating new Docker containers
+            from neo4j import GraphDatabase
 
-            neo4j_client = neo4j(
-                uri="bolt://localhost:7687",
-                user="neo4j",
-                password="testpassword",
-                name="workflows_gui_query"
+            driver = GraphDatabase.driver(
+                "bolt://localhost:7687",
+                auth=("neo4j", "testpassword")
             )
 
-            # Query to get all completed workflows with their basic info
-            query = """
+            # Build query with optional filters
+            where_clauses = []
+            params = {"limit": limit}
+
+            # Filter by status if provided (default shows all)
+            if status:
+                where_clauses.append("w.status = $status")
+                params["status"] = status
+
+            # Search by prompt text if provided
+            if search:
+                where_clauses.append("toLower(p.text) CONTAINS toLower($search)")
+                params["search"] = search
+
+            where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
+            # Query to get workflows with their basic info
+            query = f"""
             MATCH (w:Workflow)-[:CONTAINS]->(p:Prompt)
-            WHERE w.status = 'completed'
+            {where_clause}
             OPTIONAL MATCH (w)-[:CONTAINS]->(a:Action)
             WITH w, p, count(a) as action_count,
-                 collect(DISTINCT {tool: a.tool, action: a.action}) as action_types
+                 collect(DISTINCT {{tool: a.tool, action: a.action, sequence: a.sequence}}) as action_types
             RETURN w.id as id,
+                   w.status as status,
+                   w.source as source,
                    w.created_at as created_at,
                    w.completed_at as completed_at,
                    w.final_step as final_step,
                    p.text as name,
                    action_count,
                    action_types
-            ORDER BY w.completed_at DESC
-            LIMIT 50
+            ORDER BY w.created_at DESC
+            LIMIT $limit
             """
 
-            results = neo4j_client.run(query)
-            workflows = []
+            with driver.session() as session:
+                results = session.run(query, params)
+                workflows = []
 
-            for record in results:
-                # Create workflow entry compatible with frontend
-                workflow = {
-                    "id": record.get("id", "unknown"),
-                    "name": record.get("name", "Unnamed Workflow")[:100],  # Truncate long names
-                    "steps": []
-                }
+                for record in results:
+                    # Create workflow entry compatible with frontend
+                    workflow = {
+                        "id": record.get("id", "unknown"),
+                        "name": record.get("name", "Unnamed Workflow")[:100],  # Truncate long names
+                        "status": record.get("status", "unknown"),
+                        "source": record.get("source", "auto"),
+                        "description": f"Workflow with {record.get('action_count', 0)} actions",
+                        "actions": []
+                    }
 
-                # Convert action types to steps format expected by frontend
-                action_types = record.get("action_types", [])
-                for i, action in enumerate(action_types[:10]):  # Limit to 10 steps for display
-                    workflow["steps"].append({
-                        "name": f"{action.get('action', 'unknown')}",
-                        "tool": action.get('tool', 'unknown'),
-                        "description": f"Step {i+1}: {action.get('action', 'unknown')} using {action.get('tool', 'unknown')}"
-                    })
+                    # Convert action types to actions format with proper sequence
+                    action_types = record.get("action_types", [])
+                    # Sort by sequence to maintain order
+                    sorted_actions = sorted(action_types, key=lambda x: x.get('sequence', 0))
 
-                # Add metadata
-                workflow["metadata"] = {
-                    "created_at": record.get("created_at"),
-                    "completed_at": record.get("completed_at"),
-                    "final_step": record.get("final_step"),
-                    "action_count": record.get("action_count", 0)
-                }
+                    for action in sorted_actions[:20]:  # Limit to 20 actions for display
+                        workflow["actions"].append({
+                            "sequence": action.get('sequence', 0),
+                            "tool": action.get('tool', 'unknown'),
+                            "action": action.get('action', 'unknown'),
+                            "inputs": {},
+                            "output": ""
+                        })
 
-                workflows.append(workflow)
+                    # Add created/completed timestamps - convert DateTime objects
+                    if record.get("created_at"):
+                        created_at = record.get("created_at")
+                        workflow["created_at"] = created_at.iso_format() if hasattr(created_at, 'iso_format') else str(created_at)
+                    if record.get("completed_at"):
+                        completed_at = record.get("completed_at")
+                        workflow["completed_at"] = completed_at.iso_format() if hasattr(completed_at, 'iso_format') else str(completed_at)
 
-            neo4j_client.close()
+                    workflows.append(workflow)
+
+            driver.close()
             logger.info(f"Retrieved {len(workflows)} stored workflows from Neo4j")
             return workflows
 
@@ -429,13 +484,12 @@ class FastAPIGUIServer:
     async def _get_workflow_detail(self, workflow_id: str) -> Optional[Dict]:
         """Get detailed workflow information including full step chain and dependencies."""
         try:
-            from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+            # Use raw Neo4j driver to avoid creating new Docker containers
+            from neo4j import GraphDatabase
 
-            neo4j_client = neo4j(
-                uri="bolt://localhost:7687",
-                user="neo4j",
-                password="testpassword",
-                name="workflow_detail_query"
+            driver = GraphDatabase.driver(
+                "bolt://localhost:7687",
+                auth=("neo4j", "testpassword")
             )
 
             # Query to get complete workflow with action chain and dependencies
@@ -475,70 +529,80 @@ class FastAPIGUIServer:
             ORDER BY action.sequence
             """
 
-            results = neo4j_client.run(query, {"workflow_id": workflow_id})
+            with driver.session() as session:
+                results = session.run(query, {"workflow_id": workflow_id})
+                results_list = list(results)
 
-            if not results:
-                neo4j_client.close()
-                return None
+                if not results_list:
+                    driver.close()
+                    return None
 
-            # Build detailed workflow structure
-            workflow_data = None
-            actions = []
+                # Build detailed workflow structure
+                workflow_data = None
+                actions = []
 
-            for record in results:
-                if workflow_data is None:
-                    workflow_data = {
-                        "id": record.get("workflow_id"),
-                        "name": record.get("prompt", "Unnamed Workflow"),
-                        "status": record.get("status"),
-                        "created_at": record.get("created_at"),
-                        "completed_at": record.get("completed_at"),
-                        "final_step": record.get("final_step"),
-                        "prompt": record.get("prompt"),
-                        "prompt_id": record.get("prompt_id")
+                for record in results_list:
+                    if workflow_data is None:
+                        workflow_data = {
+                            "id": record.get("workflow_id"),
+                            "name": record.get("prompt", "Unnamed Workflow"),
+                            "status": record.get("status"),
+                            "created_at": record.get("created_at"),
+                            "completed_at": record.get("completed_at"),
+                            "final_step": record.get("final_step"),
+                            "prompt": record.get("prompt"),
+                            "prompt_id": record.get("prompt_id")
+                        }
+
+                    if record.get("action_id"):
+                        actions.append({
+                            "id": record.get("action_id"),
+                            "name": record.get("action_name", "unknown"),
+                            "tool": record.get("tool", "unknown"),
+                            "inputs": record.get("inputs", "{}"),
+                            "output": record.get("output", "unknown"),
+                            "sequence": record.get("sequence", 0),
+                            "dependencies": record.get("dependencies", []),
+                            "description": f"{record.get('action_name', 'unknown')} using {record.get('tool', 'unknown')}"
+                        })
+
+                # Convert to frontend format
+                if workflow_data:
+                    # Convert DateTime objects to strings
+                    created_at = workflow_data.get("created_at")
+                    if created_at:
+                        workflow_data["created_at"] = created_at.iso_format() if hasattr(created_at, 'iso_format') else str(created_at)
+                    completed_at = workflow_data.get("completed_at")
+                    if completed_at:
+                        workflow_data["completed_at"] = completed_at.iso_format() if hasattr(completed_at, 'iso_format') else str(completed_at)
+
+                    workflow_detail = {
+                        "id": workflow_data["id"],
+                        "name": workflow_data["name"],
+                        "steps": actions,
+                        "metadata": {
+                            "status": workflow_data["status"],
+                            "created_at": workflow_data["created_at"],
+                            "completed_at": workflow_data["completed_at"],
+                            "final_step": workflow_data["final_step"],
+                            "prompt": workflow_data["prompt"],
+                            "total_actions": len(actions)
+                        },
+                        "graph": {
+                            "nodes": [
+                                {"id": workflow_data["prompt_id"], "type": "prompt", "label": workflow_data["name"][:50]}
+                            ] + [
+                                {"id": action["id"], "type": "action", "label": f"{action['tool']}: {action['name']}"}
+                                for action in actions
+                            ],
+                            "edges": self._build_workflow_edges(workflow_data["prompt_id"], actions)
+                        }
                     }
 
-                if record.get("action_id"):
-                    actions.append({
-                        "id": record.get("action_id"),
-                        "name": record.get("action_name", "unknown"),
-                        "tool": record.get("tool", "unknown"),
-                        "inputs": record.get("inputs", "{}"),
-                        "output": record.get("output", "unknown"),
-                        "sequence": record.get("sequence", 0),
-                        "dependencies": record.get("dependencies", []),
-                        "description": f"{record.get('action_name', 'unknown')} using {record.get('tool', 'unknown')}"
-                    })
+                    driver.close()
+                    return workflow_detail
 
-            # Convert to frontend format
-            if workflow_data:
-                workflow_detail = {
-                    "id": workflow_data["id"],
-                    "name": workflow_data["name"],
-                    "steps": actions,
-                    "metadata": {
-                        "status": workflow_data["status"],
-                        "created_at": workflow_data["created_at"],
-                        "completed_at": workflow_data["completed_at"],
-                        "final_step": workflow_data["final_step"],
-                        "prompt": workflow_data["prompt"],
-                        "total_actions": len(actions)
-                    },
-                    "graph": {
-                        "nodes": [
-                            {"id": workflow_data["prompt_id"], "type": "prompt", "label": workflow_data["name"][:50]}
-                        ] + [
-                            {"id": action["id"], "type": "action", "label": f"{action['tool']}: {action['name']}"}
-                            for action in actions
-                        ],
-                        "edges": self._build_workflow_edges(workflow_data["prompt_id"], actions)
-                    }
-                }
-
-                neo4j_client.close()
-                return workflow_detail
-
-            neo4j_client.close()
+            driver.close()
             return None
 
         except Exception as e:

@@ -44,7 +44,7 @@ export class ApiClient {
    * Core request method
    */
   private static async request<T>(
-    type: ApiType,
+    _type: ApiType,
     endpoint: string,
     options: ApiRequestOptions & {
       baseUrl?: string;
@@ -106,7 +106,7 @@ export class ApiClient {
       if (contentType?.includes('application/json')) {
         const text = await response.text();
         // Parse JSON and convert date strings to Date objects
-        data = JSON.parse(text, (key, value) => {
+        data = JSON.parse(text, (_key, value) => {
           // Convert ISO date strings to Date objects
           if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
             return new Date(value);

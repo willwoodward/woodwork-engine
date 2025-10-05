@@ -11,7 +11,7 @@ import {
   SquareTerminal,
   User,
   CheckSquare,
-  Lightbulb,
+
   BarChart3,
   Sparkles,
 } from "lucide-react"
@@ -78,6 +78,10 @@ const data = {
         {
           title: "Agent Requests",
           url: "/inbox",
+        },
+        {
+          title: "Event Pipeline",
+          url: "/event-pipeline",
         },
       ],
     },

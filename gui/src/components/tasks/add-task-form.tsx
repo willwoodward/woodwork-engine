@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Sparkles, WifiOff, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface AddTaskFormProps {
   onAddTask: (
@@ -130,11 +129,6 @@ export function AddTaskForm({ onAddTask, onUseWorkflow, onTagClick, onTagDelete,
     setMatchResult(null);
   };
 
-  const toggleTag = (tag: TaskTag) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
 
   const handleAddNewTag = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Save, Play, Trash2 } from "lucide-react";
 import { useWorkflowsApi } from "@/hooks/useApiWithFallback";
+import { useWorkflowManagement } from "@/hooks/useWorkflowManagement";
 import { type MockWorkflowStep } from "@/data/mock-data";
 import {
   EmptyState,
@@ -17,8 +18,10 @@ export default function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
   const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
   const [workflowSteps, setWorkflowSteps] = useState<MockWorkflowStep[]>([]);
   const [workflowName, setWorkflowName] = useState("");
+  const [workflowDescription] = useState(""); // setWorkflowDescription reserved for future use
 
   const { data: mockWorkflows = [] } = useWorkflowsApi();
+  const { createWorkflow, updateWorkflow, executeWorkflow, deleteWorkflow } = useWorkflowManagement();
 
   // Load workflow data when workflowId changes
   const currentWorkflow = useMemo(() => {
@@ -63,14 +66,66 @@ export default function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
     }
   };
 
-  const handleSaveWorkflow = () => {
-    // TODO: Implement save functionality
-    console.log("Saving workflow:", { name: workflowName, steps: workflowSteps });
+  const handleSaveWorkflow = async () => {
+    try {
+      const actions = workflowSteps.map((step, idx) => ({
+        sequence: idx,
+        tool: step.tool,
+        action: step.name,
+        inputs: (step as any).inputs || {},
+        output: (step as any).output || `step_${idx}_output`,
+      }));
+
+      if (workflowId === "new") {
+        // Create new workflow
+        await createWorkflow.mutateAsync({
+          name: workflowName,
+          description: workflowDescription,
+          actions,
+        });
+        console.log("Workflow created successfully");
+      } else {
+        // Update existing workflow
+        await updateWorkflow.mutateAsync({
+          id: workflowId!,
+          name: workflowName,
+          description: workflowDescription,
+          actions,
+        });
+        console.log("Workflow updated successfully");
+      }
+    } catch (error) {
+      console.error("Failed to save workflow:", error);
+    }
   };
 
-  const handleRunWorkflow = () => {
-    // TODO: Implement run functionality
-    console.log("Running workflow:", { name: workflowName, steps: workflowSteps });
+  const handleRunWorkflow = async () => {
+    try {
+      if (workflowId && workflowId !== "new") {
+        // Execute workflow with test inputs
+        const result = await executeWorkflow.mutateAsync({
+          workflowId: workflowId,
+          inputs: {}, // Could add UI for test inputs
+        });
+        console.log("Workflow execution result:", result);
+      }
+    } catch (error) {
+      console.error("Failed to execute workflow:", error);
+    }
+  };
+
+  const handleDeleteWorkflow = async () => {
+    if (workflowId && workflowId !== "new") {
+      const confirmed = confirm("Are you sure you want to delete this workflow?");
+      if (confirmed) {
+        try {
+          await deleteWorkflow.mutateAsync(workflowId);
+          console.log("Workflow deleted successfully");
+        } catch (error) {
+          console.error("Failed to delete workflow:", error);
+        }
+      }
+    }
   };
 
   if (!workflowId) {
@@ -100,18 +155,30 @@ export default function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleSaveWorkflow}
-              className="flex items-center gap-2 px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+              disabled={createWorkflow.isPending || updateWorkflow.isPending}
+              className="flex items-center gap-2 px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              Save
+              {createWorkflow.isPending || updateWorkflow.isPending ? 'Saving...' : 'Save'}
             </button>
             <button
               onClick={handleRunWorkflow}
-              className="flex items-center gap-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+              disabled={executeWorkflow.isPending || workflowId === "new"}
+              className="flex items-center gap-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
             >
               <Play className="w-4 h-4" />
-              Run
+              {executeWorkflow.isPending ? 'Running...' : 'Run'}
             </button>
+            {workflowId !== "new" && (
+              <button
+                onClick={handleDeleteWorkflow}
+                disabled={deleteWorkflow.isPending}
+                className="flex items-center gap-2 px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleteWorkflow.isPending ? 'Deleting...' : 'Delete'}
+              </button>
+            )}
           </div>
         </div>
       </div>

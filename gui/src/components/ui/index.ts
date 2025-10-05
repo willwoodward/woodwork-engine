@@ -5,3 +5,4 @@ export { WorkflowCard } from './workflow-card';
 export { ToolIcon, getToolIcon } from './tool-icons';
 export { Badge } from './badge';
 export { IconBadge } from './icon-badge';
+export { PipelineNode } from './pipeline-node';
