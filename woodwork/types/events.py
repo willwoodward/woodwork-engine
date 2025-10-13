@@ -195,13 +195,13 @@ class AgentStepCompletePayload(BasePayload):
         return errors
 
 
-@dataclass  
+@dataclass
 class AgentErrorPayload(BasePayload):
     """Payload for agent.error events"""
     error: str = ""
     error_type: str = "Unknown"
     context: Dict[str, Any] = field(default_factory=dict)
-    
+
     def validate(self) -> List[str]:
         """Validate error payload"""
         errors = []
@@ -210,7 +210,7 @@ class AgentErrorPayload(BasePayload):
         if not isinstance(self.context, dict):
             errors.append("context field must be a dictionary")
         return errors
-    
+
     @classmethod
     def from_exception(cls, exc: Exception, context: Optional[Dict[str, Any]] = None, **kwargs) -> "AgentErrorPayload":
         """Create AgentErrorPayload from an exception"""
@@ -220,6 +220,42 @@ class AgentErrorPayload(BasePayload):
             context=context or {},
             **kwargs
         )
+
+
+@dataclass
+class UserInputRequestPayload(BasePayload):
+    """Payload for user.input.request events - requests input from user"""
+    question: str = ""
+    request_id: str = ""
+    session_id: Optional[str] = None
+    timeout_seconds: Optional[int] = None
+
+    def validate(self) -> List[str]:
+        """Validate user input request payload"""
+        errors = []
+        if not self.question or not self.question.strip():
+            errors.append("question field cannot be empty")
+        if not self.request_id or not self.request_id.strip():
+            errors.append("request_id field cannot be empty")
+        if self.timeout_seconds is not None and (not isinstance(self.timeout_seconds, int) or self.timeout_seconds <= 0):
+            errors.append("timeout_seconds must be a positive integer")
+        return errors
+
+
+@dataclass
+class UserInputResponsePayload(BasePayload):
+    """Payload for user.input.response events - user's response to input request"""
+    response: str = ""
+    request_id: str = ""
+    session_id: Optional[str] = None
+
+    def validate(self) -> List[str]:
+        """Validate user input response payload"""
+        errors = []
+        if not self.request_id or not self.request_id.strip():
+            errors.append("request_id field cannot be empty")
+        # response can be empty string - that's valid user input
+        return errors
 
 
 class PayloadRegistry:
@@ -233,6 +269,8 @@ class PayloadRegistry:
         "tool.observation": ToolObservationPayload,
         "agent.step_complete": AgentStepCompletePayload,
         "agent.error": AgentErrorPayload,
+        "user.input.request": UserInputRequestPayload,
+        "user.input.response": UserInputResponsePayload,
     }
     
     @classmethod

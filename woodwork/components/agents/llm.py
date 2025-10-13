@@ -1,20 +1,22 @@
 import json
 import re
 import logging
-import ast
+import asyncio
+import uuid
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from typing import Any, Tuple, Optional
 import tiktoken
 
 from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
-from woodwork.core.unified_event_bus import emit
+from woodwork.core.unified_event_bus import emit, get_global_event_bus
 from woodwork.types.event_source import EventSource
 from woodwork.components.llms.llm import llm
-from woodwork.core.message_bus.interface import create_component_message
+from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
+from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
+from typing import Dict
 
 log = logging.getLogger(__name__)
 
@@ -32,47 +34,84 @@ class llm(agent):
         self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"}))
         self._prompt = get_prompt(self._prompt_config.file)
 
-        # self.__retriever = None
-        # if "knowledge_base" in config:
-        #     self.__retriever = config["knowledge_base"].retriever
+        # Event-based ask_user handling
+        self._pending_user_requests: dict[str, asyncio.Future] = {}
+        self._event_bus = get_global_event_bus()
 
-    def __clean(self, x):
-        start_index = -1
-        end_index = -1
+        # Register for user input responses
+        self._event_bus.register_hook("user.input.response", self._handle_user_input_response)
 
-        for i in range(len(x) - 1):
-            if x[i] == "{":
-                start_index = i
-                break
+        # Setup internal features (only for LLM agents)
+        self._internal_component_manager = InternalComponentManager()
+        self._internal_features = InternalFeatureRegistry.create_features(config)
+        self._setup_internal_features(config)
 
-        for i in range(len(x) - 1, 0, -1):
-            if x[i] == "}":
-                end_index = i
-                break
+        # Workflow variables for action output tracking
+        self._workflow_variables: dict[str, Any] = {}
 
-        if start_index == -1:
-            return x
+    async def _handle_user_input_response(self, payload):
+        """Handle user input response events"""
+        try:
+            if isinstance(payload, UserInputResponsePayload):
+                request_id = payload.request_id
+                if request_id in self._pending_user_requests:
+                    future = self._pending_user_requests[request_id]
+                    if not future.done():
+                        future.set_result(payload.response)
+                    del self._pending_user_requests[request_id]
+                    log.debug(f"[Agent] Received user response for request {request_id}: {payload.response}")
+                else:
+                    log.warning(f"[Agent] Received user response for unknown request {request_id}")
+            elif isinstance(payload, dict) and 'request_id' in payload:
+                # Handle dict format for compatibility
+                request_id = payload['request_id']
+                if request_id in self._pending_user_requests:
+                    future = self._pending_user_requests[request_id]
+                    if not future.done():
+                        future.set_result(payload.get('response', ''))
+                    del self._pending_user_requests[request_id]
+                    log.debug(f"[Agent] Received user response for request {request_id}: {payload.get('response', '')}")
+        except Exception as e:
+            log.error(f"[Agent] Error handling user input response: {e}")
+
+    async def _ask_user_via_events(self, question: str, timeout_seconds: int = 600) -> str:
+        """Ask user for input via event system instead of blocking input()"""
+        request_id = str(uuid.uuid4())
+
+        # Create a future to wait for the response
+        future = asyncio.Future()
+        self._pending_user_requests[request_id] = future
 
         try:
-            return json.loads(x[start_index : end_index + 1 :])
-        except:
-            log.debug("Couldn't load array as JSON")
-            log.debug(x[start_index : end_index + 1 :])
-            return x
+            # Create and emit the user input request
+            request_payload = UserInputRequestPayload(
+                question=question,
+                request_id=request_id,
+                timeout_seconds=timeout_seconds,
+                component_id=self.name,
+                component_type="agent"
+            )
 
-    def _safe_json_extract(self, s: str):
-        try:
-            # First try strict JSON
-            return json.loads(s)
-        except json.JSONDecodeError:
-            try:
-                # Fallback: allow Python-style literals (True/False/None, single quotes, etc.)
-                return ast.literal_eval(s)
-            except Exception as e:
-                # If both fail, raise a clear error
-                raise ValueError(f"Invalid JSON in action: {e}\nRaw string: {repr(s)}")
+            log.debug(f"[Agent] Requesting user input: {question}")
+            await emit("user.input.request", request_payload)
 
+            # Wait for response with timeout
+            response = await asyncio.wait_for(future, timeout=timeout_seconds)
+            log.debug(f"[Agent] User response received: {response}")
+            return response
 
+        except asyncio.TimeoutError:
+            log.warning(f"[Agent] User input request {request_id} timed out after {timeout_seconds} seconds")
+            # Clean up
+            if request_id in self._pending_user_requests:
+                del self._pending_user_requests[request_id]
+            return f"[Timeout: No user response received within {timeout_seconds} seconds]"
+        except Exception as e:
+            log.error(f"[Agent] Error requesting user input: {e}")
+            # Clean up
+            if request_id in self._pending_user_requests:
+                del self._pending_user_requests[request_id]
+            return f"[Error requesting user input: {e}]"
 
     def _parse(self, agent_output: str) -> Tuple[str, Optional[dict], bool]:
         """
@@ -106,44 +145,11 @@ class llm(agent):
         cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
 
         try:
-            action = self._safe_json_extract(cleaned_action_str)
+            action = json.loads(cleaned_action_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
 
         return thought, action, False
-
-
-    def _find_inputs(self, query: str, inputs: list[str]) -> dict[str, Any]:
-        """Given a prompt and the inputs to be extracted, return the input dictionary."""
-        system_prompt = (
-            "Given the following prompt from the user, and a list of inputs:"
-            "{inputs} \n"
-            "Extract these from the user's prompt, and return in the following JSON schema:"
-            "{{{{input: extracted_text}}}}\n"
-            "For example, if the user's prompt is: what are the letters in the word chicken?, given the inputs: ['word']"
-            'The output would be: {{{{"word": "chicken"}}}}\n'
-            "When including data structures other than strings for the value, do not wrap them in a string."
-            "Return only this JSON object."
-        ).format(inputs=inputs)
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("human", "{input}"),
-            ]
-        )
-
-        chain = prompt | self._llm
-        result = chain.invoke({"input": query}).content
-
-        # Clean output as JSON
-        result = self.__clean(result)
-        return result
-
-    def _generate_workflow(self, query: str, partial_workflow: dict[str, Any]):
-        input_dict = self._find_inputs(query, partial_workflow["inputs"])
-        workflow = {"inputs": input_dict, "plan": partial_workflow["actions"]}
-        return workflow
     
     def count_tokens(self, text: str, model: str = "gpt-5-mini"):
         if not isinstance(text, str):
@@ -160,6 +166,10 @@ class llm(agent):
         if inputs is None:
             inputs = {}
 
+        # Reset workflow variables for new query and initialize with input variables
+        self._workflow_variables = inputs.copy()
+        log.debug(f"Initialized workflow variables with inputs: {list(inputs.keys())}")
+
         # Set component context for proper event attribution
         EventSource.set_current(getattr(self, 'name', 'unknown_agent'), 'agent')
 
@@ -168,25 +178,44 @@ class llm(agent):
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
-        # # Search cache for similar results
-        # if self._cache_mode:
-        #     closest_query = self._cache_search_actions(query)
-        #     if closest_query["score"] > 0.90:
-        #         log.debug("Cache hit!")
-        #         return self._output.execute(self._generate_workflow(query, closest_query))
         self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
-        transformed = await emit("input.received", {"input": query, "inputs": inputs, "session_id": getattr(self, "_session", None)})
-        
-        # Extract from typed payload
-        query = transformed.input
-        inputs = transformed.inputs
+        from woodwork.types.events import InputReceivedPayload
+        input_payload = InputReceivedPayload(
+            input=query,
+            inputs=inputs,
+            session_id=getattr(self, "_session", None),
+            component_id=self.name,
+            component_type="agent"
+        )
+        transformed = await emit("input.received", input_payload)
+
+        # Extract from typed payload (handle fallback to GenericPayload)
+        if hasattr(transformed, 'input'):
+            query = transformed.input
+            inputs = transformed.inputs
+        else:
+            # Fallback for GenericPayload
+            query = input_payload.input
+            inputs = input_payload.inputs
 
         # Build tool documentation string
         tool_documentation = ""
         for obj in self._tools:
             tool_documentation += f"tool name: {obj.name}\ntool type: {obj.type}\n<tool_description>\n{obj.description}</tool_description>\n\n\n"
+
+        # Add dynamic tools from internal features (like workflows)
+        for feature in self._internal_features:
+            if hasattr(feature, 'get_tools'):
+                try:
+                    dynamic_tools = feature.get_tools()
+                    if dynamic_tools:
+                        log.debug(f"Adding {len(dynamic_tools)} dynamic tools from {feature.__class__.__name__}")
+                    for tool in dynamic_tools:
+                        tool_documentation += f"tool name: {tool['name']}\ntool type: {tool['type']}\n<tool_description>\n{tool['description']}</tool_description>\n\n\n"
+                except Exception as e:
+                    log.debug(f"Failed to get tools from feature {feature.__class__.__name__}: {e}")
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
 
@@ -274,7 +303,13 @@ class llm(agent):
                     action = Action.from_dict(action_dict)
 
                 # Use improved message bus API for tool execution
-                observation = await self._execute_tool_with_improved_api(action)
+                result = await self._execute_tool_with_improved_api(action)
+
+                # Ensure observation is a string (tools might return dicts, lists, etc.)
+                if isinstance(result, str):
+                    observation = result
+                else:
+                    observation = json.dumps(result) if result is not None else "No output"
 
                 observation_tokens = self.count_tokens(observation)
                 if observation_tokens > 7500:
@@ -305,9 +340,61 @@ class llm(agent):
             # Emit step complete
             await emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
 
-        # # Cache instructions
-        # if self._cache_mode:
-        #     self._cache_actions(result)
+    async def _execute_workflow_by_name(self, workflow_name: str, inputs: Dict[str, Any]) -> str:
+        """
+        Execute a workflow by name or ID.
+
+        This allows agents to call workflows using:
+        tool: workflow, action: "workflow_name", inputs: {...}
+        """
+        try:
+            # Get the workflows feature if available
+            workflows_feature = None
+            for feature in self._internal_features:
+                if feature.__class__.__name__ == "WorkflowsFeature":
+                    workflows_feature = feature
+                    break
+
+            if not workflows_feature:
+                return "Error: Workflows feature not enabled"
+
+            # Look up workflow ID by name
+            workflow_id = workflows_feature._get_workflow_id_by_name(workflow_name)
+
+            if not workflow_id:
+                return f"Error: Workflow '{workflow_name}' not found"
+
+            # Execute the workflow
+            result = await workflows_feature._execute_workflow_tool(workflow_id, inputs)
+
+            log.info(f"[Agent] Executed workflow '{workflow_name}' ({workflow_id}) with inputs {inputs}")
+
+            # Format result as string
+            if isinstance(result, dict):
+                return json.dumps(result)
+            return str(result)
+
+        except Exception as e:
+            log.error(f"[Agent] Error executing workflow '{workflow_name}': {e}")
+            return f"Error executing workflow: {e}"
+
+    def _resolve_action_inputs(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        """
+        Resolve variable references in action inputs.
+
+        If an input value is a string that matches a workflow variable name,
+        replace it with the actual variable value.
+        """
+        resolved = {}
+        for key, value in inputs.items():
+            if isinstance(value, str) and value in self._workflow_variables:
+                # This is a variable reference - substitute with actual value
+                resolved[key] = self._workflow_variables[value]
+                log.debug(f"Resolved variable '{value}' to: {resolved[key]}")
+            else:
+                # Keep as literal value
+                resolved[key] = value
+        return resolved
 
     async def _execute_tool_with_improved_api(self, action: Action):
         """
@@ -317,16 +404,202 @@ class llm(agent):
         simple, reliable component-to-component communication.
         """
         try:
-            # Special handling for ask_user (not a component)
+            # Special handling for ask_user (uses event-based communication)
             if action.tool == "ask_user":
-                return input(f"{action.inputs.get('question', 'Please provide input:')}\n")
+                question = action.inputs.get('question', 'Please provide input:')
+                timeout = action.inputs.get('timeout_seconds', 60)
+                return await self._ask_user_via_events(question, timeout)
 
-            # Use the clean message API - one line!
-            return await self.request(action.tool, {
+            # Special handling for workflow execution
+            if action.tool == "workflow":
+                return await self._execute_workflow_by_name(action.action, action.inputs)
+
+            # Resolve variable references in inputs
+            resolved_inputs = self._resolve_action_inputs(action.inputs)
+
+            # Use the clean message API with resolved inputs
+            result = await self.request(action.tool, {
                 "action": action.action,
-                "inputs": action.inputs
+                "inputs": resolved_inputs
             })
+
+            # Store output in workflow variables if action has output variable
+            # NOTE: We store the raw result (could be dict, list, etc.) so subsequent
+            # actions can use the structured data. The observation converts to string separately.
+            if action.output:
+                self._workflow_variables[action.output] = result
+                log.debug(f"Stored output in variable '{action.output}': {result}")
+
+            return result
 
         except Exception as e:
             log.error(f"[Agent] Error executing tool '{action.tool}': {e}")
             return f"Error executing tool '{action.tool}': {e}"
+
+    def _setup_internal_features(self, config: dict) -> None:
+        """Setup internal features, create required components, and register hooks/pipes."""
+        log.debug(f"[LLM Agent {self.name}] Setting up {len(self._internal_features)} internal features")
+
+        for feature in self._internal_features:
+            try:
+                # Create required components for this feature
+                self._create_required_components(feature)
+
+                # Setup the feature with component manager access
+                # (This automatically registers hooks and pipes via feature.setup())
+                feature.setup(self, config, self._internal_component_manager)
+
+                log.debug(f"[LLM Agent {self.name}] Successfully set up internal feature: {feature.__class__.__name__}")
+            except Exception as e:
+                log.error(f"[LLM Agent {self.name}] Failed to setup internal feature {feature.__class__.__name__}: {e}")
+
+    def _create_required_components(self, feature: InternalFeature) -> None:
+        """Create all components required by a feature."""
+        required_components = feature.get_required_components()
+
+        for component_spec in required_components:
+            component_id = component_spec["component_id"]
+            component_type = component_spec["component_type"]
+            component_config = component_spec["config"]
+            is_optional = component_spec.get("optional", False)
+
+            try:
+                self._internal_component_manager.get_or_create_component(
+                    component_id, component_type, component_config
+                )
+                log.debug(f"[LLM Agent {self.name}] Created internal component: {component_id}")
+            except Exception as e:
+                if not is_optional:
+                    raise RuntimeError(f"Failed to create required internal component {component_id}: {e}")
+                log.warning(f"[LLM Agent {self.name}] Failed to create optional internal component {component_id}: {e}")
+
+
+    def get_internal_component(self, component_id: str):
+        """Get an internal component by ID."""
+        if hasattr(self, '_internal_component_manager'):
+            return self._internal_component_manager.get_component(component_id)
+        return None
+
+    def create_component(self, component_type: str, component_id: str = None, **config):
+        """
+        Direct API to create and attach internal components at runtime.
+
+        Args:
+            component_type: Type of component to create (e.g., 'neo4j', 'redis', 'chroma')
+            component_id: Optional custom ID, auto-generated if not provided
+            **config: Component configuration parameters
+
+        Returns:
+            Created component instance
+
+        Example:
+            # Create Neo4j component directly
+            neo4j = agent.create_component(
+                "neo4j",
+                uri="bolt://localhost:7687",
+                api_key="my-key"
+            )
+
+            # Create Redis component
+            redis = agent.create_component(
+                "redis",
+                host="localhost",
+                port=6379
+            )
+        """
+        if not hasattr(self, '_internal_component_manager'):
+            raise RuntimeError("Internal component manager not available")
+
+        # Auto-generate component ID if not provided
+        if component_id is None:
+            existing_count = len([k for k in self._internal_component_manager._components.keys()
+                                if k.startswith(f"{self.name}_{component_type}")])
+            component_id = f"{self.name}_{component_type}_{existing_count}"
+
+        # Add API key from model if available and not provided
+        if 'api_key' not in config and hasattr(self, 'model') and hasattr(self.model, '_api_key'):
+            config['api_key'] = self.model._api_key
+
+        # Create component through internal manager
+        component = self._internal_component_manager.get_or_create_component(
+            component_id, component_type, config
+        )
+
+        # Auto-attach to agent with clean attribute name
+        attr_name = f"_{component_type}_{existing_count}" if existing_count > 0 else f"_{component_type}"
+        setattr(self, attr_name, component)
+
+        log.info(f"[LLM Agent {self.name}] Created {component_type} component: {component_id}")
+        return component
+
+    def add_hook(self, event_name: str, hook_function, description: str = None):
+        """
+        Add a hook to this agent that listens for specific events.
+
+        Args:
+            event_name: Event to listen for (e.g., 'agent.thought', 'input.received')
+            hook_function: Function to call when event occurs
+            description: Optional description for debugging
+
+        Example:
+            def log_thoughts(payload):
+                print(f"Agent thought: {payload.thought}")
+
+            agent.add_hook("agent.thought", log_thoughts, "Log all agent thoughts")
+        """
+        try:
+            from woodwork.core.unified_event_bus import get_global_event_bus
+            event_bus = get_global_event_bus()
+            event_bus.register_hook(event_name, hook_function)
+
+            desc = f" ({description})" if description else ""
+            log.info(f"[LLM Agent {self.name}] Added hook for '{event_name}'{desc}")
+        except Exception as e:
+            log.error(f"[LLM Agent {self.name}] Failed to add hook for '{event_name}': {e}")
+
+    def add_pipe(self, event_name: str, pipe_function, description: str = None):
+        """
+        Add a pipe to this agent that can transform event payloads.
+
+        Args:
+            event_name: Event to transform (e.g., 'input.received')
+            pipe_function: Function that takes payload and returns modified payload
+            description: Optional description for debugging
+
+        Example:
+            def enhance_input(payload):
+                enhanced = f"Enhanced: {payload.input}"
+                return payload._replace(input=enhanced)
+
+            agent.add_pipe("input.received", enhance_input, "Add enhancement prefix")
+        """
+        try:
+            from woodwork.core.unified_event_bus import get_global_event_bus
+            event_bus = get_global_event_bus()
+            event_bus.register_pipe(event_name, pipe_function)
+
+            desc = f" ({description})" if description else ""
+            log.info(f"[LLM Agent {self.name}] Added pipe for '{event_name}'{desc}")
+        except Exception as e:
+            log.error(f"[LLM Agent {self.name}] Failed to add pipe for '{event_name}': {e}")
+
+    def close(self):
+        """Clean up internal features and components, then call parent close."""
+        try:
+            # Teardown features first
+            if hasattr(self, '_internal_features'):
+                for feature in self._internal_features:
+                    try:
+                        feature.teardown(self, self._internal_component_manager)
+                    except Exception as e:
+                        log.warning(f"[LLM Agent {self.name}] Error during feature teardown: {e}")
+
+            # Then cleanup all internal components
+            if hasattr(self, '_internal_component_manager'):
+                self._internal_component_manager.cleanup_components()
+                log.debug(f"[LLM Agent {self.name}] Internal features and components cleaned up")
+        except Exception as e:
+            log.warning(f"[LLM Agent {self.name}] Error during close: {e}")
+
+        # Call parent close method
+        super().close()

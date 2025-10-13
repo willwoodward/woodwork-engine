@@ -106,6 +106,15 @@ def app_entrypoint(args):
             gui = GUI(config_parser.task_m)
             gui.run()
             return
+        elif args.gui == "fastapi":
+            log.debug("FastAPI GUI is set to run.")
+            dependencies.activate_virtual_environment()
+            # Import and run the FastAPI GUI server
+            import asyncio
+            from woodwork.gui.fastapi_gui_server import start_gui_server
+
+            asyncio.run(start_gui_server())
+            return
 
     if args.workflow != "none":
         if args.mode in {"run", "debug"}:

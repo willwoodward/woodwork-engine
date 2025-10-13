@@ -46,7 +46,7 @@ class neo4j(graph_database):
 
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
         if not self._connected():
-            exit()
+            raise ConnectionError(f"Failed to connect to Neo4j at {uri}")
 
         self._api_key = get_optional(config, "api_key")
         self._openai_client = None
@@ -65,10 +65,9 @@ class neo4j(graph_database):
             with self._driver.session() as session:
                 session.run("RETURN 1")
                 return True
-        except Exception:
+        except Exception as e:
+            log.error(f"Neo4j connection check failed: {e}")
             return False
-        finally:
-            self._driver.close()
 
     def init_vector_index(self, index_name, label, property):
         query = f"""
