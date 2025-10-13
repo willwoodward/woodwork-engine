@@ -1,11 +1,9 @@
 """
-Unit tests for WorkflowExecutor class.
-
-Following TDD - these tests are written BEFORE implementation.
+Unit tests for WorkflowExecutor class with unified event bus integration.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 import json
 
 
@@ -20,44 +18,36 @@ class TestWorkflowExecutor:
         return neo4j
 
     @pytest.fixture
-    def mock_task_master(self):
-        """Mock task master with tools."""
-        task_master = Mock()
+    def mock_agent(self):
+        """Mock agent component with request API."""
+        agent = Mock()
 
-        # Mock file tool
-        file_tool = Mock()
-        file_tool.execute = AsyncMock(return_value="Sample file content")
+        # Mock request method that returns different values based on tool
+        async def mock_request(tool, payload):
+            responses = {
+                "file_tool": "Sample file content",
+                "text_tool": "Processed text output",
+                "analysis_tool": {"result": "analysis complete"}
+            }
+            return responses.get(tool, "default response")
 
-        # Mock text tool
-        text_tool = Mock()
-        text_tool.execute = AsyncMock(return_value="Processed text output")
-
-        # Mock analysis tool
-        analysis_tool = Mock()
-        analysis_tool.execute = AsyncMock(return_value={"result": "analysis complete"})
-
-        task_master.get_tool = Mock(side_effect=lambda name: {
-            "file_tool": file_tool,
-            "text_tool": text_tool,
-            "analysis_tool": analysis_tool
-        }.get(name))
-
-        return task_master
+        agent.request = AsyncMock(side_effect=mock_request)
+        return agent
 
     @pytest.fixture
-    def executor(self, mock_neo4j, mock_task_master):
+    def executor(self, mock_neo4j, mock_agent):
         """Create WorkflowExecutor instance."""
         from woodwork.components.internal_features.workflow_executor import WorkflowExecutor
-        return WorkflowExecutor(mock_neo4j, mock_task_master)
+        return WorkflowExecutor(mock_neo4j, mock_agent)
 
-    def test_executor_initialization(self, mock_neo4j, mock_task_master):
-        """Test that executor initializes with neo4j and task_master."""
+    def test_executor_initialization(self, mock_neo4j, mock_agent):
+        """Test that executor initializes with neo4j and agent."""
         from woodwork.components.internal_features.workflow_executor import WorkflowExecutor
 
-        executor = WorkflowExecutor(mock_neo4j, mock_task_master)
+        executor = WorkflowExecutor(mock_neo4j, mock_agent)
 
         assert executor._neo4j == mock_neo4j
-        assert executor._task_master == mock_task_master
+        assert executor._agent == mock_agent
 
     @pytest.mark.asyncio
     async def test_execute_workflow_runs_single_action(self, executor, mock_neo4j):
@@ -124,7 +114,7 @@ class TestWorkflowExecutor:
         assert result['final_outputs']['processed_text'] == "Processed text output"
 
     @pytest.mark.asyncio
-    async def test_execute_workflow_resolves_variable_references(self, executor, mock_neo4j, mock_task_master):
+    async def test_execute_workflow_resolves_variable_references(self, executor, mock_neo4j, mock_agent):
         """Test that action inputs resolve variable references correctly."""
         mock_neo4j.run.return_value = [
             {
@@ -151,15 +141,15 @@ class TestWorkflowExecutor:
             session_id="test_session"
         )
 
-        # Verify analysis tool received resolved variable
-        analysis_tool = mock_task_master.get_tool("analysis_tool")
+        # Verify agent.request was called for analysis_tool
+        # Check the second call (analysis_tool) received resolved variable
+        assert mock_agent.request.call_count == 2
 
-        # Check that execute was called with resolved inputs
-        call_args = analysis_tool.execute.call_args
-        assert call_args is not None
-
+        second_call = mock_agent.request.call_args_list[1]
+        assert second_call[0][0] == "analysis_tool"
         # The 'data' input should be resolved to the file content
-        assert "Sample file content" in str(call_args)
+        assert second_call[0][1]["inputs"]["data"] == "Sample file content"
+        assert second_call[0][1]["inputs"]["limit"] == 100
 
     @pytest.mark.asyncio
     async def test_execute_workflow_preserves_literal_values(self, executor, mock_neo4j):
@@ -196,12 +186,12 @@ class TestWorkflowExecutor:
             )
 
     @pytest.mark.asyncio
-    async def test_execute_workflow_raises_on_missing_tool(self, executor, mock_neo4j, mock_task_master):
-        """Test that missing tool raises error."""
+    async def test_execute_workflow_handles_tool_errors(self, executor, mock_neo4j, mock_agent):
+        """Test that tool execution errors are handled gracefully."""
         mock_neo4j.run.return_value = [
             {
                 "id": "a1",
-                "tool": "nonexistent_tool",
+                "tool": "failing_tool",
                 "action": "test",
                 "inputs": '{}',
                 "output": "result",
@@ -209,14 +199,18 @@ class TestWorkflowExecutor:
             }
         ]
 
-        mock_task_master.get_tool.return_value = None
+        # Make the agent.request raise an error
+        mock_agent.request.side_effect = Exception("Component not found")
 
-        with pytest.raises(ValueError, match="Tool 'nonexistent_tool' not found"):
-            await executor.execute_workflow(
-                workflow_id="w1",
-                inputs={},
-                session_id="test_session"
-            )
+        # Should not raise, but return error in result
+        result = await executor.execute_workflow(
+            workflow_id="w1",
+            inputs={},
+            session_id="test_session"
+        )
+
+        assert result['status'] == 'completed'
+        assert 'Error:' in str(result['results'][0]['output'])
 
     @pytest.mark.asyncio
     async def test_execute_entrypoint_resolves_to_workflow(self, executor, mock_neo4j):
@@ -354,3 +348,57 @@ class TestWorkflowExecutor:
         workflow_id = await executor._resolve_entrypoint("nonexistent")
 
         assert workflow_id is None
+
+    @pytest.mark.asyncio
+    @patch('woodwork.components.internal_features.workflow_executor.emit')
+    async def test_execute_action_emits_events(self, mock_emit, executor, mock_neo4j, mock_agent):
+        """Test that _execute_action emits tool.call and tool.observation events."""
+        from woodwork.components.internal_features.workflow_executor import WorkflowExecutionContext
+
+        # Setup mock emit to return payloads (emit is sync, not async)
+        def mock_emit_side_effect(event_name, payload):
+            mock_payload = Mock()
+            if event_name == "tool.call":
+                mock_payload.tool = payload["tool"]
+                mock_payload.args = payload["args"]
+            elif event_name == "tool.observation":
+                mock_payload.tool = payload["tool"]
+                mock_payload.observation = payload["observation"]
+            return mock_payload
+
+        mock_emit.side_effect = mock_emit_side_effect
+
+        action = {
+            "id": "a1",
+            "tool": "file_tool",
+            "action": "read",
+            "inputs": {"path": "test.txt"},
+            "output": "content"
+        }
+
+        context = WorkflowExecutionContext(
+            workflow_id="w1",
+            inputs={},
+            session_id="test",
+            execution_id="exec1",
+            variables={}
+        )
+
+        result = await executor._execute_action(action, context)
+
+        # Verify tool.call event was emitted
+        call_events = [call for call in mock_emit.call_args_list if call[0][0] == "tool.call"]
+        assert len(call_events) == 1
+        assert call_events[0][0][1]["tool"] == "file_tool"
+        assert call_events[0][0][1]["args"] == {"path": "test.txt"}
+
+        # Verify tool.observation event was emitted
+        obs_events = [call for call in mock_emit.call_args_list if call[0][0] == "tool.observation"]
+        assert len(obs_events) == 1
+        assert obs_events[0][0][1]["tool"] == "file_tool"
+
+        # Verify agent.request was called
+        mock_agent.request.assert_called_once_with(
+            "file_tool",
+            {"action": "read", "inputs": {"path": "test.txt"}}
+        )

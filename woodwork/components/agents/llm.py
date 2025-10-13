@@ -16,7 +16,7 @@ from woodwork.types.event_source import EventSource
 from woodwork.components.llms.llm import llm
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
-from typing import Callable
+from typing import Dict
 
 log = logging.getLogger(__name__)
 
@@ -205,6 +205,18 @@ class llm(agent):
         for obj in self._tools:
             tool_documentation += f"tool name: {obj.name}\ntool type: {obj.type}\n<tool_description>\n{obj.description}</tool_description>\n\n\n"
 
+        # Add dynamic tools from internal features (like workflows)
+        for feature in self._internal_features:
+            if hasattr(feature, 'get_tools'):
+                try:
+                    dynamic_tools = feature.get_tools()
+                    if dynamic_tools:
+                        log.debug(f"Adding {len(dynamic_tools)} dynamic tools from {feature.__class__.__name__}")
+                    for tool in dynamic_tools:
+                        tool_documentation += f"tool name: {tool['name']}\ntool type: {tool['type']}\n<tool_description>\n{tool['description']}</tool_description>\n\n\n"
+                except Exception as e:
+                    log.debug(f"Failed to get tools from feature {feature.__class__.__name__}: {e}")
+
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
 
         system_prompt = (
@@ -328,6 +340,44 @@ class llm(agent):
             # Emit step complete
             await emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
 
+    async def _execute_workflow_by_name(self, workflow_name: str, inputs: Dict[str, Any]) -> str:
+        """
+        Execute a workflow by name or ID.
+
+        This allows agents to call workflows using:
+        tool: workflow, action: "workflow_name", inputs: {...}
+        """
+        try:
+            # Get the workflows feature if available
+            workflows_feature = None
+            for feature in self._internal_features:
+                if feature.__class__.__name__ == "WorkflowsFeature":
+                    workflows_feature = feature
+                    break
+
+            if not workflows_feature:
+                return "Error: Workflows feature not enabled"
+
+            # Look up workflow ID by name
+            workflow_id = workflows_feature._get_workflow_id_by_name(workflow_name)
+
+            if not workflow_id:
+                return f"Error: Workflow '{workflow_name}' not found"
+
+            # Execute the workflow
+            result = await workflows_feature._execute_workflow_tool(workflow_id, inputs)
+
+            log.info(f"[Agent] Executed workflow '{workflow_name}' ({workflow_id}) with inputs {inputs}")
+
+            # Format result as string
+            if isinstance(result, dict):
+                return json.dumps(result)
+            return str(result)
+
+        except Exception as e:
+            log.error(f"[Agent] Error executing workflow '{workflow_name}': {e}")
+            return f"Error executing workflow: {e}"
+
     def _resolve_action_inputs(self, inputs: dict[str, Any]) -> dict[str, Any]:
         """
         Resolve variable references in action inputs.
@@ -359,6 +409,10 @@ class llm(agent):
                 question = action.inputs.get('question', 'Please provide input:')
                 timeout = action.inputs.get('timeout_seconds', 60)
                 return await self._ask_user_via_events(question, timeout)
+
+            # Special handling for workflow execution
+            if action.tool == "workflow":
+                return await self._execute_workflow_by_name(action.action, action.inputs)
 
             # Resolve variable references in inputs
             resolved_inputs = self._resolve_action_inputs(action.inputs)

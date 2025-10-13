@@ -1,7 +1,7 @@
-"""Workflow execution engine for direct workflow execution.
+"""Workflow execution engine via unified event bus.
 
 This module provides the WorkflowExecutor class that executes workflows
-by running their action sequences directly, without agent planning.
+by running their action sequences through the unified event bus.
 """
 
 import logging
@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import uuid
 import json
+from woodwork.events import emit
 
 log = logging.getLogger(__name__)
 
@@ -24,18 +25,18 @@ class WorkflowExecutionContext:
 
 
 class WorkflowExecutor:
-    """Executes workflows by running action sequences directly."""
+    """Executes workflows via unified event bus."""
 
-    def __init__(self, neo4j_component, task_master):
+    def __init__(self, neo4j_component, agent_component):
         """
         Initialize workflow executor.
 
         Args:
             neo4j_component: Neo4j knowledge base for workflow retrieval
-            task_master: TaskMaster for tool/action execution
+            agent_component: Agent component for tool execution via request API
         """
         self._neo4j = neo4j_component
-        self._task_master = task_master
+        self._agent = agent_component
         log.debug("WorkflowExecutor initialized")
 
     async def execute_workflow(
@@ -159,7 +160,7 @@ class WorkflowExecutor:
         context: WorkflowExecutionContext
     ) -> Dict[str, Any]:
         """
-        Execute a single action using task master.
+        Execute a single action via unified event bus.
 
         Args:
             action: Action dictionary with tool, action, inputs, output
@@ -167,9 +168,6 @@ class WorkflowExecutor:
 
         Returns:
             Dict with action execution results
-
-        Raises:
-            ValueError: If tool not found
         """
         # Parse inputs if stored as JSON string
         if isinstance(action['inputs'], str):
@@ -185,24 +183,42 @@ class WorkflowExecutor:
         resolved_inputs = self._resolve_inputs(action_inputs, context.variables)
 
         log.debug(
-            f"Executing action: {action['tool']}.{action['action']} "
+            f"[WorkflowExecutor] Executing action: {action['tool']}.{action['action']} "
             f"with inputs: {resolved_inputs}"
         )
 
-        # Get tool from task master
-        tool = self._task_master.get_tool(action['tool'])
+        # Emit tool.call event (pipes can transform)
+        # Note: emit is sync, wraps async event processing internally
+        tool_call_payload = emit("tool.call", {
+            "tool": action['tool'],
+            "args": resolved_inputs
+        })
 
-        if not tool:
-            raise ValueError(f"Tool '{action['tool']}' not found")
+        # Execute via component request API (goes through event bus)
+        try:
+            result = await self._agent.request(
+                tool_call_payload.tool,
+                {
+                    "action": action['action'],
+                    "inputs": tool_call_payload.args
+                }
+            )
+        except Exception as e:
+            log.error(f"[WorkflowExecutor] Error executing {action['tool']}.{action['action']}: {e}")
+            result = f"Error: {e}"
 
-        # Execute tool action
-        result = await tool.execute(action['action'], **resolved_inputs)
+        # Emit tool.observation event (hooks can observe)
+        obs_payload = emit("tool.observation", {
+            "tool": action['tool'],
+            "observation": str(result)
+        })
 
         return {
             'action_id': action['id'],
             'tool': action['tool'],
             'action': action['action'],
             'output': result,
+            'observation': obs_payload.observation,
             'output_var': action.get('output')
         }
 

@@ -9,6 +9,7 @@ Features:
 - Workflows exposed as tools for agents
 - Direct workflow execution via entrypoints
 - Manual workflow creation/editing support
+- Variable extraction for reusable workflows
 """
 
 import logging
@@ -19,6 +20,7 @@ from woodwork.types.events import AgentActionPayload, AgentStepCompletePayload, 
 from woodwork.types.workflows import Action
 from .base import InternalFeature
 from .workflow_executor import WorkflowExecutor
+from .workflow_variable_extraction import extract_variables_from_prompt
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +34,8 @@ class WorkflowsFeature(InternalFeature):
         self._current_workflow_id = None
         self._workflow_actions = []
         self._workflow_executor = None  # Workflow executor for direct execution
+        self._llm = None  # LLM for variable extraction
+        self._similar_workflows = []  # Cache of similar workflows for current input
         log.debug("WorkflowsFeature initialized")
 
     def get_required_components(self) -> List[Dict[str, Any]]:
@@ -54,6 +58,11 @@ class WorkflowsFeature(InternalFeature):
         """Initialize workflows with auto-created Neo4j component."""
         log.debug(f"Setting up WorkflowsFeature for component: {component.name}")
         self._component_ref = component
+
+        # Store reference to LLM for variable extraction
+        if hasattr(component, '_llm'):
+            self._llm = component._llm
+            log.debug("WorkflowsFeature will use LLM for variable extraction")
 
         # Get API key from model (existing pattern)
         api_key = self._extract_api_key(component)
@@ -98,15 +107,9 @@ class WorkflowsFeature(InternalFeature):
         # Initialize graph schema
         self._initialize_graph_schema()
 
-        # Create workflow executor for direct execution
-        # Note: task_master is deprecated, so we make this optional
-        # Workflow CAPTURE still works without executor (executor is only for execute_workflow tool)
-        task_master = getattr(component, 'task_m', None)
-        if task_master:
-            self._workflow_executor = WorkflowExecutor(self._neo4j_component, task_master)
-            log.debug("Workflow executor created with task_master")
-        else:
-            log.debug("No task_master available - workflow capture enabled, execute_workflow tool will not be available")
+        # Create workflow executor that uses unified event bus
+        self._workflow_executor = WorkflowExecutor(self._neo4j_component, component)
+        log.debug("Workflow executor created with agent component")
 
         # Attach to component for access
         component._workflows_db = self._neo4j_component
@@ -175,27 +178,87 @@ class WorkflowsFeature(InternalFeature):
         ]
 
     def get_tools(self) -> List[Dict[str, Any]]:
-        """Return workflow execution tools for the agent."""
-        if not self._workflow_executor:
-            return []
+        """Return similar workflows as tools in the standard format."""
+        tools = []
 
-        return [
-            {
-                "name": "execute_workflow",
-                "description": "Execute a saved workflow by ID with given inputs. Use this when you find a similar workflow that matches the current task.",
-                "parameters": {
-                    "workflow_id": {
-                        "type": "string",
-                        "description": "ID of the workflow to execute"
-                    },
-                    "inputs": {
-                        "type": "object",
-                        "description": "Input variables for the workflow"
-                    }
-                },
-                "function": self._execute_workflow_tool
-            }
-        ]
+        for ctx in self._similar_workflows:
+            workflow_name = ctx.get('name', f"Workflow {ctx['workflow_id'][:8]}")
+            parameterized = ctx.get('parameterized_prompt', '')
+            input_vars = ctx.get('input_variables', {})
+            actions = ctx.get('actions', [])
+
+            # Build description - escape ALL curly braces for LangChain template compatibility
+            description_parts = []
+
+            # CRITICAL: Make it clear to use tool type 'workflow', not the workflow name
+            description_parts.append(f"IMPORTANT: Use tool='workflow' (the type), NOT tool='{workflow_name}' (the name)")
+            description_parts.append(f"Similarity: {ctx['similarity']:.0%}")
+
+            if parameterized:
+                # Escape curly braces for LangChain template compatibility
+                escaped_parameterized = parameterized.replace('{', '{{').replace('}', '}}')
+                description_parts.append(f"Template: {escaped_parameterized}")
+
+                # Escape curly braces in JSON string
+                json_str = json.dumps(input_vars).replace('{', '{{').replace('}', '}}')
+                description_parts.append(f"Variables: {json_str}")
+
+            # Show action steps
+            if actions:
+                description_parts.append("Steps:")
+                for j, action in enumerate(actions[:3], 1):
+                    # Escape curly braces in action content
+                    action_tool = str(action.get('tool', '')).replace('{', '{{').replace('}', '}}')
+                    action_action = str(action.get('action', '')).replace('{', '{{').replace('}', '}}')
+                    description_parts.append(f"  {j}. {action_tool}.{action_action}()")
+                if len(actions) > 3:
+                    description_parts.append(f"  ... and {len(actions) - 3} more steps")
+
+            # Escape curly braces in the execution example too
+            json_str = json.dumps(input_vars).replace('{', '{{').replace('}', '}}')
+            description_parts.append(f"\nCorrect usage: {{\"tool\": \"workflow\", \"action\": \"{workflow_name}\", \"inputs\": {json_str}}}")
+
+            tools.append({
+                'name': workflow_name,
+                'type': 'workflow',
+                'description': '\n'.join(description_parts)
+            })
+
+        return tools
+
+    def _get_workflow_id_by_name(self, workflow_name: str) -> Optional[str]:
+        """Look up workflow ID by name or parameterized text."""
+        if not self._neo4j_component:
+            return None
+
+        try:
+            # First try exact ID match
+            query_id = """
+            MATCH (w:Workflow {id: $name})
+            RETURN w.id as workflow_id
+            LIMIT 1
+            """
+            result = self._neo4j_component.run(query_id, {"name": workflow_name})
+            if result and len(result) > 0:
+                return result[0]["workflow_id"]
+
+            # Then try name/text matching
+            query = """
+            MATCH (w:Workflow)-[:CONTAINS]->(p:Prompt)
+            WHERE p.text CONTAINS $name
+               OR p.parameterized_text CONTAINS $name
+            RETURN w.id as workflow_id
+            ORDER BY w.created_at DESC
+            LIMIT 1
+            """
+            result = self._neo4j_component.run(query, {"name": workflow_name})
+            if result and len(result) > 0:
+                return result[0]["workflow_id"]
+
+        except Exception as e:
+            log.warning(f"Failed to look up workflow by name '{workflow_name}': {e}")
+
+        return None
 
     async def _execute_workflow_tool(self, workflow_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Tool function for agent to execute workflows."""
@@ -218,7 +281,7 @@ class WorkflowsFeature(InternalFeature):
         return None
 
     def _check_similar_workflows_pipe(self, payload: InputReceivedPayload) -> InputReceivedPayload:
-        """Check for similar workflows and inject top 3 as context and tools."""
+        """Check for similar workflows and inject top 3 as context and tools. Also extract variables."""
         if not self._neo4j_component:
             return payload
 
@@ -228,12 +291,33 @@ class WorkflowsFeature(InternalFeature):
             return payload
 
         try:
+            # Extract variables from the prompt for reusable workflows (using LLM if available)
+            parameterized_prompt, variables, schema = extract_variables_from_prompt(
+                payload.input,
+                llm=self._llm
+            )
+
+            # Store variable information in payload for later use
+            if hasattr(payload, '__dict__'):
+                payload.parameterized_prompt = parameterized_prompt
+                payload.workflow_variables = variables
+                payload.variable_schema = schema
+
             log.debug(f"Checking for similar workflows for input: {payload.input[:50]}...")
 
-            # Search for top 3 similar prompts
-            similar_prompts = self._neo4j_component.similarity_search(
-                payload.input, "Prompt", "text", limit=3
-            )
+            # Search for similar prompts (returns top 10, we'll take top 3)
+            try:
+                similar_prompts = self._neo4j_component.similarity_search(
+                    payload.input, "Prompt", "text"
+                )
+                # Limit to top 3 results
+                if similar_prompts and len(similar_prompts) > 3:
+                    similar_prompts = similar_prompts[:3]
+
+                log.debug(f"Found {len(similar_prompts) if similar_prompts else 0} similar prompts")
+            except Exception as search_error:
+                log.warning(f"Similarity search failed: {search_error}")
+                similar_prompts = []
 
             if similar_prompts and len(similar_prompts) > 0:
                 # Build workflow context with actual action sequences
@@ -252,60 +336,80 @@ class WorkflowsFeature(InternalFeature):
                                 'workflow_id': workflow_data.get('workflow_id'),
                                 'name': workflow_data.get('name', f'Workflow {i}'),
                                 'description': workflow_data.get('description', ''),
-                                'actions': workflow_data.get('actions', [])
+                                'actions': workflow_data.get('actions', []),
+                                'parameterized_prompt': workflow_data.get('parameterized_prompt', ''),
+                                'input_variables': workflow_data.get('input_variables', {})
                             })
+                            log.debug(f"Added workflow: {workflow_data.get('name')}")
 
                 if workflow_contexts:
-                    log.info(f"Found {len(workflow_contexts)} similar workflows, injecting as context")
+                    log.info(f"Found {len(workflow_contexts)} similar workflows, caching as tools")
 
-                    # Format and inject workflow contexts
-                    context_text = self._format_workflow_contexts(workflow_contexts)
-
-                    enhanced_input = f"""{payload.input}
-
-[Available Similar Workflows]:
-{context_text}
-
-You can either:
-1. Use execute_workflow(workflow_id, inputs) to run an exact workflow
-2. Use the workflow structure as guidance for your own solution
-"""
+                    # Cache workflows for get_tools() to return
+                    self._similar_workflows = workflow_contexts
 
                     # Start new workflow tracking (even when reusing, we track the new execution)
-                    self._start_new_workflow(payload.input)
-                    return replace(payload, input=enhanced_input)
+                    self._start_new_workflow(
+                        payload.input,
+                        getattr(payload, 'parameterized_prompt', None),
+                        getattr(payload, 'workflow_variables', None),
+                        getattr(payload, 'variable_schema', None)
+                    )
+                    return payload
+                else:
+                    log.debug("No workflow contexts passed threshold")
+                    self._similar_workflows = []
 
         except Exception as e:
             # Context lookup failed, continue without enhancement
-            log.debug(f"Workflow context lookup failed: {e}")
+            log.warning(f"Workflow context lookup failed: {e}")
+            self._similar_workflows = []
 
-        # Start new workflow tracking
-        self._start_new_workflow(payload.input)
+        # Start new workflow tracking if not already started
+        if not self._current_workflow_id:
+            self._start_new_workflow(
+                payload.input,
+                getattr(payload, 'parameterized_prompt', None),
+                getattr(payload, 'workflow_variables', None),
+                getattr(payload, 'variable_schema', None)
+            )
         return payload
 
     def _format_workflow_contexts(self, contexts: List[Dict]) -> str:
-        """Format workflow contexts for agent consumption."""
+        """Format workflow contexts for agent consumption with workflow tool syntax."""
         lines = []
 
         for ctx in contexts:
+            workflow_name = ctx.get('name', f"Workflow {ctx['workflow_id'][:8]}")
+            parameterized = ctx.get('parameterized_prompt', '')
+            input_vars = ctx.get('input_variables', {})
+
             lines.append(
-                f"\n{ctx['rank']}. {ctx['name']} "
-                f"(ID: {ctx['workflow_id']}, Similarity: {ctx['similarity']:.0%})"
+                f"\n{ctx['rank']}. \"{workflow_name}\" "
+                f"(Similarity: {ctx['similarity']:.0%})"
             )
+
+            # Show parameterized prompt if available
+            if parameterized:
+                lines.append(f"   Template: {parameterized}")
+                lines.append(f"   Original Variables: {json.dumps(input_vars)}")
+                lines.append(f"   Execute with: {{\"tool\": \"workflow\", \"action\": \"{workflow_name}\", \"inputs\": {json.dumps(input_vars)}}}")
+            else:
+                lines.append(f"   ID: {ctx['workflow_id']}")
+                lines.append(f"   Execute with: {{\"tool\": \"workflow\", \"action\": \"{ctx['workflow_id']}\", \"inputs\": {{}}}}")
 
             if ctx.get('description'):
                 lines.append(f"   Description: {ctx['description']}")
 
-            lines.append("   Steps:")
-            for j, action in enumerate(ctx['actions'][:5], 1):  # Limit to 5 steps
-                inputs_str = json.dumps(action.get('inputs', {}))
+            # Show first few steps for context
+            lines.append("   Steps Preview:")
+            for j, action in enumerate(ctx['actions'][:3], 1):  # Limit to 3 steps
                 lines.append(
-                    f"      {j}. {action['tool']}.{action['action']}({inputs_str}) "
-                    f"→ {action['output']}"
+                    f"      {j}. {action['tool']}.{action['action']}()"
                 )
 
-            if len(ctx['actions']) > 5:
-                lines.append(f"      ... and {len(ctx['actions']) - 5} more steps")
+            if len(ctx['actions']) > 3:
+                lines.append(f"      ... and {len(ctx['actions']) - 3} more steps")
 
         return '\n'.join(lines)
 
@@ -327,6 +431,9 @@ You can either:
                    w.name as name,
                    w.description as description,
                    p.text as prompt,
+                   p.parameterized_text as parameterized_prompt,
+                   p.input_variables as input_variables,
+                   p.variable_schema as variable_schema,
                    collect({
                        tool: action.tool,
                        action: action.action,
@@ -355,13 +462,28 @@ You can either:
                         except json.JSONDecodeError:
                             action['inputs'] = {}
 
-                return {
+                # Parse JSON fields if needed
+                input_vars = workflow.get('input_variables', '{}')
+                if isinstance(input_vars, str):
+                    try:
+                        input_vars = json.loads(input_vars)
+                    except json.JSONDecodeError:
+                        input_vars = {}
+
+                # Use prompt text as name if workflow name is not set
+                workflow_name = workflow.get('name') or workflow.get('prompt')
+
+                workflow_detail = {
                     'workflow_id': workflow.get('workflow_id'),
-                    'name': workflow.get('name'),
+                    'name': workflow_name,
                     'description': workflow.get('description'),
+                    'parameterized_prompt': workflow.get('parameterized_prompt'),
+                    'input_variables': input_vars,
                     'prompt': workflow.get('prompt'),
                     'actions': actions
                 }
+
+                return workflow_detail
 
         except Exception as e:
             log.debug(f"Failed to get workflow detail: {e}")
@@ -401,14 +523,14 @@ You can either:
 
         return ""
 
-    def _start_new_workflow(self, input_text: str):
-        """Start tracking a new workflow."""
+    def _start_new_workflow(self, input_text: str, parameterized_prompt: str = None, variables: Dict = None, variable_schema: Dict = None):
+        """Start tracking a new workflow with optional variable information."""
         import uuid
         self._current_workflow_id = str(uuid.uuid4())
         self._workflow_actions = []
 
         try:
-            # Create workflow and prompt nodes
+            # Create workflow and prompt nodes with variable information
             query = """
             CREATE (w:Workflow {
                 id: $workflow_id,
@@ -420,7 +542,10 @@ You can either:
             CREATE (p:Prompt {
                 id: $prompt_id,
                 text: $input_text,
-                workflow_id: $workflow_id
+                parameterized_text: $parameterized_text,
+                workflow_id: $workflow_id,
+                input_variables: $input_variables,
+                variable_schema: $variable_schema
             })
             CREATE (w)-[:CONTAINS]->(p)
             WITH p
@@ -433,11 +558,14 @@ You can either:
                 "workflow_id": self._current_workflow_id,
                 "prompt_id": f"prompt_{self._current_workflow_id}",
                 "input_text": input_text,
+                "parameterized_text": parameterized_prompt or input_text,
+                "input_variables": json.dumps(variables or {}),
+                "variable_schema": json.dumps(variable_schema or {}),
                 "component_id": self._component_ref.name if self._component_ref else "unknown",
                 "api_key": self._extract_api_key(self._component_ref)
             })
 
-            log.debug(f"Started new workflow: {self._current_workflow_id}")
+            log.debug(f"Started new workflow: {self._current_workflow_id} with variables: {variables}")
 
         except Exception as e:
             log.warning(f"Failed to create workflow nodes: {e}")

@@ -24,6 +24,16 @@ Guidelines:
 - Do not fabricate or predict the results of an action — wait for the actual observation to be provided by the system.
 - If a sub-agent is available that is specialized for the task (e.g., reading files, handling messages, performing domain-specific reasoning), **prefer delegating the step to that sub-agent** rather than handling it yourself.
 
+Workflow Tools:
+- Tools with type "workflow" are reusable workflows from previous executions.
+- CRITICAL: For workflows, "tool name" and "tool type" are DIFFERENT.
+- You MUST use the TYPE ("workflow") in your action, NOT the name.
+- Example: If you see "tool name: Summarize Messages" and "tool type: workflow":
+  CORRECT: {{"tool": "workflow", "action": "Summarize Messages", "inputs": {{}}, "output": "result"}}
+  WRONG: {{"tool": "Summarize Messages", ...}}
+- Workflows execute multiple steps automatically - you get the final result in one observation.
+- Prefer using workflows when available - they represent proven solutions to similar tasks.
+
 Example:
 User prompt: What is the length of the word orange?
 
