@@ -7,11 +7,12 @@ from typing import Optional
 from woodwork.components.environments.environment import environment
 from woodwork.deployments import Docker
 from woodwork.utils import format_kwargs
+from woodwork.interfaces.startable import Startable
 
 log = logging.getLogger(__name__)
 
 
-class coding(environment):
+class coding(environment, Startable):
     def __init__(self, repo_url: Optional[str] = None, local_path: str = "/workspace", 
                  dockerfile: Optional[str] = None, image_name: str = "coding-env", 
                  container_name: str = "coding-env", **config):
@@ -68,9 +69,20 @@ class coding(environment):
             docker_volume_location=local_path,
         )
 
-        log.debug("Initializing coding environment...")
-        self.setup_environment()
-        log.debug("Coding environment initialized.")
+        self._environment_setup = False
+
+    def start(self, queue=None, config=None):
+        """Start the coding environment (called during component starting phase)"""
+        if not self._environment_setup:
+            if queue:
+                from woodwork.types import Update
+                queue.put(Update(progress=10, component_name=self.name))
+
+            self.setup_environment()
+            self._environment_setup = True
+
+            if queue:
+                queue.put(Update(progress=40, component_name=self.name))
 
     def setup_environment(self):
         """Setup the coding environment with repository, tools, and scripts."""

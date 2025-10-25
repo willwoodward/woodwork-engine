@@ -180,6 +180,9 @@ class AsyncRuntime:
                 await api_component.start_server()
             else:
                 log.warning("[AsyncRuntime] API component has no start_server method")
+        except KeyboardInterrupt:
+            log.info("[AsyncRuntime] API server interrupted, shutting down")
+            raise
         except Exception as e:
             log.error("[AsyncRuntime] API server error: %s", e)
 
@@ -200,11 +203,17 @@ class AsyncRuntime:
         log.info("[AsyncRuntime] Keeping runtime alive for API components")
 
         try:
-            while self._running:
-                await asyncio.sleep(1)
+            # Monitor the API server task - if it exits, we exit too
+            if self._api_server_task:
+                await self._api_server_task
+            else:
+                # Fallback: just keep alive with sleep loop
+                while self._running:
+                    await asyncio.sleep(1)
         except KeyboardInterrupt:
             log.info("[AsyncRuntime] Shutdown signal received")
             self._running = False
+            raise  # Propagate KeyboardInterrupt to caller
 
     async def _input_loop(self) -> None:
         """Input loop for non-API components"""

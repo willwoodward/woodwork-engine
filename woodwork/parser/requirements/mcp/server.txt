@@ -1,1 +1,3 @@
 mcp
+attrs>=24.0.0
+jsonschema>=4.0.0

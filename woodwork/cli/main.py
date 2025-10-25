@@ -14,7 +14,8 @@ from woodwork.deployments.registry import get_registry
 from woodwork.deployments import Deployer
 from woodwork.deployments.generate_exports import generate_exported_objects_file
 from .progress.progress import parallel_func_apply
-from .progress.lifecycles import init_component, parallel_init_component, start_component, parallel_start_component
+from .progress.lifecycles import start_component
+from rich.console import Console
 from woodwork.cli.setup_defaults import copy_prompts
 from woodwork.cli.cleanup import clean_all
 from woodwork.utils import get_package_directory
@@ -24,19 +25,135 @@ import woodwork.globals as globals
 log = logging.getLogger(__name__)
 
 
+def parse_and_validate_config():
+    """Parse .ww configuration files and return components."""
+    import time
+    console = Console()
+
+    console.print("Parsing configuration...", style="dim", highlight=False)
+    start = time.time()
+    dependencies.activate_virtual_environment()
+    config_parser.main_function()
+    console.print(f"✓ Config parsed in {time.time() - start:.1f}s", style="dim", highlight=False)
+
+    return config_parser.task_m._tools
+
+
+def generate_exports():
+    """Generate exported objects file for the registry."""
+    import time
+    console = Console()
+
+    start = time.time()
+    registry = get_registry()
+    generate_exported_objects_file(registry=registry)
+    console.print(f"✓ Exports generated in {time.time() - start:.1f}s", style="dim", highlight=False)
+
+
+def deploy_containers():
+    """Deploy Docker containers for components that need them."""
+    import time
+    console = Console()
+
+    console.print("Deploying containers...", style="dim", highlight=False)
+    start = time.time()
+    deployer = Deployer()
+    deployer.main()
+    console.print(f"✓ Containers deployed in {time.time() - start:.1f}s", style="dim", highlight=False)
+
+
+def start_components(components):
+    """Start all components with progress bar display."""
+    import time
+    console = Console()
+
+    console.print(f"Starting {len(components)} components...", style="dim", highlight=False)
+    start = time.time()
+    parallel_func_apply(components, start_component, "started", "starting")
+
+
+def start_runtime(components):
+    """Start the appropriate runtime (async or task master)."""
+    import time
+    console = Console()
+
+    if globals.global_config.get("message_bus_active", False):
+        _start_async_runtime(components)
+    else:
+        _start_task_master_runtime()
+
+
+def _start_async_runtime(components):
+    """Start async runtime with distributed message bus orchestration."""
+    from woodwork.core.async_runtime import AsyncRuntime
+    import asyncio
+    from rich.spinner import Spinner
+    from rich.live import Live
+    import sys
+
+    console = Console()
+
+    component_config = {}
+    for tool in components:
+        component_config[tool.name] = {
+            "component": tool.__class__.__name__.lower(),
+            "type": getattr(tool, 'type', 'unknown'),
+            "object": tool
+        }
+
+    async def start_async_runtime():
+        runtime = AsyncRuntime()
+        try:
+            await runtime.start({"components": components, "component_configs": component_config})
+        except KeyboardInterrupt:
+            print("\n", flush=True)
+            sys.stderr.flush()
+
+            with Live(Spinner("dots", text="[dim]Shutting down...[/dim]"), console=console, refresh_per_second=10, redirect_stdout=False, redirect_stderr=False, transient=False):
+                await runtime.stop()
+        except Exception as e:
+            log.error("Runtime error: %s", e)
+            await runtime.stop()
+            raise
+
+    try:
+        asyncio.run(start_async_runtime())
+    except KeyboardInterrupt:
+        pass
+
+
+def _start_task_master_runtime():
+    """Start traditional task master orchestration."""
+    print("🔧 DEBUG: Traditional mode - using TaskMaster orchestration")
+    config_parser.task_m.start()
+
+
 def app_entrypoint(args):
+    """Main application entrypoint for Woodwork CLI.
+
+    Handles different execution modes:
+    - --init: Install dependencies for .ww config files
+    - --gui: Run GUI interface (FastAPI or legacy)
+    - --clean: Clean up resources
+    - default: Run Woodwork with configured components
+    """
     registry = get_registry()
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
 
+    # ============================================================================
+    # VALIDATION: Check arguments before doing anything else
+    # ============================================================================
     try:
-        # Confirm that there are no known conflicts in the arguments before doing anything else
         argument_parser.check_parse_conflicts(args)
     except ParseError as e:
         log.critical("ParseError: %s", e)
         return
 
+    # ============================================================================
+    # UTILITY MODES: Handle simple commands that don't require full initialization
+    # ============================================================================
     if args.version:
         version_from_toml = helper_functions.get_version_from_pyproject(
             str(pathlib.Path(__file__).parent.parent / "pyproject.toml")
@@ -51,7 +168,9 @@ def app_entrypoint(args):
 
     log.debug("Arguments: %s", args)
 
-    # Set globals based on flags before execution
+    # ============================================================================
+    # CONFIGURATION: Set up globals and copy default prompts
+    # ============================================================================
     match args.mode:
         case "run":
             log.debug("Mode set to 'run'.")
@@ -67,16 +186,14 @@ def app_entrypoint(args):
         case "clear":
             log.debug("Mode set to 'clear'.")
         case _:
-            # ArgParse will SysExit if choice not in list
             pass
 
-    log.debug(
-        "Globals set: Mode = %s",
-        globals.global_config["mode"],
-    )
-
+    log.debug("Globals set: Mode = %s", globals.global_config["mode"])
     copy_prompts()
 
+    # ============================================================================
+    # INIT MODE: Install dependencies only (no component initialization)
+    # ============================================================================
     if args.init is not None:
         options = {"isolated": False, "all": False}
         if args.init == "isolated":
@@ -86,16 +203,14 @@ def app_entrypoint(args):
             options["isolated"] = True
             options["all"] = True
             log.debug("Initialization mode set to 'all'.")
+
+        # Only install dependencies - no parsing, no components, no initialization
         dependencies.init(options)
-
-        # Run the initialization methods
-        config_parser.main_function(registry=registry)
-
-        components = config_parser.task_m._tools
-        parallel_func_apply(components, parallel_init_component, init_component, "initialized", "initializing")
-        generate_exported_objects_file(registry=registry)
         return
 
+    # ============================================================================
+    # GUI MODE: Run web interface
+    # ============================================================================
     if args.gui is not None:
         if args.gui == "run":
             log.debug("GUI is set to run.")
@@ -116,6 +231,9 @@ def app_entrypoint(args):
             asyncio.run(start_gui_server())
             return
 
+    # ============================================================================
+    # WORKFLOW CONFIGURATION: Handle workflow-specific settings
+    # ============================================================================
     if args.workflow != "none":
         if args.mode in {"run", "debug"}:
             log.debug(
@@ -130,34 +248,31 @@ def app_entrypoint(args):
             )
         set_globals(inputs_activated=False)
 
-    # Execute the main functionality
-    dependencies.activate_virtual_environment()
-    config_parser.main_function()
-    generate_exported_objects_file(registry=registry)
-    
-    # Debug: Show which orchestration mode is active
-    if globals.global_config.get("message_bus_active", False):
-        log.info("🚀 Woodwork running with DISTRIBUTED MESSAGE BUS orchestration")
-    else:
-        log.info("🔧 Woodwork running with TASK MASTER orchestration")
+    # ============================================================================
+    # MAIN EXECUTION: Build, deploy, and run
+    # ============================================================================
+    # Phase 1: Build - Parse configuration and generate exports
+    components = parse_and_validate_config()
+    generate_exports()
 
-    deployer = Deployer()
-    deployer.main()
+    # Phase 2: Deploy - Start Docker containers
+    deploy_containers()
 
-    # Start all components that implement the Startable interface
-    components = config_parser.task_m._tools
-    parallel_func_apply(components, parallel_start_component, start_component, "started", "starting")
+    # Phase 3: Start - Initialize all components
+    start_components(components)
 
-    # Clean up after execution
+    # ============================================================================
+    # POST-EXECUTION: Handle mode-specific cleanup and operations
+    # ============================================================================
     match args.mode:
         case "embed":
             config_parser.embed_all()
         case "clear":
             config_parser.clear_all()
         case _:
-            # ArgParse will SysExit if choice not in list
             pass
 
+    # Handle workflow operations (add/remove/find action plans)
     match args.workflow:
         case "add":
             pass
@@ -168,35 +283,13 @@ def app_entrypoint(args):
             config_parser.find_action_plan(args.target)
             log.debug("%s Workflow found with query: %s.", args.workflow, args.target)
         case _:
-            # ArgParse will SysExit if choice not in list
             pass
 
-    # Use AsyncRuntime for message bus mode, TaskMaster for traditional mode
-    if globals.global_config.get("message_bus_active", False):
-        print("🚀 DEBUG: Message bus mode active - using AsyncRuntime")
-        from woodwork.core.async_runtime import AsyncRuntime
-        import asyncio
-
-        # Create component config from parsed tools
-        component_config = {}
-        for tool in config_parser.task_m._tools:
-            component_config[tool.name] = {
-                "component": tool.__class__.__name__.lower(),
-                "type": getattr(tool, 'type', 'unknown'),
-                "object": tool
-            }
-
-        # Start unified async runtime
-        async def start_async_runtime():
-            runtime = AsyncRuntime()
-            await runtime.start({"components": config_parser.task_m._tools, "component_configs": component_config})
-
-        asyncio.run(start_async_runtime())
-        print("✅ DEBUG: AsyncRuntime completed")
-    else:
-        print("🔧 DEBUG: Traditional mode - using TaskMaster orchestration")
-        # Use traditional Task Master approach
-        config_parser.task_m.start()
+    # ============================================================================
+    # RUNTIME: Start the appropriate orchestration system
+    # ============================================================================
+    # Phase 4: Run - Start the runtime event loop
+    start_runtime(components)
 
 
 def cli_entrypoint() -> None:

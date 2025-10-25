@@ -986,11 +986,11 @@ class GlobalMessageBusManager:
         if has_set_router and has_router:
             component.set_router(self.router)
             log.debug("[GlobalMessageBusManager] Set router on component '%s'", component_name)
-        else:
-            if not has_set_router:
-                log.warning("[GlobalMessageBusManager] Component '%s' missing set_router method", component_name)
-            if not has_router:
-                log.warning("[GlobalMessageBusManager] No router available to set on component '%s'", component_name)
+        # else:
+        #     if not has_set_router:
+        #         log.warning("[GlobalMessageBusManager] Component '%s' missing set_router method", component_name)
+        #     if not has_router:
+        #         log.warning("[GlobalMessageBusManager] No router available to set on component '%s'", component_name)
         
         self.registered_components[component_name] = component
         

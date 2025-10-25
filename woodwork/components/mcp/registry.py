@@ -196,7 +196,7 @@ class MCPRegistry:
 
             async with http_client.get(url) as response:
                 if response.status == 404:
-                    log.warning(f"[MCPRegistry] Server not found in registry: {name}, trying fallback")
+                    log.debug(f"[MCPRegistry] Server not found in registry: {name}, using fallback")
                     return self._get_fallback_metadata(name, version, toolsets, readonly)
 
                 response.raise_for_status()

@@ -67,7 +67,12 @@ def activate_virtual_environment():
     # Activate the venv
     subprocess.run('/bin/bash -c "source .woodwork/env/bin/activate"', shell=True, check=True)
 
-    # Adjust sys.path to prioritize the virtual environment
+    # Remove ALL site-packages from sys.path except the one we're about to add
+    # This prevents conflicts with parent venv or system packages
+    original_paths = sys.path.copy()
+    sys.path[:] = [p for p in sys.path if 'site-packages' not in p]
+
+    # Add the project virtual environment site-packages
     site_packages = os.path.join(
         venv_path,
         "lib",
@@ -75,7 +80,9 @@ def activate_virtual_environment():
         "site-packages",
     )
     sys.path.insert(0, site_packages)
-    log.debug("Virtual environment activated.")
+
+    removed_paths = [p for p in original_paths if 'site-packages' in p]
+    log.debug("Virtual environment activated. Removed all site-packages paths: %s", removed_paths)
 
 
 def get_components() -> list[tuple[str, str]]:
@@ -147,6 +154,9 @@ def get_all_requirements(root_dir, output_file):
 
 
 def init(options={"isolated": False, "all": False}):
+    from rich.console import Console
+    console = Console()
+
     # Make sure the virtual environment is set up properly
     setup_virtual_env(options)
 
@@ -154,7 +164,7 @@ def init(options={"isolated": False, "all": False}):
     activate_script = ".woodwork/env/bin/activate"
     temp_requirements_file = ".woodwork/requirements.txt"
 
-    print("Installing dependencies...")
+    console.print("Installing dependencies...", style="dim", highlight=False)
     if options["all"]:
         get_all_requirements(REQUIREMENTS_DIR, temp_requirements_file)
     else:
@@ -164,10 +174,10 @@ def init(options={"isolated": False, "all": False}):
     # Install requirements from temporary file
     try:
         subprocess.check_call(
-            [f". {activate_script} && uv pip install -r {temp_requirements_file}"],
+            [f". {activate_script} && uv pip install -r {temp_requirements_file} --quiet"],
             shell=True,
         )
-        print("Installed all combined dependencies.")
+        console.print("Installed all combined dependencies.", style="dim", highlight=False)
     except subprocess.CalledProcessError:
         sys.exit(1)
     finally:
@@ -177,4 +187,4 @@ def init(options={"isolated": False, "all": False}):
 
     # Now run init() methods on all components
 
-    print("Initialization complete.")
+    console.print("Initialization complete.", style="dim", highlight=False)

@@ -17,7 +17,27 @@ from woodwork.deployments.router import get_router, Deployment
 
 log = logging.getLogger(__name__)
 
-task_m = task_master(name="task_master")
+# Lazy-initialize task_master to avoid registration during module import
+_task_m = None
+
+
+def _get_task_master():
+    """Lazy initialization of task_master"""
+    global _task_m
+    if _task_m is None:
+        _task_m = task_master(name="task_master")
+    return _task_m
+
+
+# Expose task_m as a module-level property for backward compatibility
+class _TaskMasterProxy:
+    """Proxy object that lazily initializes task_master on first access"""
+
+    def __getattr__(self, name):
+        return getattr(_get_task_master(), name)
+
+
+task_m = _TaskMasterProxy()
 
 
 def resolve_dict(dictionary, dependency, component_object):
@@ -40,7 +60,14 @@ def dependency_resolver(commands, component):
     if component["depends_on"] == []:
         # Initialise component, return object reference
         if "object" not in component:
+            import time
+            component_name = component.get("variable", "unknown")
+            log.debug(f"Creating component: {component_name}")
+            start = time.time()
             component["object"] = create_object(component)
+            elapsed = time.time() - start
+            if elapsed > 1.0:
+                log.warning(f"Component {component_name} took {elapsed:.1f}s to initialize")
         return component["object"]
 
     # Else, if the depends_on array has dependencies
@@ -643,8 +670,8 @@ def parse(config: str, registry=None) -> dict:
     import woodwork.globals as globals
     globals.global_config["message_bus_active"] = True
     log.info("[ConfigParser] Message bus mode activated - initialization deferred to DistributedStartupCoordinator")
-    
-    task_m.add_tools(tools)
+
+    _get_task_master().add_tools(tools)
 
     return commands
 
@@ -787,7 +814,7 @@ def main_function(registry=None):
 def embed_all():
     from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
 
-    for tool in task_m._tools:
+    for tool in _get_task_master()._tools:
         if isinstance(tool, knowledge_base):
             tool.embed_init()
 
@@ -795,7 +822,7 @@ def embed_all():
 def clear_all():
     from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
 
-    for tool in task_m._tools:
+    for tool in _get_task_master()._tools:
         if isinstance(tool, knowledge_base):
             tool.clear_all()
 
@@ -803,7 +830,7 @@ def clear_all():
 def delete_action_plan(id: str):
     from woodwork.components.agents.agent import agent
 
-    for tool in task_m._tools:
+    for tool in _get_task_master()._tools:
         if isinstance(tool, agent):
             tool._cache.run(f"""MATCH (n)-[:NEXT*]->(m)
                 WHERE elementId(n) = "{id}"
@@ -816,7 +843,7 @@ def delete_action_plan(id: str):
 def find_action_plan(query: str):
     from woodwork.components.agents.agent import agent
 
-    for tool in task_m._tools:
+    for tool in _get_task_master()._tools:
         if isinstance(tool, agent):
             similar_prompts = tool._cache.similarity_search(query, "Prompt", "value")
             num_results = min(len(similar_prompts), 10)

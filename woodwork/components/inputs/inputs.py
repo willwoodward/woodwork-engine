@@ -14,8 +14,6 @@ class inputs(component):
             config["task_master"] = task_master
         if to is not None:
             config["to"] = to
-        
-        print(f"to: {to}")
 
         format_kwargs(config, task_master=task_master, to=to, type="component")
         super().__init__(**config)

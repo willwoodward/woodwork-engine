@@ -252,6 +252,8 @@ class api_input(inputs):
 
     async def start_server(self) -> None:
         """Start the FastAPI server for API input component with proper KeyboardInterrupt handling."""
+        shutdown_requested = False
+
         try:
             import uvicorn
             import signal
@@ -261,29 +263,33 @@ class api_input(inputs):
                 app=self.app,
                 host="0.0.0.0",
                 port=self.port,
-                log_level="info"
+                log_level="warning"  # Only show warnings and errors, not startup/shutdown info
             )
 
             server = uvicorn.Server(config)
 
             # Setup signal handlers for graceful shutdown
             def signal_handler(signum, frame):
+                nonlocal shutdown_requested
                 log.info("[api_input] Received signal %d, shutting down gracefully...", signum)
+                shutdown_requested = True
                 server.should_exit = True
 
             signal.signal(signal.SIGINT, signal_handler)
             signal.signal(signal.SIGTERM, signal_handler)
 
-            log.info("[api_input] Starting FastAPI server on port %d", self.port)
-            log.info("[api_input] Press Ctrl+C to stop the server")
-
             try:
                 await server.serve()
             except KeyboardInterrupt:
-                log.info("[api_input] KeyboardInterrupt received, shutting down...")
+                shutdown_requested = True
             finally:
-                log.info("[api_input] Server stopped")
+                # Re-raise KeyboardInterrupt to propagate shutdown to runtime
+                if shutdown_requested:
+                    raise KeyboardInterrupt("API server shutdown requested")
 
+        except KeyboardInterrupt:
+            # Propagate to runtime
+            raise
         except Exception as e:
             log.error("[api_input] Error starting server: %s", e)
 
@@ -306,9 +312,9 @@ class api_input(inputs):
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             """Application lifespan manager."""
-            log.info("[api_input] Starting FastAPI application")
+            log.debug("[api_input] Starting FastAPI application")
             yield
-            log.info("[api_input] Shutting down FastAPI application")
+            log.debug("[api_input] Shutting down FastAPI application")
 
         # Create FastAPI app with lifespan manager
         self.app = FastAPI(
@@ -533,6 +539,116 @@ class api_input(inputs):
     def _setup_workflow_query_routes(self):
         """Setup routes for querying workflows from Neo4j (for frontend workflow browser)."""
 
+        @self.app.get("/api/tools")
+        async def get_tools():
+            """Get available tools with schemas from unified event bus."""
+            try:
+                schemas = [
+                    schema.to_dict()
+                    for schema in self.event_bus.get_all_tool_schemas()
+                ]
+                log.info(f"[api_input] Returning {len(schemas)} tool schemas")
+                return JSONResponse(content={"tools": schemas})
+            except Exception as e:
+                log.error(f"[api_input] Error getting tool schemas: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"tools": [], "error": str(e)}
+                )
+
+        @self.app.get("/api/workflows/{workflow_id}")
+        async def get_workflow_detail(workflow_id: str):
+            """Get detailed workflow by ID from Neo4j."""
+            try:
+                from neo4j import GraphDatabase
+
+                driver = GraphDatabase.driver(
+                    "bolt://localhost:7687",
+                    auth=("neo4j", "testpassword")
+                )
+
+                with driver.session() as session:
+                    # Get workflow with all actions
+                    query = """
+                    MATCH (w:Workflow {id: $id})
+                    OPTIONAL MATCH (w)-[:CONTAINS]->(a:Action)
+                    RETURN w, collect(a) as actions
+                    """
+                    result = session.run(query, {"id": workflow_id})
+                    record = result.single()
+
+                    if not record:
+                        driver.close()
+                        return JSONResponse(
+                            status_code=404,
+                            content={"error": "Workflow not found"}
+                        )
+
+                    workflow_node = record["w"]
+                    actions = record["actions"]
+
+                    # Sort actions by sequence and build response
+                    sorted_actions = sorted(
+                        [a for a in actions if a is not None],
+                        key=lambda x: x.get("sequence", 0)
+                    )
+
+                    # Build workflow detail response matching frontend expectations
+                    workflow_detail = {
+                        "id": workflow_node["id"],
+                        "name": workflow_node.get("name", "Unnamed Workflow"),
+                        "steps": [
+                            {
+                                "id": action.get("id", f"action-{i}"),
+                                "name": action.get("action", ""),
+                                "tool": action.get("tool", ""),
+                                "inputs": action.get("inputs", "{}") if isinstance(action.get("inputs"), str) else json.dumps(action.get("inputs", {})),
+                                "output": action.get("output", ""),
+                                "sequence": action.get("sequence", i),
+                                "dependencies": [],
+                                "description": f"{action.get('tool', '')} - {action.get('action', '')}"
+                            }
+                            for i, action in enumerate(sorted_actions)
+                        ],
+                        "metadata": {
+                            "status": workflow_node.get("status", "draft"),
+                            "created_at": workflow_node.get("created_at").iso_format() if workflow_node.get("created_at") else None,
+                            "completed_at": workflow_node.get("completed_at").iso_format() if workflow_node.get("completed_at") else None,
+                            "final_step": len(sorted_actions),
+                            "prompt": workflow_node.get("name", "Unnamed Workflow"),
+                            "total_actions": len(sorted_actions)
+                        },
+                        "graph": {
+                            "nodes": [
+                                {
+                                    "id": f"step-{i}",
+                                    "type": "action",
+                                    "label": f"{action.get('tool', '')}: {action.get('action', '')}"
+                                }
+                                for i, action in enumerate(sorted_actions)
+                            ],
+                            "edges": [
+                                {
+                                    "id": f"edge-{i}",
+                                    "source": f"step-{i}",
+                                    "target": f"step-{i+1}",
+                                    "type": "next"
+                                }
+                                for i in range(len(sorted_actions) - 1)
+                            ]
+                        }
+                    }
+
+                driver.close()
+                return JSONResponse(content=workflow_detail)
+
+            except Exception as e:
+                log.error(f"[api_input] Error getting workflow detail: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": str(e)}
+                )
+
         @self.app.get("/api/workflows")
         async def get_workflows(
             status: str = None,
@@ -656,6 +772,240 @@ class api_input(inputs):
                 }],
                 "total": 1
             })
+
+        @self.app.post("/api/workflows")
+        async def create_workflow(request: Request):
+            """Create new workflow in Neo4j."""
+            try:
+                from woodwork.types.workflows import Workflow
+                from neo4j import GraphDatabase
+
+                data = await request.json()
+                workflow = Workflow.from_dict(data)
+                workflow_id = str(uuid.uuid4())
+
+                # Store in Neo4j
+                driver = GraphDatabase.driver(
+                    "bolt://localhost:7687",
+                    auth=("neo4j", "testpassword")
+                )
+
+                with driver.session() as session:
+                    # Create Workflow node
+                    create_query = """
+                    CREATE (w:Workflow {
+                        id: $id,
+                        name: $name,
+                        status: 'draft',
+                        source: 'manual',
+                        created_at: datetime()
+                    })
+                    RETURN w.id as id
+                    """
+                    session.run(create_query, {"id": workflow_id, "name": workflow.name})
+
+                    # Create Action nodes
+                    for idx, action in enumerate(workflow.plan):
+                        action_query = """
+                        MATCH (w:Workflow {id: $workflow_id})
+                        CREATE (a:Action {
+                            id: randomUUID(),
+                            tool: $tool,
+                            action: $action,
+                            inputs: $inputs,
+                            output: $output,
+                            sequence: $sequence
+                        })
+                        CREATE (w)-[:CONTAINS]->(a)
+                        """
+                        session.run(action_query, {
+                            "workflow_id": workflow_id,
+                            "tool": action.tool,
+                            "action": action.action,
+                            "inputs": json.dumps(action.inputs),
+                            "output": action.output,
+                            "sequence": idx
+                        })
+
+                driver.close()
+                log.info(f"[api_input] Created workflow {workflow_id}: {workflow.name}")
+
+                return JSONResponse(content={
+                    "id": workflow_id,
+                    "name": workflow.name,
+                    "status": "success"
+                })
+
+            except Exception as e:
+                log.error(f"[api_input] Error creating workflow: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": str(e)}
+                )
+
+        @self.app.put("/api/workflows/{workflow_id}")
+        async def update_workflow(workflow_id: str, request: Request):
+            """Update existing workflow in Neo4j."""
+            try:
+                from neo4j import GraphDatabase
+
+                data = await request.json()
+
+                driver = GraphDatabase.driver(
+                    "bolt://localhost:7687",
+                    auth=("neo4j", "testpassword")
+                )
+
+                with driver.session() as session:
+                    # Update workflow metadata
+                    if "name" in data:
+                        session.run(
+                            "MATCH (w:Workflow {id: $id}) SET w.name = $name",
+                            {"id": workflow_id, "name": data["name"]}
+                        )
+
+                    # Update actions if provided
+                    if "actions" in data:
+                        # Delete old actions
+                        session.run(
+                            "MATCH (w:Workflow {id: $id})-[:CONTAINS]->(a:Action) DETACH DELETE a",
+                            {"id": workflow_id}
+                        )
+
+                        # Create new actions
+                        for idx, action in enumerate(data["actions"]):
+                            action_query = """
+                            MATCH (w:Workflow {id: $workflow_id})
+                            CREATE (a:Action {
+                                id: randomUUID(),
+                                tool: $tool,
+                                action: $action,
+                                inputs: $inputs,
+                                output: $output,
+                                sequence: $sequence
+                            })
+                            CREATE (w)-[:CONTAINS]->(a)
+                            """
+                            session.run(action_query, {
+                                "workflow_id": workflow_id,
+                                "tool": action.get("tool", ""),
+                                "action": action.get("action", ""),
+                                "inputs": json.dumps(action.get("inputs", {})),
+                                "output": action.get("output", ""),
+                                "sequence": action.get("sequence", idx)
+                            })
+
+                driver.close()
+                log.info(f"[api_input] Updated workflow {workflow_id}")
+
+                return JSONResponse(content={"status": "success"})
+
+            except Exception as e:
+                log.error(f"[api_input] Error updating workflow: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": str(e)}
+                )
+
+        @self.app.delete("/api/workflows/{workflow_id}")
+        async def delete_workflow(workflow_id: str):
+            """Delete workflow from Neo4j."""
+            try:
+                from neo4j import GraphDatabase
+
+                driver = GraphDatabase.driver(
+                    "bolt://localhost:7687",
+                    auth=("neo4j", "testpassword")
+                )
+
+                with driver.session() as session:
+                    session.run(
+                        "MATCH (w:Workflow {id: $id}) DETACH DELETE w",
+                        {"id": workflow_id}
+                    )
+
+                driver.close()
+                log.info(f"[api_input] Deleted workflow {workflow_id}")
+
+                return JSONResponse(content={"status": "deleted"})
+
+            except Exception as e:
+                log.error(f"[api_input] Error deleting workflow: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": str(e)}
+                )
+
+        @self.app.post("/api/workflows/{workflow_id}/entrypoint")
+        async def create_entrypoint(workflow_id: str, request: Request):
+            """Create entrypoint for workflow."""
+            try:
+                from neo4j import GraphDatabase
+
+                data = await request.json()
+                entrypoint_name = data["name"]
+
+                driver = GraphDatabase.driver(
+                    "bolt://localhost:7687",
+                    auth=("neo4j", "testpassword")
+                )
+
+                with driver.session() as session:
+                    query = """
+                    MATCH (w:Workflow {id: $workflow_id})
+                    MERGE (e:Entrypoint {name: $name})
+                    ON CREATE SET
+                        e.description = $description,
+                        e.input_schema = $schema
+                    CREATE (e)-[:EXECUTES]->(w)
+                    RETURN e
+                    """
+                    session.run(query, {
+                        "workflow_id": workflow_id,
+                        "name": entrypoint_name,
+                        "description": data.get("description", ""),
+                        "schema": json.dumps(data.get("inputSchema", {}))
+                    })
+
+                driver.close()
+                log.info(f"[api_input] Created entrypoint {entrypoint_name} for workflow {workflow_id}")
+
+                return JSONResponse(content={"status": "created"})
+
+            except Exception as e:
+                log.error(f"[api_input] Error creating entrypoint: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": str(e)}
+                )
+
+        @self.app.post("/api/workflows/{workflow_id}/execute")
+        async def execute_workflow(workflow_id: str, request: Request):
+            """Execute workflow with given inputs."""
+            try:
+                data = await request.json()
+                executor = self._get_workflow_executor()
+
+                if not executor:
+                    return JSONResponse(
+                        status_code=500,
+                        content={"error": "Workflow executor not available"}
+                    )
+
+                result = await executor.execute_workflow(
+                    workflow_id=workflow_id,
+                    inputs=data.get("inputs", {}),
+                    session_id=data.get("sessionId", str(uuid.uuid4()))
+                )
+
+                return JSONResponse(content=result)
+
+            except Exception as e:
+                log.error(f"[api_input] Error executing workflow: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": str(e)}
+                )
 
         @self.app.post("/api/workflows/match")
         async def match_workflow(request: Request):

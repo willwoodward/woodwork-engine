@@ -40,12 +40,16 @@ class UnifiedEventBus:
         self._pipes: Dict[str, List[Callable]] = defaultdict(list)
         self._events: Dict[str, List[Callable]] = defaultdict(list)
 
+        # Tool registry (integrated)
+        self._tool_schemas: Dict[str, Any] = {}
+
         # Statistics
         self._stats = {
             "events_emitted": 0,
             "components_registered": 0,
             "routes_processed": 0,
-            "hooks_executed": 0
+            "hooks_executed": 0,
+            "tools_registered": 0
         }
 
         log.debug("[UnifiedEventBus] Initialized")
@@ -513,6 +517,122 @@ class UnifiedEventBus:
         """Register message handler for component (compatibility method)"""
         log.debug("[UnifiedEventBus] Registered handler for component '%s'", component_name)
         # For now, we don't need separate handlers since we handle everything directly
+
+    # Tool Schema Registry Methods
+
+    def register_tool_schema(self, schema: "ToolSchema") -> None:
+        """Register tool schema for workflow builder discovery."""
+        self._tool_schemas[schema.tool_name] = schema
+        self._stats["tools_registered"] += 1
+        log.debug("[UnifiedEventBus] Registered tool schema: %s", schema.tool_name)
+
+    def get_tool_schema(self, tool_name: str) -> Optional["ToolSchema"]:
+        """Get schema for specific tool."""
+        return self._tool_schemas.get(tool_name)
+
+    def get_all_tool_schemas(self) -> List["ToolSchema"]:
+        """Get all registered tool schemas for workflow builder."""
+        return list(self._tool_schemas.values())
+
+    def discover_tools_from_agent(self, agent: Any) -> List["ToolSchema"]:
+        """
+        Auto-discover and register tool schemas from agent's tool list.
+        Called during agent registration or manually.
+
+        Args:
+            agent: Agent component with _tools attribute
+
+        Returns:
+            List of discovered tool schemas
+        """
+        from woodwork.types.tool_schema import ToolSchema
+
+        if not hasattr(agent, "_tools"):
+            log.debug("[UnifiedEventBus] Agent '%s' has no _tools attribute", getattr(agent, 'name', 'unknown'))
+            return []
+
+        schemas = []
+        for tool in agent._tools:
+            schema = self._extract_schema_from_tool(tool)
+            if schema:
+                self.register_tool_schema(schema)
+                schemas.append(schema)
+
+        agent_name = getattr(agent, 'name', 'unknown')
+        log.info("[UnifiedEventBus] Discovered %d tool schemas from agent '%s'", len(schemas), agent_name)
+        return schemas
+
+    def _extract_schema_from_tool(self, tool: Any) -> Optional["ToolSchema"]:
+        """
+        Extract tool schema from tool.description or decorator metadata.
+
+        Strategy:
+        1. Check for __tool_schema__ decorator metadata
+        2. Generate basic schema from tool.description
+        3. Infer category from class name
+
+        Args:
+            tool: Tool implementing tool_interface
+
+        Returns:
+            ToolSchema or None if tool invalid
+        """
+        from woodwork.types.tool_schema import ToolSchema
+
+        if not hasattr(tool, "name"):
+            log.warning("[UnifiedEventBus] Tool has no 'name' attribute, skipping")
+            return None
+
+        # Check for explicit schema metadata from decorator
+        if hasattr(tool, "__tool_schema__"):
+            return tool.__tool_schema__
+
+        # Get tool description
+        description = ""
+        if hasattr(tool, "description"):
+            try:
+                description = tool.description
+                # Truncate if too long
+                if isinstance(description, str) and len(description) > 300:
+                    description = description[:300] + "..."
+            except Exception as e:
+                log.debug("[UnifiedEventBus] Error getting description for tool '%s': %s", tool.name, e)
+                description = f"Tool: {tool.name}"
+
+        # Generate basic schema
+        return ToolSchema(
+            tool_name=tool.name,
+            display_name=tool.name.replace("_", " ").title(),
+            description=description if description else f"Tool: {tool.name}",
+            category=self._infer_tool_category(tool),
+            parameters=[],  # TODO: Parse from description or require decorator
+            output_type="string"
+        )
+
+    def _infer_tool_category(self, tool: Any) -> str:
+        """
+        Infer tool category from class name or module.
+
+        Args:
+            tool: Tool instance
+
+        Returns:
+            Category string
+        """
+        class_name = tool.__class__.__name__.lower()
+
+        if "file" in class_name or "read" in class_name or "write" in class_name:
+            return "file"
+        elif "api" in class_name or "web" in class_name or "http" in class_name:
+            return "api"
+        elif "data" in class_name or "clean" in class_name or "transform" in class_name:
+            return "data"
+        elif "ml" in class_name or "model" in class_name or "train" in class_name:
+            return "ml"
+        elif "agent" in class_name:
+            return "agent"
+        else:
+            return "general"
 
 
 # Global event bus instance

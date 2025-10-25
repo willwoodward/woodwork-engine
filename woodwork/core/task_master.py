@@ -21,13 +21,8 @@ class task_master(component):
         format_kwargs(config, component="task_master", type="default")
         super().__init__(**config)
 
-        # Setup workflows storage
-        self.cache = neo4j(
-            uri="bolt://localhost:7687",
-            user="neo4j",
-            password="testpassword",
-            name="agent_cache",
-        )
+        # Lazy initialization of Neo4j cache
+        self._cache = None
 
         self._tools = []
         self._inputs = []
@@ -36,6 +31,18 @@ class task_master(component):
         self.workflow_actions: dict[str, Action] = {}
         self.workflow_variables: dict[str, Any] = {}
         self.last_action_name: str = None
+
+    @property
+    def cache(self):
+        """Lazy initialization of Neo4j workflow cache"""
+        if self._cache is None:
+            self._cache = neo4j(
+                uri="bolt://localhost:7687",
+                user="neo4j",
+                password="testpassword",
+                name="agent_cache",
+            )
+        return self._cache
 
     def add_tools(self, tools):
         self._tools = self._tools + tools
