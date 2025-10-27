@@ -1,4 +1,18 @@
-from colorama import Fore, Style
+try:
+    from colorama import Fore, Style
+except Exception:
+    # Provide fallback no-op color constants when colorama isn't installed so
+    # tests and environments without color support can still import this module.
+    class _NoColor:
+        RED = ""
+        CYAN = ""
+        YELLOW = ""
+
+    class _NoStyle:
+        RESET_ALL = ""
+
+    Fore = _NoColor()
+    Style = _NoStyle()
 
 
 class WoodworkError(Exception):
