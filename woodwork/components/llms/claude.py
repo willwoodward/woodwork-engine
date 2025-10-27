@@ -2,6 +2,11 @@ import logging
 import multiprocessing
 import time
 
+# Expose ChatAnthropic at module level so tests can monkeypatch it.
+# The actual import is attempted inside start() if the module-level
+# variable remains None.
+ChatAnthropic = None
+
 # NOTE: import langchain_anthropic.ChatAnthropic lazily inside start()
 # to avoid import-time errors when the optional dependency isn't installed.
 
@@ -14,6 +19,11 @@ log = logging.getLogger(__name__)
 
 class claude(llm, ParallelStartable, Startable):
     def __init__(self, api_key: str, model="claude-sonnet-4-20250514", **config):
+        # Ensure required kwargs for parent component initialization exist.
+        # Provide a sensible default name so component.__init__ is satisfied
+        # when callers (like tests) don't pass a name explicitly.
+        config.setdefault("name", "claude")
+
         format_kwargs(config, api_key=api_key, model=model, type="claude")
         log.debug("Establishing connection with Claude model...")
         self._model = model
@@ -36,15 +46,15 @@ class claude(llm, ParallelStartable, Startable):
         time.sleep(1)
 
     def start(self, queue: multiprocessing.Queue, config: dict = {}):
-        # Import ChatAnthropic here so tests can import this module even when
-        # the optional langchain_anthropic package is not installed. Tests
-        # can monkeypatch claude.ChatAnthropic before calling start().
-        try:
-            from langchain_anthropic import ChatAnthropic
-        except Exception:
-            # If import fails, leave ChatAnthropic undefined so callers/tests
-            # can monkeypatch claude.ChatAnthropic as needed.
-            ChatAnthropic = None
+        # Prefer the module-level ChatAnthropic (allows tests to monkeypatch).
+        global ChatAnthropic
+        if ChatAnthropic is None:
+            try:
+                from langchain_anthropic import ChatAnthropic as _ImportedChatAnthropic
+                ChatAnthropic = _ImportedChatAnthropic
+            except Exception:
+                # Keep ChatAnthropic as None if import fails; we'll raise below.
+                ChatAnthropic = None
 
         if ChatAnthropic is None:
             # Defer raising until someone actually tries to start without a
