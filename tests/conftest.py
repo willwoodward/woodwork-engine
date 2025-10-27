@@ -359,6 +359,12 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: mark test as slow running"
     )
+    config.addinivalue_line(
+        "markers", "asyncio: mark async tests"
+    )
+    config.addinivalue_line(
+        "markers", "workflows: mark tests that require workflows feature"
+    )
 
 
 # Test Collection Configuration

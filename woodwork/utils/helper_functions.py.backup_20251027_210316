@@ -119,25 +119,17 @@ def get_prompt(path: str) -> str:
 def sync_async(func, *args, **kwargs):
     """
     Run an async function from synchronous code.
-
-    Behavior:
-    - If there's no running event loop, run the coroutine synchronously via asyncio.run and return the result.
-    - If there is already a running loop, we cannot block the loop with run_until_complete. In that case
-      we create and return an asyncio.Task so the caller (which is already async-aware) can await it.
-      If callers expect a synchronous return value while already inside a running loop, they should
-      instead call the coroutine directly (await) or use an appropriate thread-based helper.
+    Falls back gracefully if already inside an event loop.
     """
     if inspect.iscoroutinefunction(func):
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            # no running loop -> safe to use asyncio.run
+            # no running loop → safe to use asyncio.run
             return asyncio.run(func(*args, **kwargs))
         else:
-            # already in an event loop -> create and return a Task (caller can await it)
-            # NOTE: It is not safe to block the running loop here; returning a Task is the
-            # most compatible behavior for code running inside an event loop.
-            return loop.create_task(func(*args, **kwargs))
+            # already in an event loop → use create_task and wait
+            return loop.run_until_complete(func(*args, **kwargs))
     else:
         return func(*args, **kwargs)
     
