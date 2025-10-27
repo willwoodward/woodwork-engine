@@ -41,14 +41,17 @@ class coding(environment, Startable):
         FROM ubuntu:latest
         RUN apt-get update && apt-get install -y \\
             bash git curl wget vim nano \\
-            build-essential sudo \\
+            build-essential sudo python3 python3-pip python3-venv \\
             && rm -rf /var/lib/apt/lists/*
-        
+
         # Create user with same UID/GID as host user
         RUN groupadd -g {gid} {username} || groupmod -g {gid} {username} 2>/dev/null || true
         RUN useradd -u {uid} -g {gid} -m -s /bin/bash {username} || usermod -u {uid} -g {gid} {username} 2>/dev/null || true
-        RUN echo "{username} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-        
+
+        # Configure sudoers properly - use sudoers.d to avoid conflicts
+        RUN echo "{username} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/{username} && \\
+            chmod 0440 /etc/sudoers.d/{username}
+
         USER {username}
         WORKDIR /workspace
         CMD ["tail", "-f", "/dev/null"]
@@ -57,7 +60,8 @@ class coding(environment, Startable):
         # Container arguments with user specification
         container_args = {
             "user": f"{uid}:{gid}",
-            "environment": config.get("environment_variables", {})
+            "environment": config.get("environment_variables", {}),
+            "log_config": {"type": "json-file"}
         }
         
         self.docker = Docker(
@@ -376,28 +380,46 @@ class coding(environment, Startable):
     def search_in_files(self, pattern: str, file_glob: str = "*", context_lines: int = 0, case_insensitive: bool = False):
         """Search for regex patterns in files with optional context lines."""
         container = self.docker.get_container()
-        
+
         # Build grep command
         grep_flags = ["-n"]  # Show line numbers
         if case_insensitive:
             grep_flags.append("-i")
         if context_lines > 0:
             grep_flags.append(f"-C {context_lines}")
-        
+
         # Escape pattern for shell
         escaped_pattern = pattern.replace("'", "'\"'\"'")
-        
+
         # Build find command for file matching
         if file_glob == "*":
             find_part = f"find {self.local_path} -type f"
         else:
-            # Convert glob to find pattern
+            # Parse glob pattern to extract directory and filename parts
             if "**" in file_glob:
-                # Recursive glob
-                find_part = f"find {self.local_path} -type f -name '{file_glob.replace('**/', '')}'"
+                # Recursive glob (e.g., "tests/**/*.py" or "**/*.py")
+                parts = file_glob.split("**/")
+                if len(parts) == 2 and parts[0]:
+                    # Has directory prefix like "tests/**/*.py"
+                    dir_prefix = parts[0].rstrip("/")
+                    file_pattern = parts[1]
+                    search_path = f"{self.local_path}/{dir_prefix}"
+                else:
+                    # Just "**/*.py" - search everywhere
+                    file_pattern = parts[-1]
+                    search_path = self.local_path
+                find_part = f"find {search_path} -type f -name '{file_pattern}'"
+            elif "/" in file_glob:
+                # Pattern with directory but no ** (e.g., "tests/*.py")
+                pattern_parts = file_glob.rsplit("/", 1)
+                dir_path = pattern_parts[0]
+                file_pattern = pattern_parts[1] if len(pattern_parts) > 1 else "*"
+                search_path = f"{self.local_path}/{dir_path}"
+                find_part = f"find {search_path} -maxdepth 1 -type f -name '{file_pattern}'"
             else:
+                # Simple filename pattern (e.g., "*.py")
                 find_part = f"find {self.local_path} -type f -name '{file_glob}'"
-        
+
         # Combine find and grep
         command = f"{find_part} -exec grep {' '.join(grep_flags)} '{escaped_pattern}' {{}} +"
         
@@ -414,7 +436,7 @@ class coding(environment, Startable):
                     processed_lines.append(relative_line)
                 else:
                     processed_lines.append(line)
-            return "\\n".join(processed_lines)
+            return "\n".join(processed_lines)
         elif result.exit_code == 1:
             return "No matches found"
         else:
@@ -530,30 +552,33 @@ class coding(environment, Startable):
         setup_marker = "/workspace/.woodwork_setup_complete"
         
         # Check if the first setup script is to remove the marker (force rerun)
+        skip_first_script = False
         if self.setup_scripts and self.setup_scripts[0].startswith("rm -f /workspace/.woodwork_setup_complete"):
             log.info("Force setup rerun detected, removing completion marker...")
             container.exec_run(f"/bin/sh -c 'rm -f {setup_marker}'")
+            skip_first_script = True
         else:
             # Check if setup has already been completed
             check_command = f"test -f {setup_marker}"
             result = container.exec_run(f"/bin/sh -c '{check_command}'")
-            
+
             if result.exit_code == 0:
                 log.info("Setup scripts already completed, skipping...")
                 return
-        
+
         log.info("Running setup scripts for first time...")
-        
+
         # Prepare environment variables from config
         env_vars = {}
         env_vars.update(self.environment_variables)
         log.info(f"Environment variables for setup: {env_vars}")
-        
+
         # Copy any local setup script files to the container
         self._copy_setup_files()
-        
-        # Run the setup scripts (file paths only)
-        for script_path in self.setup_scripts:
+
+        # Run the setup scripts (file paths only), skipping the rm command if present
+        scripts_to_run = self.setup_scripts[1:] if skip_first_script else self.setup_scripts
+        for script_path in scripts_to_run:
             if isinstance(script_path, str):
                 # Execute script file with environment variables
                 result = self._execute_script_with_env(script_path, env_vars)
@@ -602,7 +627,7 @@ class coding(environment, Startable):
     def _execute_script_with_env(self, script_path: str, env_vars: dict) -> str:
         """Execute a script file with specific environment variables."""
         container = self.docker.get_container()
-        
+
         # Build environment variable string, properly escaping values
         env_parts = []
         for key, value in env_vars.items():
@@ -611,13 +636,19 @@ class coding(environment, Startable):
                 escaped_value = str(value).replace("'", "'\"'\"'")
                 env_parts.append(f"{key}='{escaped_value}'")
         env_string = " ".join(env_parts)
-        
-        # Execute script file with environment variables
-        full_command = f'cd {self.current_directory} && {env_string} {script_path}'
+
+        # Execute script file with environment variables using bash instead of sh
+        full_command = f'cd {self.current_directory} && {env_string} bash {script_path}'
         log.info(f"Executing script with env: {full_command}")
-        out = container.exec_run(f'/bin/sh -c "{full_command}"')
+        out = container.exec_run(f'/bin/bash -c "{full_command}"')
         result = out.output.decode("utf-8").strip()
         log.info(f"Script result (exit_code={out.exit_code}): {result}")
+
+        # Also log stderr if there was an error
+        if out.exit_code != 0:
+            log.error(f"Script failed with exit code {out.exit_code}")
+            log.error(f"Output: {result}")
+
         return result
 
     def _run_startup_scripts_once(self):

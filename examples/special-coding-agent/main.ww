@@ -42,7 +42,7 @@ input = input command_line {
 github_api = mcp server {
   server: "github/mcp-server"
   version: "latest"
-  toolsets: "repos,issues"
+  toolsets: "repos,issues,pull_requests"
   env: {
     GITHUB_TOKEN: $GITHUB_AGENT_MCP_TOKEN
   }
@@ -58,10 +58,14 @@ dev_env = environment coding {
         "/workspace/startup_env.sh"
     ]
     environment_variables: {
+        AGENT_GIT_NAME: $AGENT_GIT_NAME
+        AGENT_GIT_EMAIL: $AGENT_GIT_EMAIL
+        AGENT_GIT_USERNAME: $AGENT_GIT_USERNAME
         GIT_AUTHOR_NAME: $AGENT_GIT_NAME
         GIT_AUTHOR_EMAIL: $AGENT_GIT_EMAIL
         GIT_COMMITTER_NAME: $AGENT_GIT_NAME
         GIT_COMMITTER_EMAIL: $AGENT_GIT_EMAIL
+        GITHUB_PAT: $GITHUB_PAT
         GITHUB_TOKEN: $GITHUB_PAT
         PYTHON_ENV: "development"
     }

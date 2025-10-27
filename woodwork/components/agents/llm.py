@@ -337,7 +337,7 @@ class llm(agent, Startable):
                     observation = json.dumps(result) if result is not None else "No output"
 
                 observation_tokens = self.count_tokens(observation)
-                if observation_tokens > 7500:
+                if observation_tokens > 15000:
                     observation = f"The output from this tool was way too large, it contained {observation_tokens} tokens."
 
             except KeyError as e:
