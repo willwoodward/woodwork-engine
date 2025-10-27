@@ -25,7 +25,12 @@ class agent(component, tool_interface, ABC):
 
         self._tools = tools
         self._task_m = task_m
-        self._cache = task_m.cache
+        # Try to initialize cache, but don't fail if Neo4j is unavailable
+        try:
+            self._cache = task_m.cache
+        except ConnectionError as e:
+            log.warning(f"[Agent] Failed to initialize workflow cache: {e}. Cache features will be disabled.")
+            self._cache = None
         self._cache_mode = False
         # Agents must be provided with a model (an LLM component instance) via the config key 'model'.
         # This is mandatory — agents should not require an api_key to be passed directly.
@@ -48,8 +53,17 @@ class agent(component, tool_interface, ABC):
             self._tools.append(planning)
             self._task_m.add_tools([planning])
 
+        # Auto-discover and register tool schemas with event bus
+        try:
+            from woodwork.core.unified_event_bus import get_global_event_bus
+            event_bus = get_global_event_bus()
+            schemas = event_bus.discover_tools_from_agent(self)
+            log.info(f"[Agent] Auto-discovered {len(schemas)} tool schemas for workflow builder")
+        except Exception as e:
+            log.warning(f"[Agent] Failed to auto-discover tool schemas: {e}")
+
         if "cache" in config:
-            if config["cache"]:
+            if config["cache"] and self._cache is not None:
                 # Initialise neo4j cache
                 self._cache_mode = True
 
@@ -59,6 +73,9 @@ class agent(component, tool_interface, ABC):
 
                 self._cache.set_api_key(api_key=api_key)
                 self._cache.init_vector_index(index_name="embeddings", label="Prompt", property="embedding")
+            elif config["cache"] and self._cache is None:
+                log.warning("[Agent] Cache requested but unavailable (Neo4j not connected). Continuing without cache.")
+                self._cache_mode = False
         else:
             self._cache_mode = False
 

@@ -2,14 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+This repo is on github, and it is under willwoodward/woodwork-engine. Whenever you add code, follow a test driven approach,
+writing unit tests and using ruff and ty for formatting and linting.
+
 ## Development Commands
 
 ### Installation & Setup
 - `pip install woodwork-engine` - Install the main package
-- `pip install -e .[all]` - Install in development mode with all optional dependencies
-- `pip install pre-commit` - Install pre-commit hooks for linting/formatting
-- `pre-commit install` - Enable pre-commit hooks
+- `pip install -e .[test]` - Install with test dependencies (pytest, pytest-asyncio)
+- `pip install -e .[dev]` - Install with development dependencies (includes test + ruff, black, pre-commit, ty)
+- `pip install -e .[all]` - Install in development mode with all optional dependencies (includes dev + chromadb, langchain, etc.)
+- `pre-commit install` - Enable pre-commit hooks (requires [dev] or [all])
 - `woodwork init` - Install dependencies for .ww config files (when working standalone)
+
+**Note:** For faster installation, use `uv pip install` instead of `pip install` - it's significantly faster for large dependency sets like `[all]`.
 
 ### Common Operations
 - `woodwork` - Run the main application (requires main.ww file)
@@ -18,12 +24,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `uv run ty check` - Type checking (used in pre-commit)
 
 ### Testing & Code Quality
-- `pytest` - Run tests (test files located in `tests/` directory)
+- `pytest` - Run all tests (requires `[test]` or higher dependencies)
 - `pytest tests/test_specific.py` - Run specific test file
 - `pytest -k "test_name"` - Run specific test by name pattern
-- `ruff check --fix` - Run linter with auto-fix
-- `ruff format` - Format code
+- `pytest -v` - Run tests with verbose output
+- `pytest -m "not slow"` - Run tests excluding slow ones (e.g., skip full venv installations)
+- `ruff check --fix` - Run linter with auto-fix (requires `[dev]` or `[all]`)
+- `ruff format` - Format code (requires `[dev]` or `[all]`)
+- `ty check` - Type checking (requires `[dev]` or `[all]`)
 - Pre-commit hooks run `ruff-check`, `ruff-format`, and `ty check` automatically
+
+**Dependency Levels:**
+- **Runtime**: Core dependencies needed to run woodwork
+- **[test]**: Adds pytest and pytest-asyncio for running tests
+- **[dev]**: Adds development tools (ruff, black, pre-commit, ty) on top of [test]
+- **[all]**: Adds optional features (chromadb, langchain, etc.) on top of [dev]
+
+**Verifying Dependency Groups:**
+- `pytest tests/integration/test_dependency_groups.py::TestPyprojectTomlStructure` - Fast structure checks
+- `pytest tests/integration/test_dependency_groups.py` - Full installation tests (slow)
+- See `tests/integration/README_DEPENDENCY_TESTS.md` for details
 
 ## Architecture Overview
 

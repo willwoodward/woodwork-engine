@@ -5,26 +5,14 @@ llm = llm openai {
 
 coding_ag = agent llm {
     model: llm
-    graph_cache: True
-    cache: False
     planning: True
     tools: [github_api, dev_env, llm]
     
     hooks: [
         {
-            event: "input.received"
-            script_path: "hooks.py"
-            function_name: "print_input_received"
-        },
-        {
             event: "agent.thought"
             script_path: "hooks.py"
             function_name: "print_agent_thought"
-        },
-        {
-            event: "agent.action"
-            script_path: "hooks.py"
-            function_name: "print_agent_action"
         },
         {
             event: "tool.call"
@@ -35,16 +23,6 @@ coding_ag = agent llm {
             event: "tool.observation"
             script_path: "hooks.py"
             function_name: "print_tool_observation"
-        },
-        {
-            event: "agent.step_complete"
-            script_path: "hooks.py"
-            function_name: "print_step_complete"
-        },
-        {
-            event: "agent.error"
-            script_path: "hooks.py"
-            function_name: "print_error"
         }
     ]
     
@@ -57,16 +35,16 @@ coding_ag = agent llm {
     ]
 }
 
-input = input api {
+input = input command_line {
     to: coding_ag
 }
 
 github_api = mcp server {
   server: "github/mcp-server"
   version: "latest"
-  toolsets: "repos,issues"
+  toolsets: "repos,issues,pull_requests"
   env: {
-    GITHUB_TOKEN: $GITHUB_MCP_TOKEN
+    GITHUB_TOKEN: $GITHUB_AGENT_MCP_TOKEN
   }
 }
 
@@ -80,10 +58,14 @@ dev_env = environment coding {
         "/workspace/startup_env.sh"
     ]
     environment_variables: {
+        AGENT_GIT_NAME: $AGENT_GIT_NAME
+        AGENT_GIT_EMAIL: $AGENT_GIT_EMAIL
+        AGENT_GIT_USERNAME: $AGENT_GIT_USERNAME
         GIT_AUTHOR_NAME: $AGENT_GIT_NAME
         GIT_AUTHOR_EMAIL: $AGENT_GIT_EMAIL
         GIT_COMMITTER_NAME: $AGENT_GIT_NAME
         GIT_COMMITTER_EMAIL: $AGENT_GIT_EMAIL
+        GITHUB_PAT: $GITHUB_PAT
         GITHUB_TOKEN: $GITHUB_PAT
         PYTHON_ENV: "development"
     }

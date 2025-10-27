@@ -1,6 +1,7 @@
 from .data_types import Data, Text, Audio, Image, Stream, Update
 from .prompts import Prompt
 from .workflows import Action, Workflow
+from .tool_schema import ToolParameter, ToolSchema
 from .events import (
     BasePayload,
     GenericPayload,
@@ -16,7 +17,7 @@ from .events import (
 from .event_source import EventSource, track_events_from
 from .streaming_data import (
     StreamChunk,
-    StreamMetadata, 
+    StreamMetadata,
     StreamBuffer,
     StreamDataType,
     StreamStatus,
@@ -26,12 +27,14 @@ from .streaming_data import (
 
 __all__ = [
     # Data types
-    "Data", "Text", "Audio", "Image", "Stream", "Update", 
+    "Data", "Text", "Audio", "Image", "Stream", "Update",
     # Prompts and workflows
     "Prompt", "Action", "Workflow",
+    # Tool schemas
+    "ToolParameter", "ToolSchema",
     # Event payload types
-    "BasePayload", "GenericPayload", "InputReceivedPayload", "AgentThoughtPayload", 
-    "AgentActionPayload", "ToolCallPayload", "ToolObservationPayload", 
+    "BasePayload", "GenericPayload", "InputReceivedPayload", "AgentThoughtPayload",
+    "AgentActionPayload", "ToolCallPayload", "ToolObservationPayload",
     "AgentStepCompletePayload", "AgentErrorPayload", "PayloadRegistry",
     # Event source tracking
     "EventSource", "track_events_from",

@@ -16,12 +16,13 @@ from woodwork.types.event_source import EventSource
 from woodwork.components.llms.llm import llm
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
+from woodwork.interfaces.startable import Startable
 from typing import Dict
 
 log = logging.getLogger(__name__)
 
 
-class llm(agent):
+class llm(agent, Startable):
     def __init__(self, model: llm, **config):
         # Require a model (an LLM component instance or a ChatOpenAI instance) be provided.
         format_kwargs(config, model=model, type="llm")
@@ -41,13 +42,37 @@ class llm(agent):
         # Register for user input responses
         self._event_bus.register_hook("user.input.response", self._handle_user_input_response)
 
-        # Setup internal features (only for LLM agents)
+        # Defer internal features setup to start() method
         self._internal_component_manager = InternalComponentManager()
-        self._internal_features = InternalFeatureRegistry.create_features(config)
-        self._setup_internal_features(config)
+        self._internal_features = []
+        self._internal_features_config = config  # Store config for later
+        self._internal_features_setup = False
 
         # Workflow variables for action output tracking
         self._workflow_variables: dict[str, Any] = {}
+
+    def start(self, queue=None, config=None):
+        """Start the agent and setup internal features (called during component starting phase)"""
+        if not self._internal_features_setup:
+            log.debug(f"[LLM Agent] Setting up internal features for {self.name}...")
+
+            # Report progress if queue is available
+            if queue:
+                from woodwork.types import Update
+                queue.put(Update(progress=10, component_name=self.name))
+
+            self._internal_features = InternalFeatureRegistry.create_features(self._internal_features_config)
+
+            if queue:
+                queue.put(Update(progress=30, component_name=self.name))
+
+            self._setup_internal_features(self._internal_features_config)
+            self._internal_features_setup = True
+
+            if queue:
+                queue.put(Update(progress=50, component_name=self.name))
+
+            log.debug(f"[LLM Agent] {self.name} internal features setup complete")
 
     async def _handle_user_input_response(self, payload):
         """Handle user input response events"""
@@ -312,7 +337,7 @@ class llm(agent):
                     observation = json.dumps(result) if result is not None else "No output"
 
                 observation_tokens = self.count_tokens(observation)
-                if observation_tokens > 7500:
+                if observation_tokens > 15000:
                     observation = f"The output from this tool was way too large, it contained {observation_tokens} tokens."
 
             except KeyError as e:

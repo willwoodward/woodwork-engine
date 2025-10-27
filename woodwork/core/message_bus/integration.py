@@ -847,9 +847,16 @@ class GlobalMessageBusManager:
             # Get global message bus
             self.message_bus = await get_global_message_bus()
             log.info("[GlobalMessageBusManager] Connected to global message bus")
-            
+
             # Use unified event bus for routing (replaces DeclarativeRouter)
             unified_event_bus = get_global_event_bus()
+            log.warning("[GlobalMessageBusManager] Got global event bus: id=%s", id(unified_event_bus))
+
+            # Set message bus reference on unified event bus for virtual component delivery
+            log.warning("[GlobalMessageBusManager] About to set message bus: %s (type=%s)",
+                       self.message_bus, type(self.message_bus).__name__)
+            unified_event_bus.set_message_bus(self.message_bus)
+            log.warning("[GlobalMessageBusManager] Message bus set on unified event bus")
 
             # Set router early so it's available for component registration
             self.router = unified_event_bus
@@ -910,8 +917,8 @@ class GlobalMessageBusManager:
         """Handle messages routed to console output with streaming support"""
         try:
             payload = envelope.payload
-            data = payload.get("data", payload)
-            
+            data = getattr(payload, 'data', payload)
+
             log.debug("[GlobalMessageBusManager] Handling console message: %s", str(data)[:100])
             
             # Handle streaming output (like task_master implementation)
@@ -986,11 +993,11 @@ class GlobalMessageBusManager:
         if has_set_router and has_router:
             component.set_router(self.router)
             log.debug("[GlobalMessageBusManager] Set router on component '%s'", component_name)
-        else:
-            if not has_set_router:
-                log.warning("[GlobalMessageBusManager] Component '%s' missing set_router method", component_name)
-            if not has_router:
-                log.warning("[GlobalMessageBusManager] No router available to set on component '%s'", component_name)
+        # else:
+        #     if not has_set_router:
+        #         log.warning("[GlobalMessageBusManager] Component '%s' missing set_router method", component_name)
+        #     if not has_router:
+        #         log.warning("[GlobalMessageBusManager] No router available to set on component '%s'", component_name)
         
         self.registered_components[component_name] = component
         

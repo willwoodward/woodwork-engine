@@ -9,15 +9,22 @@ from woodwork.components.knowledge_bases.graph_databases.graph_database import (
 )
 from woodwork.deployments import Docker
 from woodwork.utils import format_kwargs, get_optional
+from woodwork.interfaces.startable import Startable
 
 log = logging.getLogger(__name__)
 
 
-class neo4j(graph_database):
+class neo4j(graph_database, Startable):
     def __init__(self, uri, user, password, **config):
         format_kwargs(config, uri=uri, user=user, password=password, type="neo4j")
         super().__init__(**config)
         log.debug("Initializing Neo4j Knowledge Base...")
+
+        self.uri = uri
+        self.user = user
+        self.password = password
+        self._driver = None
+        self._docker_started = False
 
         self.docker = Docker(
             image_name="custom-neo4j",
@@ -42,11 +49,6 @@ class neo4j(graph_database):
             },
             volume_location=".woodwork/neo4j/data",
         )
-        self.docker.init()
-
-        self._driver = GraphDatabase.driver(uri, auth=(user, password))
-        if not self._connected():
-            raise ConnectionError(f"Failed to connect to Neo4j at {uri}")
 
         self._api_key = get_optional(config, "api_key")
         self._openai_client = None
@@ -54,7 +56,27 @@ class neo4j(graph_database):
         if self._api_key:
             self._openai_client = OpenAI()
 
-        log.debug("Neo4j Knowledge Base created.")
+        log.debug("Neo4j Knowledge Base created (Docker deferred to start()).")
+
+    def start(self, queue=None, config=None):
+        """Start the Neo4j container and establish connection"""
+        if not self._docker_started:
+            if queue:
+                from woodwork.types import Update
+                queue.put(Update(progress=10, component_name=self.name))
+
+            self.docker.init()
+            self._docker_started = True
+
+            if queue:
+                queue.put(Update(progress=30, component_name=self.name))
+
+            self._driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+            if not self._connected():
+                raise ConnectionError(f"Failed to connect to Neo4j at {self.uri}")
+
+            if queue:
+                queue.put(Update(progress=40, component_name=self.name))
 
     def set_api_key(self, api_key: str):
         self._openai_client = OpenAI(api_key=api_key)

@@ -1,38 +1,21 @@
-import multiprocessing
+import queue
+import logging
 
 from woodwork.components.component import component
-from woodwork.interfaces.intializable import ParallelInitializable, Initializable
-from woodwork.interfaces.startable import ParallelStartable, Startable
+from woodwork.interfaces.startable import Startable
 from woodwork.types import Update
 
+log = logging.getLogger(__name__)
 
-def parallel_start_component(c: component, queue: multiprocessing.Queue):
-    if isinstance(c, ParallelStartable):
-        c.parallel_start(queue=queue, config={})
 
+def start_component(c: component, q: queue.Queue):
+    """Start a component (called in parallel via threading)"""
+    # If component implements Startable interface, call start() method
     if isinstance(c, Startable):
-        queue.put(Update(progress=50, component_name=c.name))
+        c.start(queue=q, config={})
+        if q:
+            q.put(Update(progress=50, component_name=c.name))
     else:
-        queue.put(Update(progress=100, component_name=c.name))
-
-
-def start_component(c: component, queue: multiprocessing.Queue):
-    if isinstance(c, Startable):
-        c.start(queue=queue, config={})
-    queue.put(Update(progress=100, component_name=c.name))
-
-
-def parallel_init_component(c: component, queue: multiprocessing.Queue):
-    if isinstance(c, ParallelInitializable):
-        c.parallel_init(queue=queue, config={})
-
-    if isinstance(c, Initializable):
-        queue.put(Update(progress=50, component_name=c.name))
-    else:
-        queue.put(Update(progress=100, component_name=c.name))
-
-
-def init_component(c: component, queue: multiprocessing.Queue):
-    if isinstance(c, Initializable):
-        c.init(queue=queue, config={})
-    queue.put(Update(progress=100, component_name=c.name))
+        # Component doesn't need starting, mark as complete
+        if q:
+            q.put(Update(progress=100, component_name=c.name))

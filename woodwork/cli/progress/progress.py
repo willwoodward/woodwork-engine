@@ -1,5 +1,6 @@
 import logging
-import multiprocessing
+import threading
+import queue
 from rich.console import Console, Group
 from rich.progress import (
     Progress,
@@ -52,7 +53,7 @@ class SpinnerOrCheckColumn(ProgressColumn):
 
 
 def component_progression_display(
-    console, components: List[component], queue: multiprocessing.Queue, present_verb: str
+    console, components: List[component], progress_queue: queue.Queue, present_verb: str, threads: List[threading.Thread]
 ):
     progress = Progress(
         TextColumn("[grey23]|-", justify="right"),
@@ -83,9 +84,10 @@ def component_progression_display(
     layout = Group(Text(f"Components {present_verb}...", style="bold white"), progress)
     completed = True
     with Live(layout, console=console, refresh_per_second=10):
-        while done_count < len(components):
+        # Continue until all threads are done AND queue is empty
+        while any(t.is_alive() for t in threads) or not progress_queue.empty():
             try:
-                update: Update = queue.get(timeout=0.1)  # small timeout to keep loop alive
+                update: Update = progress_queue.get(timeout=0.1)  # small timeout to keep loop alive
                 task_id = tasks[update.component_name]
                 if update.component_name == "_error":
                     completed = False
@@ -100,10 +102,11 @@ def component_progression_display(
                         component_name=f"[green]{update.component_name}[/green]",
                         elapsed=elapsed_str,
                     )
+                else:
+                    # Only update progress if not already complete
+                    progress.update(task_id, completed=update.progress)
 
-                progress.update(task_id, completed=update.progress)
-
-            except:
+            except queue.Empty:
                 pass
 
             # Update elapsed time
@@ -117,31 +120,28 @@ def component_progression_display(
 
 
 def parallel_func_apply(
-    components: List[component], parallel_func: Callable, component_func: Callable, past_verb: str, present_verb: str
+    components: List[component], component_func: Callable, past_verb: str, present_verb: str
 ):
-    queue = multiprocessing.Queue()
+    progress_queue = queue.Queue()
 
-    # Start processes
-    processes = []
-    for name in components:
-        p = multiprocessing.Process(target=worker, args=(name, queue, parallel_func))
-        p.start()
-        processes.append(p)
+    # Start threads - each thread calls start() on its component
+    threads = []
+    for comp in components:
+        t = threading.Thread(target=worker, args=(comp, progress_queue, component_func))
+        t.start()
+        threads.append(t)
 
     console = Console()
 
-    completed = component_progression_display(console, components, queue, present_verb)
+    completed = component_progression_display(console, components, progress_queue, present_verb, threads)
 
-    for p in processes:
-        p.join()
-
-    for comp in components:
-        component_func(comp, queue)
+    for t in threads:
+        t.join()
 
     if completed:
-        console.print(f"[bold green]All components {past_verb} successfully![/bold green]")
+        console.print(f"[dim]All components {past_verb} successfully![/dim]", highlight=False)
     else:
-        console.print(f"[bold red]Components {past_verb} successfully![/bold red]")
+        console.print(f"[bold red]Components {past_verb} failed![/bold red]", highlight=False)
 
 
 async def deploy_components(deployments: dict):

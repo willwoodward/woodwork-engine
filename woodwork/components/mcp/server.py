@@ -2,6 +2,7 @@ from typing import Literal
 from woodwork.components.mcp.mcp_base import mcp
 from woodwork.deployments.docker import Docker
 from woodwork.utils import format_kwargs
+from woodwork.interfaces.startable import Startable
 
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.sse import sse_client
@@ -9,9 +10,12 @@ from mcp import ClientSession
 import asyncio
 from urllib.parse import urlparse
 import os
+import logging
+
+log = logging.getLogger(__name__)
 
 
-class mcp_server(mcp):
+class mcp_server(mcp, Startable):
     def __init__(
         self,
         transport: Literal["stdio", "sse"],
@@ -38,9 +42,24 @@ class mcp_server(mcp):
         self.client_reader = None
         self.client_writer = None
         self.session = None
+        self._connected = False
+        self._stdio_context = None  # Keep stdio context alive
 
-        # Automatically connect
+    def start(self, queue=None, config=None):
+        """Start the MCP server connection (called during component starting phase)"""
+        log.debug(f"[MCP Server] Starting connection for {self.name}...")
+
+        if queue:
+            from woodwork.types import Update
+            queue.put(Update(progress=10, component_name=self.name))
+
         asyncio.run(self.connect())
+        self._connected = True
+
+        if queue:
+            queue.put(Update(progress=40, component_name=self.name))
+
+        log.debug(f"[MCP Server] {self.name} connected successfully")
 
     async def connect(self):
         if self.transport == "stdio":
@@ -67,11 +86,13 @@ class mcp_server(mcp):
                     "exec", "-i", self.name, "github-mcp-server",
                 ],
             )
-            async with stdio_client(params) as (reader, writer):
-                self.client_reader = reader
-                self.client_writer = writer
-                self.session = ClientSession(reader, writer)
-                await self.session.initialize()
+            # Store the context manager to keep connection alive
+            self._stdio_context = stdio_client(params).__aenter__()
+            reader, writer = await self._stdio_context
+            self.client_reader = reader
+            self.client_writer = writer
+            self.session = ClientSession(reader, writer)
+            await self.session.initialize()
 
         elif self.transport == "http":
             if not self.remote_url or urlparse(self.remote_url).scheme not in ("http", "https"):

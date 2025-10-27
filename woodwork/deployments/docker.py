@@ -89,6 +89,7 @@ class Docker:
 
     def _run_docker_container(self):
         """Run the Docker container."""
+        from docker.errors import APIError
         log.debug("Running Docker container...")
 
         # Check if the container already exists
@@ -96,10 +97,23 @@ class Docker:
         try:
             container = self.docker_client.containers.get(self.container_name)
             log.debug(f"Container '{self.container_name}' already exists. Starting it...")
-            container.start()
-            self.container = container
-            time.sleep(10)
-            self.wait_for_container(container)
+            try:
+                container.start()
+                self.container = container
+                time.sleep(10)
+                self.wait_for_container(container)
+            except APIError as e:
+                # Container exists but can't start (stale mounts, etc.) - remove and recreate
+                log.debug(f"Container '{self.container_name}' failed to start: {e}. Removing and recreating...")
+                container.remove(force=True)
+                container = self.docker_client.containers.run(
+                    self.image_name,
+                    name=self.container_name,
+                    detach=True,
+                    **self.container_args,
+                )
+                self.wait_for_container(container)
+                self.container = container
         except NotFound:
             log.debug(f"Container '{self.container_name}' not found. Creating a new one...")
             container = self.docker_client.containers.run(
