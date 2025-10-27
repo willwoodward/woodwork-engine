@@ -10,19 +10,9 @@ coding_ag = agent llm {
     
     hooks: [
         {
-            event: "input.received"
-            script_path: "hooks.py"
-            function_name: "print_input_received"
-        },
-        {
             event: "agent.thought"
             script_path: "hooks.py"
             function_name: "print_agent_thought"
-        },
-        {
-            event: "agent.action"
-            script_path: "hooks.py"
-            function_name: "print_agent_action"
         },
         {
             event: "tool.call"
@@ -33,16 +23,6 @@ coding_ag = agent llm {
             event: "tool.observation"
             script_path: "hooks.py"
             function_name: "print_tool_observation"
-        },
-        {
-            event: "agent.step_complete"
-            script_path: "hooks.py"
-            function_name: "print_step_complete"
-        },
-        {
-            event: "agent.error"
-            script_path: "hooks.py"
-            function_name: "print_error"
         }
     ]
     
@@ -55,7 +35,7 @@ coding_ag = agent llm {
     ]
 }
 
-input = input api {
+input = input command_line {
     to: coding_ag
 }
 
@@ -64,7 +44,7 @@ github_api = mcp server {
   version: "latest"
   toolsets: "repos,issues"
   env: {
-    GITHUB_TOKEN: $GITHUB_MCP_TOKEN
+    GITHUB_TOKEN: $GITHUB_AGENT_MCP_TOKEN
   }
 }
 

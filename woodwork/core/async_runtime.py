@@ -54,6 +54,9 @@ class AsyncRuntime:
             # 2.5. Start internal components created by features
             await self.startup_internal_components()
 
+            # 2.7. Initialize message bus integration for virtual components
+            await self._initialize_message_bus_integration()
+
             # 3. Configure routing
             self.event_bus.configure_routing()
 
@@ -364,6 +367,32 @@ class AsyncRuntime:
                 log.debug("[AsyncRuntime] All internal components started successfully")
             except Exception as e:
                 log.error("[AsyncRuntime] Error during internal component startup: %s", e)
+
+    async def _initialize_message_bus_integration(self) -> None:
+        """Initialize message bus integration and set reference on unified event bus"""
+
+        try:
+            from woodwork.core.message_bus.integration import get_global_message_bus_manager
+            from woodwork.core.message_bus.factory import get_global_message_bus
+
+            # Get the message bus
+            message_bus = await get_global_message_bus()
+
+            # Set it on the unified event bus
+            self.event_bus.set_message_bus(message_bus)
+
+            # Get the manager and set the message bus on it too
+            manager = get_global_message_bus_manager()
+            manager.message_bus = message_bus
+            manager.router = self.event_bus
+
+            # Setup console output handler
+            await manager._setup_console_output_handler()
+
+        except Exception as e:
+            log.error("[AsyncRuntime] Failed to initialize message bus integration: %s", e)
+            import traceback
+            traceback.print_exc()
 
     def get_stats(self) -> Dict[str, Any]:
         """Get runtime statistics"""

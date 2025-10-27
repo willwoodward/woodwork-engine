@@ -2,7 +2,7 @@
 
 from woodwork.components.llms.openai import openai
 from woodwork.components.agents.llm import llm
-from woodwork.components.inputs.api_input import api_input
+from woodwork.components.inputs.command_line import command_line
 from woodwork.components.mcp.mcp_server import MCPServer
 from woodwork.components.environments.coding import coding
 
@@ -14,7 +14,7 @@ registry = get_registry()
 
 llm: openai = registry.get('llm')
 coding_ag: llm = registry.get('coding_ag')
-input: api_input = registry.get('input')
+input: command_line = registry.get('input')
 github_api: MCPServer = registry.get('github_api')
 dev_env: coding = registry.get('dev_env')
 

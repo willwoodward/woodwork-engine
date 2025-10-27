@@ -423,18 +423,29 @@ class coding(environment, Startable):
     def find_files(self, pattern: str, path: str = "."):
         """Find files matching glob patterns."""
         container = self.docker.get_container()
-        search_path = f"{self.local_path}/{path}" if path != "." else self.local_path
-        
+        base_search_path = f"{self.local_path}/{path}" if path != "." else self.local_path
+
+        # Check for recursive pattern first
         if "**" in pattern:
-            # Recursive search
+            # Recursive search (e.g., "**/*.py" or "dir/**/file.txt")
             file_pattern = pattern.replace("**/", "")
+            search_path = base_search_path
             command = f"find {search_path} -type f -name '{file_pattern}'"
+        elif "/" in pattern:
+            # Pattern includes directory path (e.g., "woodwork/components/llms/*")
+            pattern_parts = pattern.rsplit("/", 1)
+            dir_path = pattern_parts[0]
+            file_pattern = pattern_parts[1] if len(pattern_parts) > 1 else "*"
+            search_path = f"{base_search_path}/{dir_path}"
+            command = f"find {search_path} -maxdepth 1 -type f -name '{file_pattern}'"
         else:
-            # Non-recursive search  
-            command = f"find {search_path} -maxdepth 1 -type f -name '{pattern}'"
-        
+            # Pattern is just a filename pattern (e.g., "*.py")
+            search_path = base_search_path
+            file_pattern = pattern
+            command = f"find {search_path} -maxdepth 1 -type f -name '{file_pattern}'"
+
         result = container.exec_run(f"/bin/sh -c '{command}'")
-        
+
         if result.exit_code == 0:
             files = result.output.decode("utf-8").strip().splitlines()
             # Return relative paths from repo root

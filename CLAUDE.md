@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+This repo is on github, and it is under willwoodward/woodwork-engine. Whenever you add code, follow a test driven approach,
+writing unit tests and using ruff and ty for formatting and linting.
+
 ## Development Commands
 
 ### Installation & Setup

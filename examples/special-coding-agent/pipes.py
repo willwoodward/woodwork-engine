@@ -5,7 +5,6 @@ from woodwork.types import InputReceivedPayload
 
 def add_claude_md_to_input(payload: InputReceivedPayload) -> InputReceivedPayload:
     """Pipe that adds CLAUDE.md context to input payloads."""
-    print("🔄 ADDING CLAUDE.MD CONTEXT")
     
     # Type check - this pipe only handles InputReceivedPayload
     if not isinstance(payload, InputReceivedPayload):
@@ -13,7 +12,6 @@ def add_claude_md_to_input(payload: InputReceivedPayload) -> InputReceivedPayloa
         return payload
     
     component_info = f" from {payload.component_id}" if payload.component_id else ""
-    print(f"📥 Processing input{component_info}")
     
     # Look for CLAUDE.md file
     claude_md_path = find_claude_md()

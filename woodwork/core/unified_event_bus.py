@@ -43,6 +43,9 @@ class UnifiedEventBus:
         # Tool registry (integrated)
         self._tool_schemas: Dict[str, Any] = {}
 
+        # Message bus reference (for virtual component delivery)
+        self._message_bus: Optional[Any] = None
+
         # Statistics
         self._stats = {
             "events_emitted": 0,
@@ -51,8 +54,6 @@ class UnifiedEventBus:
             "hooks_executed": 0,
             "tools_registered": 0
         }
-
-        log.debug("[UnifiedEventBus] Initialized")
 
     def register_component(self, component: Any) -> None:
         """Register component for event delivery and routing"""
@@ -69,6 +70,10 @@ class UnifiedEventBus:
                 log.warning("[UnifiedEventBus] Failed to set router on component '%s': %s", component_name, e)
 
         log.debug("[UnifiedEventBus] Registered component: %s", component_name)
+
+    def set_message_bus(self, message_bus: Any) -> None:
+        """Set message bus reference for delivering to virtual components"""
+        self._message_bus = message_bus
 
     def configure_routing(self) -> None:
         """Build routing table from component 'to' properties"""
@@ -337,7 +342,33 @@ class UnifiedEventBus:
         target_component = self._components.get(target_name)
 
         if not target_component:
-            if target_name != "_console_output":  # Skip virtual components
+            # Try to deliver via message bus component handlers (for virtual components)
+            if self._message_bus:
+                log.debug("[UnifiedEventBus] Component '%s' not in registry, trying message bus delivery", target_name)
+                try:
+                    from woodwork.core.message_bus.interface import MessageEnvelope
+                    import uuid
+
+                    envelope = MessageEnvelope(
+                        message_id=f"msg-{uuid.uuid4().hex[:12]}",
+                        session_id=getattr(payload, 'session_id', 'default'),
+                        event_type=event_type,
+                        payload=payload,
+                        sender_component=source_component,
+                        target_component=target_name
+                    )
+
+                    success = await self._message_bus.send_to_component(envelope)
+                    if success:
+                        log.debug("[UnifiedEventBus] Delivered '%s' to '%s' via message bus", event_type, target_name)
+                        return True
+                    else:
+                        log.debug("[UnifiedEventBus] Message bus delivery to '%s' returned False", target_name)
+                except Exception as e:
+                    log.error("[UnifiedEventBus] Failed to deliver via message bus to '%s': %s", target_name, e)
+
+            # Component not found and message bus delivery failed/unavailable
+            if target_name not in ["_console_output"]:  # Don't warn for known virtual components
                 log.warning("[UnifiedEventBus] Target component '%s' not found", target_name)
             return None
 
@@ -645,7 +676,6 @@ def get_global_event_bus() -> UnifiedEventBus:
 
     if _global_event_bus is None:
         _global_event_bus = UnifiedEventBus()
-        log.info("[UnifiedEventBus] Created global event bus instance")
 
     return _global_event_bus
 

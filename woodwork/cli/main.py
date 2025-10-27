@@ -119,7 +119,8 @@ def _start_async_runtime(components):
     try:
         asyncio.run(start_async_runtime())
     except KeyboardInterrupt:
-        pass
+        Console().print("[dim]✓ Shutdown complete[/dim]", highlight=False)
+        # Program will exit naturally after this
 
 
 def _start_task_master_runtime():

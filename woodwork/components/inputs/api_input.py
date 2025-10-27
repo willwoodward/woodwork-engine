@@ -1082,3 +1082,17 @@ class api_input(inputs):
             "port": self.port,
             "event_bus_stats": self.event_bus.get_stats()
         }
+
+    async def close(self):
+        """Close API input component and cleanup resources."""
+        log.debug("[api_input] Closing API input component")
+
+        # Close all websocket sessions
+        for session_id, session in list(self._websocket_sessions.items()):
+            try:
+                await session.websocket.close()
+            except Exception as e:
+                log.debug("[api_input] Error closing websocket %s: %s", session_id, e)
+
+        self._websocket_sessions.clear()
+        log.debug("[api_input] Closed all websocket sessions")
