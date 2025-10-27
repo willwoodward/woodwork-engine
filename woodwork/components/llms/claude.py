@@ -1,7 +1,9 @@
 import logging
 import multiprocessing
-from langchain_anthropic import ChatAnthropic
 import time
+
+# NOTE: import langchain_anthropic.ChatAnthropic lazily inside start()
+# to avoid import-time errors when the optional dependency isn't installed.
 
 from woodwork.components.llms.llm import llm
 from woodwork.interfaces import ParallelStartable, Startable
@@ -34,6 +36,24 @@ class claude(llm, ParallelStartable, Startable):
         time.sleep(1)
 
     def start(self, queue: multiprocessing.Queue, config: dict = {}):
+        # Import ChatAnthropic here so tests can import this module even when
+        # the optional langchain_anthropic package is not installed. Tests
+        # can monkeypatch claude.ChatAnthropic before calling start().
+        try:
+            from langchain_anthropic import ChatAnthropic
+        except Exception:
+            # If import fails, leave ChatAnthropic undefined so callers/tests
+            # can monkeypatch claude.ChatAnthropic as needed.
+            ChatAnthropic = None
+
+        if ChatAnthropic is None:
+            # Defer raising until someone actually tries to start without a
+            # patched ChatAnthropic; create a clear error message.
+            raise RuntimeError(
+                "ChatAnthropic (langchain_anthropic) is not installed. "
+                "Install the optional dependency or monkeypatch claude.ChatAnthropic in tests."
+            )
+
         self._llm_value = ChatAnthropic(
             model=self._model,
             temperature=0,
