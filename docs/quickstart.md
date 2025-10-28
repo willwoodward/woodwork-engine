@@ -6,7 +6,7 @@ index: 2
 
 # Quickstart — 2 minute path
 
-This quick guide gets you from nothing to a running Woodwork instance in a couple of minutes.
+This guide gets you from install → runnable project quickly. Keep your `main.ww` small while you learn.
 
 1. Install the package (stable release):
 
@@ -14,39 +14,52 @@ This quick guide gets you from nothing to a running Woodwork instance in a coupl
 pip install woodwork-engine
 ```
 
-2. Initialize the project (installs .ww dependencies):
+2. Create a `.env` file in your project root (copy from `.env.example`) and set required keys (example for OpenAI):
 
 ```bash
-woodwork init
+cp .env.example .env
+# then edit .env and add your key, e.g.:
+# OPENAI_API_KEY=sk-...
 ```
 
-3. Create a minimal `main.ww` in your project root. Example:
+3. Create a minimal `main.ww` in your project root. Use an LLM component (simplest path):
 
 ```
 # main.ww
 
-my_agent = agent openai {
-  model = "gpt-4"
+my_llm = llm openai {
+  model: "gpt-4"
+  api_key: "$OPENAI_API_KEY"
 }
 
-input = input.cli {}
-
-pipeline = workflow {
-  steps = [ input -> my_agent ]
+input = input command_line {
+  to: my_llm
 }
 ```
 
-4. Run Woodwork to load `main.ww` and start the CLI agent:
+Notes:
+- Property syntax in `.ww` uses colons (e.g., `model: "gpt-4"`).
+- Environment variables are referenced with `$VARNAME` in `.ww` files.
+
+4. Install runtime dependencies referenced by your config (run this after creating `main.ww`):
+
+```bash
+woodwork --init
+```
+
+5. Start Woodwork:
 
 ```bash
 woodwork
 ```
 
-You should see the agent start and the CLI prompt for input.
+You should be able to type into the command line and see responses from the configured LLM.
 
 Quick tips:
-- To work on docs or examples, clone the repo and use `pip install -e .[dev]` to install dev/test tools.
-- Run tests with `pytest` and format with `ruff format` (requires `[dev]`).
-- See `examples/` for runnable .ww files and `docs/tutorials/` for step-by-step guides.
+- Keep examples small: start with a single LLM and a command-line input.
+- For development, install editable/dev deps: `pip install -e .[dev]` and run `pytest` and `ruff format`.
+- If using a hosted LLM, ensure your `.env` is present and contains the API key referenced in your `.ww`.
 
-If something fails, check `.env.example` for required environment variables (API keys, etc.) and read `docs/getting-started.md` for more setup details.
+If something fails:
+- Confirm `.env` exists and variables match what you referenced in `main.ww`.
+- Check `examples/` for working configurations and copy the pattern.
