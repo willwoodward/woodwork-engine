@@ -6,42 +6,35 @@ index: 1
 
 # Beginner Overview
 
-Welcome to Woodwork Engine — a lightweight, modular framework for building AI agents and workflows using a declarative `.ww` configuration language.
+Welcome to Woodwork Engine — a compact, modular framework for building AI agents and workflows using a single declarative configuration file (commonly `main.ww`).
 
-This short guide gives you the essentials to get started and points to the next steps.
+This short guide focuses on what beginners actually need to know to get started.
 
-## What is Woodwork Engine?
+## What you use as a beginner
 
-- A CLI-driven tool (`woodwork`) that loads `.ww` configuration files describing components and workflows.
-- Components are modular (LLMs, knowledge bases, inputs, outputs, tools) and connected via an event system.
-- Designed to be extensible: add new components, hooks, pipes, and payload types.
+- The `woodwork` CLI to start the program and interact with configured components.
+- A configuration file (`main.ww`) that declares components (LLMs, inputs, outputs) and how they connect.
+- A `.env` file for API keys and secrets referenced from the `.ww` config.
 
-## High-level architecture
+The basic flow for newcomers is: write a simple `.ww` config, add any required environment variables in `.env`, run `woodwork --init` to install runtime dependencies referenced by the config, then start `woodwork` and interact with your components.
 
-- Parser: `woodwork/parser/config_parser.py` — reads `.ww` files and creates component instances.
-- Core/Task Master: `woodwork/core/task_master.py` — orchestrates tasks and component interactions.
-- Components: `woodwork/components/` — implementations for LLMs, KBs, agents, inputs, outputs, etc.
-- Event system: `woodwork/events/` and `woodwork/types/events.py` — typed, JSON-serializable events, hooks, and pipes.
-- Types: `woodwork/types/` — central place for payloads, prompts, and type definitions.
+## Minimal mental model
 
-## Quick mental model
+1. Declare components in `main.ww` (for example: an LLM and a command-line input).
+2. The parser reads `main.ww` and instantiates the configured components.
+3. Run `woodwork` to start the CLI and send inputs to the configured components.
 
-1. You write a `.ww` file declaring components and how they connect.
-2. The parser instantiates components and wires them into the Task Master.
-3. Events flow between components (hooks for logging, pipes for transforms).
-4. Agents and tools call actions; the event system ensures typed payloads and attribution.
+Note: internal orchestration details (internal modules/classes) may change over time — beginners do not need to understand those internals to use the tool.
 
 ## Recommended next steps
 
-1. Read docs/getting-started.md for installation and basic usage.
-2. Try an example `.ww` from `examples/` to see components wired together.
-3. Read docs/tutorials/first-project.md (coming) for a minimal hands-on walkthrough.
-4. Explore `woodwork/components/` and `woodwork/types/` to learn extension points.
+1. Read docs/quickstart.md for a short install → run path.
+2. Start with a single LLM and a command-line input in `main.ww`.
+3. Explore `examples/` for working configurations you can copy.
 
 ## Where to contribute
 
-- Add beginner-friendly tutorials in `docs/tutorials/` (short, runnable examples).
-- Improve docs/quickstart.md with a 2–3 minute path from install → run.
-- Add more explicit examples for common components under `examples/`.
+- Add short, runnable tutorials to `docs/tutorials/`.
+- Improve quickstart examples and `.ww` snippets to reduce friction for newcomers.
 
-Thanks for helping make Woodwork Engine easier for beginners — small, clear docs make a big difference!
+Thanks for improving the experience for new users — keeping docs short and focused helps people get productive faster.
