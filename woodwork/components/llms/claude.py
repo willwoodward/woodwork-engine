@@ -2,13 +2,12 @@ import logging
 import multiprocessing
 import time
 
-# Expose ChatAnthropic at module level so tests can monkeypatch it.
-# The actual import is attempted inside start() if the module-level
-# variable remains None.
-ChatAnthropic = None
-
-# NOTE: import langchain_anthropic.ChatAnthropic lazily inside start()
-# to avoid import-time errors when the optional dependency isn't installed.
+# Try to import the optional langchain_anthropic.ChatAnthropic at module import
+# time so tests may monkeypatch claude.ChatAnthropic more predictably.
+try:
+    from langchain_anthropic import ChatAnthropic
+except ImportError:
+    ChatAnthropic = None
 
 from woodwork.components.llms.llm import llm
 from woodwork.interfaces import ParallelStartable, Startable
@@ -46,19 +45,8 @@ class claude(llm, ParallelStartable, Startable):
         time.sleep(1)
 
     def start(self, queue: multiprocessing.Queue, config: dict = {}):
-        # Prefer the module-level ChatAnthropic (allows tests to monkeypatch).
-        global ChatAnthropic
+        # Use the module-level ChatAnthropic, which tests can monkeypatch.
         if ChatAnthropic is None:
-            try:
-                from langchain_anthropic import ChatAnthropic as _ImportedChatAnthropic
-                ChatAnthropic = _ImportedChatAnthropic
-            except Exception:
-                # Keep ChatAnthropic as None if import fails; we'll raise below.
-                ChatAnthropic = None
-
-        if ChatAnthropic is None:
-            # Defer raising until someone actually tries to start without a
-            # patched ChatAnthropic; create a clear error message.
             raise RuntimeError(
                 "ChatAnthropic (langchain_anthropic) is not installed. "
                 "Install the optional dependency or monkeypatch claude.ChatAnthropic in tests."

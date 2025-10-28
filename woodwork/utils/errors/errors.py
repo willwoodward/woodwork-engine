@@ -1,8 +1,7 @@
 try:
     from colorama import Fore, Style
-except Exception:
-    # Provide fallback no-op color constants when colorama isn't installed so
-    # tests and environments without color support can still import this module.
+except ImportError:
+    # Provide no-op color constants when colorama isn't installed so imports won't fail
     class _NoColor:
         RED = ""
         CYAN = ""

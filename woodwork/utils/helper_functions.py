@@ -2,8 +2,6 @@ import importlib
 import importlib.resources as pkg_resources
 import os
 import logging
-# tomli is optional; prefer it if available, otherwise fall back to stdlib tomllib when needed
-# We avoid importing it at module import time to keep optional deps optional
 import inspect
 import asyncio
 
@@ -11,6 +9,19 @@ from woodwork.utils.errors import WoodworkError
 from woodwork.globals import global_config as config
 
 log = logging.getLogger(__name__)
+
+# Determine which TOML parser is available at import time so callers and tests
+# have predictable behavior. Prefer the third-party 'tomli' backport when
+# available (works on older Python versions), otherwise use the stdlib
+# 'tomllib' (Python 3.11+). If neither is available, _tomllib will be None and
+# get_version_from_pyproject will raise a clear error.
+try:
+    import tomli as _tomllib  # type: ignore
+except ImportError:
+    try:
+        import tomllib as _tomllib  # type: ignore
+    except ImportError:
+        _tomllib = None
 
 
 def set_globals(**kwargs) -> None:
@@ -83,19 +94,11 @@ def get_version_from_pyproject(pyproject_path="pyproject.toml") -> str:
     """
     Get the version from the pyproject.toml file.
 
-    This tries to use tomli if available (backport third-party), otherwise falls back to
-    the stdlib tomllib (Python 3.11+). We import lazily to avoid requiring optional deps
-    at module import time.
+    Uses the TOML parser determined at import time (tomli or tomllib). Raises a
+    clear RuntimeError if no TOML parser is available.
     """
-    try:
-        # Prefer third-party tomli if installed
-        import tomli as _tomllib
-    except Exception:
-        try:
-            # Fallback to stdlib tomllib (Python 3.11+)
-            import tomllib as _tomllib
-        except Exception:
-            raise RuntimeError("Neither 'tomli' nor 'tomllib' is available to parse pyproject.toml")
+    if _tomllib is None:
+        raise RuntimeError("Neither 'tomli' nor 'tomllib' is available to parse pyproject.toml")
 
     with open(pyproject_path, "rb") as f:
         data = _tomllib.load(f)
@@ -115,6 +118,7 @@ def get_prompt(path: str) -> str:
     with open(path) as f:
         prompt = f.read()
     return prompt
+
 
 def sync_async(func, *args, **kwargs):
     """
@@ -140,7 +144,7 @@ def sync_async(func, *args, **kwargs):
             return loop.create_task(func(*args, **kwargs))
     else:
         return func(*args, **kwargs)
-    
+
 
 async def maybe_async(func, *args, **kwargs):
     """Helper to call either sync or async functions properly"""
