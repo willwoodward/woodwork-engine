@@ -3,8 +3,6 @@
 from woodwork.components.llms.openai import openai
 from woodwork.components.agents.llm import llm
 from woodwork.components.inputs.command_line import command_line
-from woodwork.components.mcp.mcp_server import MCPServer
-from woodwork.components.environments.coding import coding
 
 from woodwork.registry import get_registry
 from woodwork.config_parser import main_function
@@ -12,10 +10,8 @@ from woodwork.config_parser import main_function
 main_function()
 registry = get_registry()
 
-llm: openai = registry.get('llm')
-coding_ag: llm = registry.get('coding_ag')
+model: openai = registry.get('model')
+billing_agent: llm = registry.get('billing_agent')
 input: command_line = registry.get('input')
-github_api: MCPServer = registry.get('github_api')
-dev_env: coding = registry.get('dev_env')
 
-__all__ = ['llm', 'coding_ag', 'input', 'github_api', 'dev_env']
+__all__ = ['model', 'billing_agent', 'input']

@@ -11,6 +11,7 @@ logs/
 
 # Local .ww Schemas at root
 *.ww
+hidden-*/
 
 # Local one-off testing scripts
 *ignore.py

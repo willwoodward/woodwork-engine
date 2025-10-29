@@ -5,14 +5,21 @@ from woodwork.types import InputReceivedPayload
 
 def add_claude_md_to_input(payload: InputReceivedPayload) -> InputReceivedPayload:
     """Pipe that adds CLAUDE.md context to input payloads."""
-    
+
     # Type check - this pipe only handles InputReceivedPayload
     if not isinstance(payload, InputReceivedPayload):
         print(f"⚠️  Expected InputReceivedPayload, got {type(payload)}")
         return payload
-    
+
+    # Check if this is a continuing session - if so, skip adding CLAUDE.md
+    # (it's already in the session context from the first turn)
+    session = payload.inputs.get("_session") if payload.inputs else None
+    if session and len(session.conversation_history) > 0:
+        print("ℹ️  Skipping CLAUDE.md (already in session context)")
+        return payload
+
     component_info = f" from {payload.component_id}" if payload.component_id else ""
-    
+
     # Look for CLAUDE.md file
     claude_md_path = find_claude_md()
     

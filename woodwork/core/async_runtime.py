@@ -11,6 +11,7 @@ import time
 from typing import Dict, Any, List, Optional
 
 from woodwork.core.unified_event_bus import UnifiedEventBus, get_global_event_bus
+from woodwork.core.session import ConversationSession
 from woodwork.types import InputReceivedPayload
 
 log = logging.getLogger(__name__)
@@ -30,8 +31,16 @@ class AsyncRuntime:
         self.config: Dict[str, Any] = {}
         self._running = False
         self._api_server_task: Optional[asyncio.Task] = None
+        self._sessions: Dict[str, "ConversationSession"] = {}
 
         log.debug("[AsyncRuntime] Initialized")
+
+    def _get_or_create_session(self, session_id: str) -> ConversationSession:
+        """Get existing session or create new one"""
+        if session_id not in self._sessions:
+            self._sessions[session_id] = ConversationSession(id=session_id)
+            log.debug("[AsyncRuntime] Created new session: %s", session_id)
+        return self._sessions[session_id]
 
     async def start(self, config: Dict[str, Any]) -> None:
         """
@@ -233,16 +242,24 @@ class AsyncRuntime:
             log.warning("[AsyncRuntime] No input component found")
             return
 
+        # Get or create session for CLI
+        session_id = "cli_session"
+        session = self._get_or_create_session(session_id)
+        log.info("[AsyncRuntime] Using session: %s", session_id)
+
         try:
             while self._running:
-                # Get input (this should be async or made async)
+                # Get input
                 user_input = await self._get_user_input(input_component)
 
                 if user_input in ["exit", ";"]:
                     break
 
-                # Process input through event system
-                await self.process_user_input(user_input, input_component.name)
+                # Track user input in session
+                session.add_turn("user", user_input)
+
+                # Process input through event system with session
+                await self.process_user_input(user_input, input_component.name, session)
 
         except KeyboardInterrupt:
             log.info("[AsyncRuntime] Input loop interrupted")
@@ -268,15 +285,19 @@ class AsyncRuntime:
             log.error("[AsyncRuntime] Error getting user input: %s", e)
             return ""
 
-    async def process_user_input(self, user_input: str, source_component: str) -> None:
+    async def process_user_input(self, user_input: str, source_component: str, session: Optional[ConversationSession] = None) -> None:
         """Process user input through unified event system"""
         log.debug("[AsyncRuntime] Processing user input: %s", user_input[:100])
 
-        # Create input payload
+        # Create input payload with session info
+        inputs = {}
+        if session:
+            inputs["_session"] = session
+
         payload = InputReceivedPayload(
             input=user_input,
-            inputs={},
-            session_id="default_session",
+            inputs=inputs,
+            session_id=session.id if session else "default_session",
             component_id=source_component,
             component_type="inputs"
         )
