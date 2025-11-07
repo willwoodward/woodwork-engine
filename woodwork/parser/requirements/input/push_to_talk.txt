@@ -1,5 +1,2 @@
-vosk
-numpy
-openai
 sounddevice
 webrtcvad

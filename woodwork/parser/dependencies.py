@@ -1,7 +1,6 @@
 import importlib.resources as pkg_resources
 import logging
 import os
-import re
 import subprocess
 import sys
 
@@ -86,29 +85,41 @@ def activate_virtual_environment():
 
 
 def get_components() -> list[tuple[str, str]]:
+    """Extract components from main.ww file.
+
+    Uses the shared parsing logic from config_parser to ensure consistency.
+
+    Returns:
+        List of (component, type) tuples. Example: [('llm', 'openai'), ('input', 'keyword_voice')]
+    """
+    from woodwork.parser.config_parser import get_declarations, parse_component_declaration
+
     components = set()
     with open(os.getcwd() + "/main.ww", "r") as f:
         lines = f.read()
 
-        entry_pattern = r".+=.+\{[\s\S]*?\}"
-        entries = re.findall(entry_pattern, lines)
+        # Use the same declaration extraction as the main parser
+        entries = get_declarations(lines)
 
-        for entry in entries:
-            component = entry.split("=")[1].split(" ")[1].strip()
-            type = entry.split(component)[1].split("{")[0].strip()
-            components.add((component, type))
+        for entry, line_number in entries:
+            variable, component, type_name = parse_component_declaration(entry)
+            components.add((component, type_name))
 
     return list(components)
 
 
 def parse_requirements_file(requirements_set, file_path):
     if os.path.isfile(file_path):
+        log.debug(f"Found requirements file: {file_path}")
         with open(file_path, "r") as f:
             for line in f:
                 # Remove any comments or empty lines
                 cleaned_line = line.strip()
                 if cleaned_line and not cleaned_line.startswith("#"):
                     requirements_set.add(cleaned_line)
+                    log.debug(f"  Added requirement: {cleaned_line}")
+    else:
+        log.debug(f"Requirements file not found: {file_path}")
 
 
 def get_requirements(components: list, temp_requirements_file: str):
@@ -117,8 +128,11 @@ def get_requirements(components: list, temp_requirements_file: str):
     # Install dependencies
     # Dependencies stored in requirements/{component}/{type}
     for component, type in components:
+        log.debug(f"Processing component: {component}, type: {type}")
+
         # Access the requirements directory as a package resource
         component_requirements = os.path.join(REQUIREMENTS_DIR, component, f"{component}.txt")
+        log.debug(f"Looking for component requirements: {component_requirements}")
         try:
             parse_requirements_file(requirements_set, component_requirements)
         except subprocess.CalledProcessError:
@@ -126,10 +140,13 @@ def get_requirements(components: list, temp_requirements_file: str):
 
         # Install the component type dependencies
         type_requirements = os.path.join(REQUIREMENTS_DIR, component, f"{type}.txt")
+        log.debug(f"Looking for type requirements: {type_requirements}")
         try:
             parse_requirements_file(requirements_set, type_requirements)
         except subprocess.CalledProcessError:
             sys.exit(1)
+
+    log.debug(f"Collected requirements: {sorted(requirements_set)}")
 
     # Write combined unique requirements to a temporary file
     with open(temp_requirements_file, "w") as f:
@@ -169,12 +186,13 @@ def init(options={"isolated": False, "all": False}):
         get_all_requirements(REQUIREMENTS_DIR, temp_requirements_file)
     else:
         components = get_components()
+        console.print(f"Detected components: {components}", style="dim", highlight=False)
         get_requirements(components, temp_requirements_file)
 
     # Install requirements from temporary file
     try:
         subprocess.check_call(
-            [f". {activate_script} && uv pip install -r {temp_requirements_file} --quiet"],
+            [f". {activate_script} && uv pip install -r {temp_requirements_file}"],
             shell=True,
         )
         console.print("Installed all combined dependencies.", style="dim", highlight=False)

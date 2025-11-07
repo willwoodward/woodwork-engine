@@ -372,9 +372,9 @@ class UnifiedEventBus:
                 log.warning("[UnifiedEventBus] Target component '%s' not found", target_name)
             return None
 
-        # Only deliver input.received events to component input methods
+        # Only deliver input.received and agent.response events to component input methods
         # Other events are processed by hooks/pipes but not delivered as input
-        if event_type != "input.received":
+        if event_type not in ["input.received", "agent.response"]:
             log.debug("[UnifiedEventBus] Skipping delivery of '%s' to component '%s' (not an input event)",
                      event_type, target_name)
             return None
@@ -387,10 +387,22 @@ class UnifiedEventBus:
         try:
             log.debug("[UnifiedEventBus] Delivering '%s' to component '%s'", event_type, target_name)
 
-            # Prepare input data for input.received events
-            if hasattr(payload, 'input'):
-                input_data = payload.input
-                inputs_dict = getattr(payload, 'inputs', {})
+            # Prepare input data based on event type
+            if event_type == "input.received":
+                # For input.received events, extract input field
+                if hasattr(payload, 'input'):
+                    input_data = payload.input
+                    inputs_dict = getattr(payload, 'inputs', {})
+                else:
+                    input_data = payload
+                    inputs_dict = {}
+            elif event_type == "agent.response":
+                # For agent.response events, extract response from data
+                if hasattr(payload, 'data') and isinstance(payload.data, dict):
+                    input_data = payload.data.get('response', str(payload))
+                else:
+                    input_data = str(payload)
+                inputs_dict = {}
             else:
                 input_data = payload
                 inputs_dict = {}

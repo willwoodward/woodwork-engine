@@ -368,6 +368,27 @@ def extract_nested_dict(key: str, text: str) -> str:
     return ""  # Return empty string if no complete dictionary is found
 
 
+def parse_component_declaration(entry: str) -> tuple[str, str, str]:
+    """Parse a component declaration into variable, component, and type.
+
+    Args:
+        entry: Component declaration string (e.g., "model = llm openai { ... }")
+
+    Returns:
+        Tuple of (variable_name, component_type, specific_type)
+        Example: ("model", "llm", "openai")
+    """
+    # Match: variable = component type {
+    pattern = r"(\w+)\s*=\s*(\w+)\s+(\w+)\s*\{"
+    match = re.match(pattern, entry)
+
+    if not match:
+        raise ValueError(f"Invalid component declaration format: {entry[:50]}...")
+
+    variable, component, type_name = match.groups()
+    return variable, component, type_name
+
+
 def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
     config_items = list(
         map(
@@ -618,10 +639,8 @@ def parse(config: str, registry=None) -> dict:
 
     for entry, line_number in entries:
         command = {}
-        # Replace these with some fancy regex
-        command["variable"] = entry.split("=")[0].strip()
-        command["component"] = entry.split("=")[1].split(" ")[1].strip()
-        command["type"] = entry.split("=")[1].split(command["component"])[1].split("{")[0].strip()
+        # Parse component declaration using shared function
+        command["variable"], command["component"], command["type"] = parse_component_declaration(entry)
 
         if command["variable"].lower() == "true" or command["variable"].lower() == "false":
             raise ForbiddenVariableNameError(

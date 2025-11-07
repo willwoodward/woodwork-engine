@@ -30,6 +30,7 @@ class push_to_talk(inputs):
             pass
 
     def input_function(self):
+        print("\n[Press Enter to start recording]")
         input()
         return self._handle_voice_command()
 
@@ -81,10 +82,10 @@ class push_to_talk(inputs):
     def _transcribe_audio(self, filepath):
         client = openai.OpenAI(api_key=self._api_key)
 
-        log.debug("Transcribing with Whisper...")
+        print("Transcribing with Whisper...")
         with open(filepath, "rb") as f:
             transcript = client.audio.transcriptions.create(model="whisper-1", file=f)
-        log.debug(f"Transcribed: {transcript.text}")
+        print(f"You said: {transcript.text}")
         return transcript.text
 
     def _handle_voice_command(self):
