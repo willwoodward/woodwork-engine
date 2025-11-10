@@ -4,22 +4,23 @@ import pytest
 import asyncio
 import logging
 from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any
 
 # Import fixtures from our test modules
 from tests.unit.fixtures.mock_components import (
-    MockComponent, MockAgent, MockTool, MockOutput, MockMessageBus, MockStream,
-    create_test_components, create_mock_router
+    MockComponent,
+    MockAgent,
+    MockTool,
+    MockOutput,
+    MockMessageBus,
+    MockStream,
+    create_test_components,
+    create_mock_router,
 )
-from tests.unit.fixtures.test_messages import (
-    MockMessageEnvelope, create_component_message, create_response_message, create_hook_message
-)
-from tests.unit.fixtures.event_fixtures import (
-    MockEventManager, MockPayload, create_test_event_data, create_mock_hooks, create_mock_pipes
-)
+from tests.unit.fixtures.test_messages import create_component_message, create_response_message, create_hook_message
+from tests.unit.fixtures.event_fixtures import MockPayload, create_test_event_data, create_mock_hooks, create_mock_pipes
 
 # Configure logging for tests
-logging.basicConfig(level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format="%(name)s - %(levelname)s - %(message)s")
 
 
 @pytest.fixture(scope="session")
@@ -33,7 +34,7 @@ def event_loop():
 @pytest.fixture
 def mock_time():
     """Mock time.time() to return predictable values."""
-    with patch('time.time', return_value=1000.0):
+    with patch("time.time", return_value=1000.0):
         yield 1000.0
 
 
@@ -49,7 +50,7 @@ def deterministic_uuid():
         mock_obj.hex = f"test_uuid_{counter:04d}"
         return mock_obj
 
-    with patch('uuid.uuid4', side_effect=mock_uuid):
+    with patch("uuid.uuid4", side_effect=mock_uuid):
         yield
 
 
@@ -102,6 +103,7 @@ def real_message_bus():
     """Create a real InMemoryMessageBus for integration tests."""
     try:
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+
         bus = InMemoryMessageBus()
         bus.start()
         yield bus
@@ -115,6 +117,7 @@ def real_router(real_message_bus):
     """Create a real DeclarativeRouter for integration tests."""
     try:
         from woodwork.core.unified_event_bus import UnifiedEventBus
+
         return UnifiedEventBus(real_message_bus)
     except ImportError:
         return create_mock_router(real_message_bus)
@@ -124,32 +127,21 @@ def real_router(real_message_bus):
 @pytest.fixture
 def test_message():
     """Create a test message envelope."""
-    return create_component_message(
-        source="test_source",
-        target="test_target",
-        data={"action": "test", "inputs": {}}
-    )
+    return create_component_message(source="test_source", target="test_target", data={"action": "test", "inputs": {}})
 
 
 @pytest.fixture
 def response_message():
     """Create a test response message."""
     return create_response_message(
-        source="test_tool",
-        target="test_agent",
-        result="test_result",
-        request_id="test_request_123"
+        source="test_tool", target="test_agent", result="test_result", request_id="test_request_123"
     )
 
 
 @pytest.fixture
 def hook_message():
     """Create a test hook message."""
-    return create_hook_message(
-        event_type="agent.thought",
-        data={"thought": "test thought"},
-        source="test_agent"
-    )
+    return create_hook_message(event_type="agent.thought", data={"thought": "test thought"}, source="test_agent")
 
 
 # Streaming Fixtures
@@ -196,7 +188,7 @@ def streaming_component():
 @pytest.fixture
 def mock_event_manager():
     """Create a mock event manager."""
-    return MockUnifiedEventBus()
+    return Mock()
 
 
 @pytest.fixture
@@ -228,9 +220,10 @@ def real_event_manager():
     """Create a real event manager if available."""
     try:
         from woodwork.events import create_default_emitter
+
         return create_default_emitter()
     except ImportError:
-        return MockUnifiedEventBus()
+        return Mock()
 
 
 # Integration Test Fixtures
@@ -252,17 +245,11 @@ async def full_system():
 
         # Configure routing
         component_configs = {
-            name: {"object": component, "component": component.component}
-            for name, component in components.items()
+            name: {"object": component, "component": component.component} for name, component in components.items()
         }
         router.configure_from_components(component_configs)
 
-        yield {
-            "message_bus": message_bus,
-            "router": router,
-            "components": components,
-            "event_manager": MockUnifiedEventBus()
-        }
+        yield {"message_bus": message_bus, "router": router, "components": components, "event_manager": Mock()}
 
         # Cleanup
         message_bus.stop()
@@ -272,7 +259,7 @@ async def full_system():
             "message_bus": MockMessageBus(),
             "router": create_mock_router(),
             "components": create_test_components(),
-            "event_manager": MockUnifiedEventBus()
+            "event_manager": Mock(),
         }
 
 
@@ -292,7 +279,7 @@ def benchmark_data():
     return {
         "small_payload": {"size": "small", "data": "x" * 100},
         "medium_payload": {"size": "medium", "data": "x" * 10000},
-        "large_payload": {"size": "large", "data": "x" * 1000000}
+        "large_payload": {"size": "large", "data": "x" * 1000000},
     }
 
 
@@ -347,18 +334,10 @@ def async_test_timeout():
 # Test Markers
 def pytest_configure(config):
     """Configure custom test markers."""
-    config.addinivalue_line(
-        "markers", "unit: mark test as unit test"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test"
-    )
-    config.addinivalue_line(
-        "markers", "performance: mark test as performance test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
+    config.addinivalue_line("markers", "unit: mark test as unit test")
+    config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "performance: mark test as performance test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
 
 
 # Test Collection Configuration
@@ -391,6 +370,7 @@ def cleanup_after_test():
 @pytest.fixture
 def message_factory():
     """Factory for creating test messages."""
+
     def _create_message(source="default_source", target="default_target", **kwargs):
         return create_component_message(source=source, target=target, **kwargs)
 
@@ -400,6 +380,7 @@ def message_factory():
 @pytest.fixture
 def component_factory():
     """Factory for creating test components."""
+
     def _create_component(name="default_component", component_type="test", **kwargs):
         return MockComponent(name, component_type, **kwargs)
 
@@ -415,7 +396,7 @@ def error_conditions():
         "timeout_error": TimeoutError("Operation timed out"),
         "invalid_data": ValueError("Invalid data format"),
         "permission_error": PermissionError("Access denied"),
-        "resource_error": OSError("Resource not available")
+        "resource_error": OSError("Resource not available"),
     }
 
 
@@ -423,16 +404,14 @@ def error_conditions():
 @pytest.fixture
 def patch_time():
     """Patch time-related functions for deterministic tests."""
-    with patch('time.time', return_value=1000.0), \
-         patch('time.sleep'), \
-         patch('asyncio.sleep', new_callable=AsyncMock):
+    with patch("time.time", return_value=1000.0), patch("time.sleep"), patch("asyncio.sleep", new_callable=AsyncMock):
         yield
 
 
 @pytest.fixture
 def patch_uuid():
     """Patch UUID generation for deterministic tests."""
-    with patch('uuid.uuid4') as mock_uuid:
+    with patch("uuid.uuid4") as mock_uuid:
         mock_uuid.return_value.hex = "deterministic_uuid_1234"
         yield mock_uuid
 

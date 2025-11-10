@@ -1,9 +1,9 @@
 """
 Test AsyncRuntime session management
 """
+
 import pytest
 from woodwork.core.async_runtime import AsyncRuntime
-from woodwork.core.session import ConversationSession
 
 
 @pytest.mark.asyncio

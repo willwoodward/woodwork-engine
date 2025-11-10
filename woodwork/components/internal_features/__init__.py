@@ -6,4 +6,4 @@ from .base import InternalFeature, InternalComponentManager, InternalFeatureRegi
 # Import features to trigger registration
 from .workflows import WorkflowsFeature
 
-__all__ = ['InternalFeature', 'InternalComponentManager', 'InternalFeatureRegistry', 'WorkflowsFeature']
+__all__ = ["InternalFeature", "InternalComponentManager", "InternalFeatureRegistry", "WorkflowsFeature"]

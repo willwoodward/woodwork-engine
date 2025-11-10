@@ -14,10 +14,12 @@ Features:
 
 import logging
 import json
-from typing import Dict, List, Tuple, Callable, Any, Optional
-from dataclasses import replace
+from typing import Dict, List, Tuple, Callable, Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from woodwork.components.component import component
+
 from woodwork.types.events import AgentActionPayload, AgentStepCompletePayload, InputReceivedPayload
-from woodwork.types.workflows import Action
 from .base import InternalFeature
 from .workflow_executor import WorkflowExecutor
 from .workflow_variable_extraction import extract_variables_from_prompt
@@ -48,19 +50,19 @@ class WorkflowsFeature(InternalFeature):
                     "uri": "bolt://localhost:7687",
                     "user": "neo4j",
                     "password": "testpassword",
-                    "name": "workflows_db"
+                    "name": "workflows_db",
                 },
-                "optional": False
+                "optional": False,
             }
         ]
 
-    def _setup_feature(self, component: 'component', config: Dict, component_manager) -> None:
+    def _setup_feature(self, component: "component", config: Dict, component_manager) -> None:
         """Initialize workflows with auto-created Neo4j component."""
         log.debug(f"Setting up WorkflowsFeature for component: {component.name}")
         self._component_ref = component
 
         # Store reference to LLM for variable extraction
-        if hasattr(component, '_llm'):
+        if hasattr(component, "_llm"):
             self._llm = component._llm
             log.debug("WorkflowsFeature will use LLM for variable extraction")
 
@@ -75,29 +77,23 @@ class WorkflowsFeature(InternalFeature):
             "user": config.get("workflows_user", "neo4j"),
             "password": config.get("workflows_password", "testpassword"),
             "name": f"{component.name}_workflows",
-            "api_key": api_key
+            "api_key": api_key,
         }
 
         log.debug(f"Creating Neo4j component with config: {neo4j_config}")
         self._neo4j_component = component_manager.get_or_create_component(
-            component_id=f"{component.name}_workflows_neo4j",
-            component_type="neo4j",
-            config=neo4j_config
+            component_id=f"{component.name}_workflows_neo4j", component_type="neo4j", config=neo4j_config
         )
 
         # Initialize vector indices for similarity search
         try:
             # Index for prompts
             self._neo4j_component.init_vector_index(
-                index_name="prompt_embeddings",
-                label="Prompt",
-                property="embedding"
+                index_name="prompt_embeddings", label="Prompt", property="embedding"
             )
             # Index for actions
             self._neo4j_component.init_vector_index(
-                index_name="action_embeddings",
-                label="Action",
-                property="embedding"
+                index_name="action_embeddings", label="Action", property="embedding"
             )
             log.debug("Vector indices initialized successfully")
         except Exception as e:
@@ -130,7 +126,7 @@ class WorkflowsFeature(InternalFeature):
                 "CREATE INDEX action_tool IF NOT EXISTS FOR (a:Action) ON (a.tool)",
                 "CREATE INDEX workflow_status IF NOT EXISTS FOR (w:Workflow) ON (w.status)",
                 "CREATE INDEX workflow_source IF NOT EXISTS FOR (w:Workflow) ON (w.source)",
-                "CREATE INDEX entrypoint_name_idx IF NOT EXISTS FOR (e:Entrypoint) ON (e.name)"
+                "CREATE INDEX entrypoint_name_idx IF NOT EXISTS FOR (e:Entrypoint) ON (e.name)",
             ]
 
             for query in schema_queries:
@@ -144,15 +140,15 @@ class WorkflowsFeature(InternalFeature):
         except Exception as e:
             log.warning(f"Failed to initialize graph schema: {e}")
 
-    def teardown(self, component: 'component', component_manager) -> None:
+    def teardown(self, component: "component", component_manager) -> None:
         """Clean up workflows (component manager handles Neo4j cleanup)."""
         log.debug(f"Tearing down WorkflowsFeature for component: {component.name}")
 
         # Remove references from component
-        if hasattr(component, '_workflows_db'):
-            delattr(component, '_workflows_db')
-        if hasattr(component, '_workflows_mode'):
-            delattr(component, '_workflows_mode')
+        if hasattr(component, "_workflows_db"):
+            delattr(component, "_workflows_db")
+        if hasattr(component, "_workflows_mode"):
+            delattr(component, "_workflows_mode")
 
         # Component manager will handle actual Neo4j component cleanup
         self._neo4j_component = None
@@ -173,34 +169,34 @@ class WorkflowsFeature(InternalFeature):
 
     def get_pipes(self) -> List[Tuple[str, Callable]]:
         """Return workflow-related pipes."""
-        return [
-            ("input.received", self._check_similar_workflows_pipe)
-        ]
+        return [("input.received", self._check_similar_workflows_pipe)]
 
     def get_tools(self) -> List[Dict[str, Any]]:
         """Return similar workflows as tools in the standard format."""
         tools = []
 
         for ctx in self._similar_workflows:
-            workflow_name = ctx.get('name', f"Workflow {ctx['workflow_id'][:8]}")
-            parameterized = ctx.get('parameterized_prompt', '')
-            input_vars = ctx.get('input_variables', {})
-            actions = ctx.get('actions', [])
+            workflow_name = ctx.get("name", f"Workflow {ctx['workflow_id'][:8]}")
+            parameterized = ctx.get("parameterized_prompt", "")
+            input_vars = ctx.get("input_variables", {})
+            actions = ctx.get("actions", [])
 
             # Build description - escape ALL curly braces for LangChain template compatibility
             description_parts = []
 
             # CRITICAL: Make it clear to use tool type 'workflow', not the workflow name
-            description_parts.append(f"IMPORTANT: Use tool='workflow' (the type), NOT tool='{workflow_name}' (the name)")
+            description_parts.append(
+                f"IMPORTANT: Use tool='workflow' (the type), NOT tool='{workflow_name}' (the name)"
+            )
             description_parts.append(f"Similarity: {ctx['similarity']:.0%}")
 
             if parameterized:
                 # Escape curly braces for LangChain template compatibility
-                escaped_parameterized = parameterized.replace('{', '{{').replace('}', '}}')
+                escaped_parameterized = parameterized.replace("{", "{{").replace("}", "}}")
                 description_parts.append(f"Template: {escaped_parameterized}")
 
                 # Escape curly braces in JSON string
-                json_str = json.dumps(input_vars).replace('{', '{{').replace('}', '}}')
+                json_str = json.dumps(input_vars).replace("{", "{{").replace("}", "}}")
                 description_parts.append(f"Variables: {json_str}")
 
             # Show action steps
@@ -208,21 +204,19 @@ class WorkflowsFeature(InternalFeature):
                 description_parts.append("Steps:")
                 for j, action in enumerate(actions[:3], 1):
                     # Escape curly braces in action content
-                    action_tool = str(action.get('tool', '')).replace('{', '{{').replace('}', '}}')
-                    action_action = str(action.get('action', '')).replace('{', '{{').replace('}', '}}')
+                    action_tool = str(action.get("tool", "")).replace("{", "{{").replace("}", "}}")
+                    action_action = str(action.get("action", "")).replace("{", "{{").replace("}", "}}")
                     description_parts.append(f"  {j}. {action_tool}.{action_action}()")
                 if len(actions) > 3:
                     description_parts.append(f"  ... and {len(actions) - 3} more steps")
 
             # Escape curly braces in the execution example too
-            json_str = json.dumps(input_vars).replace('{', '{{').replace('}', '}}')
-            description_parts.append(f"\nCorrect usage: {{\"tool\": \"workflow\", \"action\": \"{workflow_name}\", \"inputs\": {json_str}}}")
+            json_str = json.dumps(input_vars).replace("{", "{{").replace("}", "}}")
+            description_parts.append(
+                f'\nCorrect usage: {{"tool": "workflow", "action": "{workflow_name}", "inputs": {json_str}}}'
+            )
 
-            tools.append({
-                'name': workflow_name,
-                'type': 'workflow',
-                'description': '\n'.join(description_parts)
-            })
+            tools.append({"name": workflow_name, "type": "workflow", "description": "\n".join(description_parts)})
 
         return tools
 
@@ -266,17 +260,15 @@ class WorkflowsFeature(InternalFeature):
             raise ValueError("Workflow executor not initialized")
 
         # Get current session ID from component ref
-        session_id = getattr(self._component_ref, 'session_id', 'default')
+        session_id = getattr(self._component_ref, "session_id", "default")
 
         log.info(f"Agent executing workflow {workflow_id} with inputs: {inputs}")
 
-        return await self._workflow_executor.execute_workflow(
-            workflow_id, inputs, session_id
-        )
+        return await self._workflow_executor.execute_workflow(workflow_id, inputs, session_id)
 
     def _extract_api_key(self, component) -> str:
         """Extract API key from component's model."""
-        if hasattr(component, 'model') and hasattr(component.model, '_api_key'):
+        if hasattr(component, "model") and hasattr(component.model, "_api_key"):
             return component.model._api_key
         return None
 
@@ -292,13 +284,10 @@ class WorkflowsFeature(InternalFeature):
 
         try:
             # Extract variables from the prompt for reusable workflows (using LLM if available)
-            parameterized_prompt, variables, schema = extract_variables_from_prompt(
-                payload.input,
-                llm=self._llm
-            )
+            parameterized_prompt, variables, schema = extract_variables_from_prompt(payload.input, llm=self._llm)
 
             # Store variable information in payload for later use
-            if hasattr(payload, '__dict__'):
+            if hasattr(payload, "__dict__"):
                 payload.parameterized_prompt = parameterized_prompt
                 payload.workflow_variables = variables
                 payload.variable_schema = schema
@@ -307,9 +296,7 @@ class WorkflowsFeature(InternalFeature):
 
             # Search for similar prompts (returns top 10, we'll take top 3)
             try:
-                similar_prompts = self._neo4j_component.similarity_search(
-                    payload.input, "Prompt", "text"
-                )
+                similar_prompts = self._neo4j_component.similarity_search(payload.input, "Prompt", "text")
                 # Limit to top 3 results
                 if similar_prompts and len(similar_prompts) > 3:
                     similar_prompts = similar_prompts[:3]
@@ -330,16 +317,18 @@ class WorkflowsFeature(InternalFeature):
                         workflow_data = self._get_workflow_detail(match.get("nodeID"))
 
                         if workflow_data:
-                            workflow_contexts.append({
-                                'rank': i,
-                                'similarity': similarity_score,
-                                'workflow_id': workflow_data.get('workflow_id'),
-                                'name': workflow_data.get('name', f'Workflow {i}'),
-                                'description': workflow_data.get('description', ''),
-                                'actions': workflow_data.get('actions', []),
-                                'parameterized_prompt': workflow_data.get('parameterized_prompt', ''),
-                                'input_variables': workflow_data.get('input_variables', {})
-                            })
+                            workflow_contexts.append(
+                                {
+                                    "rank": i,
+                                    "similarity": similarity_score,
+                                    "workflow_id": workflow_data.get("workflow_id"),
+                                    "name": workflow_data.get("name", f"Workflow {i}"),
+                                    "description": workflow_data.get("description", ""),
+                                    "actions": workflow_data.get("actions", []),
+                                    "parameterized_prompt": workflow_data.get("parameterized_prompt", ""),
+                                    "input_variables": workflow_data.get("input_variables", {}),
+                                }
+                            )
                             log.debug(f"Added workflow: {workflow_data.get('name')}")
 
                 if workflow_contexts:
@@ -351,9 +340,9 @@ class WorkflowsFeature(InternalFeature):
                     # Start new workflow tracking (even when reusing, we track the new execution)
                     self._start_new_workflow(
                         payload.input,
-                        getattr(payload, 'parameterized_prompt', None),
-                        getattr(payload, 'workflow_variables', None),
-                        getattr(payload, 'variable_schema', None)
+                        getattr(payload, "parameterized_prompt", None),
+                        getattr(payload, "workflow_variables", None),
+                        getattr(payload, "variable_schema", None),
                     )
                     return payload
                 else:
@@ -369,9 +358,9 @@ class WorkflowsFeature(InternalFeature):
         if not self._current_workflow_id:
             self._start_new_workflow(
                 payload.input,
-                getattr(payload, 'parameterized_prompt', None),
-                getattr(payload, 'workflow_variables', None),
-                getattr(payload, 'variable_schema', None)
+                getattr(payload, "parameterized_prompt", None),
+                getattr(payload, "workflow_variables", None),
+                getattr(payload, "variable_schema", None),
             )
         return payload
 
@@ -380,38 +369,37 @@ class WorkflowsFeature(InternalFeature):
         lines = []
 
         for ctx in contexts:
-            workflow_name = ctx.get('name', f"Workflow {ctx['workflow_id'][:8]}")
-            parameterized = ctx.get('parameterized_prompt', '')
-            input_vars = ctx.get('input_variables', {})
+            workflow_name = ctx.get("name", f"Workflow {ctx['workflow_id'][:8]}")
+            parameterized = ctx.get("parameterized_prompt", "")
+            input_vars = ctx.get("input_variables", {})
 
-            lines.append(
-                f"\n{ctx['rank']}. \"{workflow_name}\" "
-                f"(Similarity: {ctx['similarity']:.0%})"
-            )
+            lines.append(f'\n{ctx["rank"]}. "{workflow_name}" (Similarity: {ctx["similarity"]:.0%})')
 
             # Show parameterized prompt if available
             if parameterized:
                 lines.append(f"   Template: {parameterized}")
                 lines.append(f"   Original Variables: {json.dumps(input_vars)}")
-                lines.append(f"   Execute with: {{\"tool\": \"workflow\", \"action\": \"{workflow_name}\", \"inputs\": {json.dumps(input_vars)}}}")
+                lines.append(
+                    f'   Execute with: {{"tool": "workflow", "action": "{workflow_name}", "inputs": {json.dumps(input_vars)}}}'
+                )
             else:
                 lines.append(f"   ID: {ctx['workflow_id']}")
-                lines.append(f"   Execute with: {{\"tool\": \"workflow\", \"action\": \"{ctx['workflow_id']}\", \"inputs\": {{}}}}")
+                lines.append(
+                    f'   Execute with: {{"tool": "workflow", "action": "{ctx["workflow_id"]}", "inputs": {{}}}}'
+                )
 
-            if ctx.get('description'):
+            if ctx.get("description"):
                 lines.append(f"   Description: {ctx['description']}")
 
             # Show first few steps for context
             lines.append("   Steps Preview:")
-            for j, action in enumerate(ctx['actions'][:3], 1):  # Limit to 3 steps
-                lines.append(
-                    f"      {j}. {action['tool']}.{action['action']}()"
-                )
+            for j, action in enumerate(ctx["actions"][:3], 1):  # Limit to 3 steps
+                lines.append(f"      {j}. {action['tool']}.{action['action']}()")
 
-            if len(ctx['actions']) > 3:
+            if len(ctx["actions"]) > 3:
                 lines.append(f"      ... and {len(ctx['actions']) - 3} more steps")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _get_workflow_detail(self, prompt_node_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed workflow information from a prompt node."""
@@ -449,21 +437,18 @@ class WorkflowsFeature(InternalFeature):
                 workflow = result[0]
 
                 # Sort actions by sequence
-                actions = sorted(
-                    workflow.get("actions", []),
-                    key=lambda x: x.get('sequence', 0)
-                )
+                actions = sorted(workflow.get("actions", []), key=lambda x: x.get("sequence", 0))
 
                 # Parse inputs if stored as JSON strings
                 for action in actions:
-                    if isinstance(action.get('inputs'), str):
+                    if isinstance(action.get("inputs"), str):
                         try:
-                            action['inputs'] = json.loads(action['inputs'])
+                            action["inputs"] = json.loads(action["inputs"])
                         except json.JSONDecodeError:
-                            action['inputs'] = {}
+                            action["inputs"] = {}
 
                 # Parse JSON fields if needed
-                input_vars = workflow.get('input_variables', '{}')
+                input_vars = workflow.get("input_variables", "{}")
                 if isinstance(input_vars, str):
                     try:
                         input_vars = json.loads(input_vars)
@@ -471,16 +456,16 @@ class WorkflowsFeature(InternalFeature):
                         input_vars = {}
 
                 # Use prompt text as name if workflow name is not set
-                workflow_name = workflow.get('name') or workflow.get('prompt')
+                workflow_name = workflow.get("name") or workflow.get("prompt")
 
                 workflow_detail = {
-                    'workflow_id': workflow.get('workflow_id'),
-                    'name': workflow_name,
-                    'description': workflow.get('description'),
-                    'parameterized_prompt': workflow.get('parameterized_prompt'),
-                    'input_variables': input_vars,
-                    'prompt': workflow.get('prompt'),
-                    'actions': actions
+                    "workflow_id": workflow.get("workflow_id"),
+                    "name": workflow_name,
+                    "description": workflow.get("description"),
+                    "parameterized_prompt": workflow.get("parameterized_prompt"),
+                    "input_variables": input_vars,
+                    "prompt": workflow.get("prompt"),
+                    "actions": actions,
                 }
 
                 return workflow_detail
@@ -523,9 +508,12 @@ class WorkflowsFeature(InternalFeature):
 
         return ""
 
-    def _start_new_workflow(self, input_text: str, parameterized_prompt: str = None, variables: Dict = None, variable_schema: Dict = None):
+    def _start_new_workflow(
+        self, input_text: str, parameterized_prompt: str = None, variables: Dict = None, variable_schema: Dict = None
+    ):
         """Start tracking a new workflow with optional variable information."""
         import uuid
+
         self._current_workflow_id = str(uuid.uuid4())
         self._workflow_actions = []
 
@@ -554,16 +542,19 @@ class WorkflowsFeature(InternalFeature):
             RETURN p.id as prompt_id
             """
 
-            result = self._neo4j_component.run(query, {
-                "workflow_id": self._current_workflow_id,
-                "prompt_id": f"prompt_{self._current_workflow_id}",
-                "input_text": input_text,
-                "parameterized_text": parameterized_prompt or input_text,
-                "input_variables": json.dumps(variables or {}),
-                "variable_schema": json.dumps(variable_schema or {}),
-                "component_id": self._component_ref.name if self._component_ref else "unknown",
-                "api_key": self._extract_api_key(self._component_ref)
-            })
+            self._neo4j_component.run(
+                query,
+                {
+                    "workflow_id": self._current_workflow_id,
+                    "prompt_id": f"prompt_{self._current_workflow_id}",
+                    "input_text": input_text,
+                    "parameterized_text": parameterized_prompt or input_text,
+                    "input_variables": json.dumps(variables or {}),
+                    "variable_schema": json.dumps(variable_schema or {}),
+                    "component_id": self._component_ref.name if self._component_ref else "unknown",
+                    "api_key": self._extract_api_key(self._component_ref),
+                },
+            )
 
             log.debug(f"Started new workflow: {self._current_workflow_id} with variables: {variables}")
 
@@ -624,18 +615,21 @@ class WorkflowsFeature(InternalFeature):
                 "action": action_name,
                 "inputs": inputs,
                 "output": output_var,
-                "sequence": len(self._workflow_actions)
+                "sequence": len(self._workflow_actions),
             }
 
-            result = self._neo4j_component.run(query, {
-                "workflow_id": self._current_workflow_id,
-                "action_id": action_id,
-                "tool": tool,
-                "action_name": action_name,
-                "inputs_json": json.dumps(inputs),
-                "output_var": output_var,
-                "sequence": current_action["sequence"]
-            })
+            self._neo4j_component.run(
+                query,
+                {
+                    "workflow_id": self._current_workflow_id,
+                    "action_id": action_id,
+                    "tool": tool,
+                    "action_name": action_name,
+                    "inputs_json": json.dumps(inputs),
+                    "output_var": output_var,
+                    "sequence": current_action["sequence"],
+                },
+            )
 
             # Add vector embedding (non-blocking - failure won't prevent action creation)
             try:
@@ -645,11 +639,14 @@ class WorkflowsFeature(InternalFeature):
                     genai.vector.encode($action_text, "OpenAI", {token: $api_key}))
                 RETURN a.id
                 """
-                self._neo4j_component.run(embedding_query, {
-                    "action_id": action_id,
-                    "action_text": action_text,
-                    "api_key": self._extract_api_key(self._component_ref)
-                })
+                self._neo4j_component.run(
+                    embedding_query,
+                    {
+                        "action_id": action_id,
+                        "action_text": action_text,
+                        "api_key": self._extract_api_key(self._component_ref),
+                    },
+                )
                 log.debug(f"Vector embedding added for action: {action_id}")
             except Exception as embed_error:
                 log.warning(f"Failed to add vector embedding for action {action_id}: {embed_error}")
@@ -660,7 +657,9 @@ class WorkflowsFeature(InternalFeature):
             # Now create relationships (this needs the action in the list)
             self._create_action_relationships(action_id, inputs, output_var)
 
-            log.info(f"Action synced to workflow: {action_id} (sequence: {current_action['sequence']}, tool: {tool}.{action_name})")
+            log.info(
+                f"Action synced to workflow: {action_id} (sequence: {current_action['sequence']}, tool: {tool}.{action_name})"
+            )
 
         except Exception as e:
             log.error(f"Failed to sync action to workflow {self._current_workflow_id}: {e}", exc_info=True)
@@ -696,10 +695,9 @@ class WorkflowsFeature(InternalFeature):
                 MATCH (a:Action {id: $action_id})
                 CREATE (p)-[:STARTS]->(a)
                 """
-                self._neo4j_component.run(start_query, {
-                    "workflow_id": self._current_workflow_id,
-                    "action_id": action_id
-                })
+                self._neo4j_component.run(
+                    start_query, {"workflow_id": self._current_workflow_id, "action_id": action_id}
+                )
                 log.debug(f"Created STARTS relationship: Prompt -> {action_id}")
 
             # Create DEPENDS_ON relationships for variable dependencies
@@ -710,10 +708,7 @@ class WorkflowsFeature(InternalFeature):
                     MATCH (dep:Action {id: $dep_id})
                     MERGE (current)-[:DEPENDS_ON]->(dep)
                     """
-                    self._neo4j_component.run(dep_query, {
-                        "action_id": action_id,
-                        "dep_id": dep_id
-                    })
+                    self._neo4j_component.run(dep_query, {"action_id": action_id, "dep_id": dep_id})
                     log.debug(f"Created DEPENDS_ON relationship: {action_id} -> {dep_id}")
 
             # Create NEXT relationship from previous action (sequential flow)
@@ -731,10 +726,7 @@ class WorkflowsFeature(InternalFeature):
                     MATCH (current:Action {id: $action_id})
                     MERGE (prev)-[:NEXT]->(current)
                     """
-                    self._neo4j_component.run(next_query, {
-                        "prev_id": prev_action["id"],
-                        "action_id": action_id
-                    })
+                    self._neo4j_component.run(next_query, {"prev_id": prev_action["id"], "action_id": action_id})
                     log.debug(f"Created NEXT relationship: {prev_action['id']} -> {action_id}")
 
         except Exception as e:
@@ -758,11 +750,10 @@ class WorkflowsFeature(InternalFeature):
             RETURN w.id as workflow_id
             """
 
-            self._neo4j_component.run(query, {
-                "workflow_id": self._current_workflow_id,
-                "step": payload.step,
-                "session_id": payload.session_id
-            })
+            self._neo4j_component.run(
+                query,
+                {"workflow_id": self._current_workflow_id, "step": payload.step, "session_id": payload.session_id},
+            )
 
             log.info(f"Workflow completed: {self._current_workflow_id}")
 
@@ -777,9 +768,11 @@ class WorkflowsFeature(InternalFeature):
 # Register the feature (import at module level to avoid circular imports)
 def _register_feature():
     from .base import InternalFeatureRegistry
+
     InternalFeatureRegistry.register("workflows", WorkflowsFeature)
     # Register as graph_cache for backward compatibility
     InternalFeatureRegistry.register("graph_cache", WorkflowsFeature)
+
 
 # Register when module is imported
 _register_feature()

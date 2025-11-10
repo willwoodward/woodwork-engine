@@ -1,12 +1,12 @@
 """Tests for MessageBusIntegration component."""
 
-import pytest
 from unittest.mock import Mock, patch
 from woodwork.core.message_bus.integration import MessageBusIntegration
 
 
 class MockBaseComponent:
     """Base component for testing."""
+
     def __init__(self, name="test_component", **kwargs):
         self.name = name
 
@@ -28,35 +28,32 @@ class TestMessageBusIntegration:
         assert component._message_bus is None
         assert component._router is None
         assert not component._integration_ready
-        assert hasattr(component, 'integration_stats')
-        assert hasattr(component, 'output_targets')
-        assert hasattr(component, 'session_id')
+        assert hasattr(component, "integration_stats")
+        assert hasattr(component, "output_targets")
+        assert hasattr(component, "session_id")
 
     def test_initialization_with_config(self):
         """Test initialization with configuration."""
-        config = {
-            'to': ['target1', 'target2'],
-            'session_id': 'test_session_123'
-        }
+        config = {"to": ["target1", "target2"], "session_id": "test_session_123"}
         component = MockIntegrationComponent(config=config)
 
-        assert component.output_targets == ['target1', 'target2']
-        assert component.session_id == 'test_session_123'
+        assert component.output_targets == ["target1", "target2"]
+        assert component.session_id == "test_session_123"
 
     def test_output_targets_extraction_string(self):
         """Test extracting output targets from string."""
-        config = {'to': 'single_target'}
+        config = {"to": "single_target"}
         component = MockIntegrationComponent(config=config)
 
         # String should be converted to list
-        assert component.output_targets == ['single_target']
+        assert component.output_targets == ["single_target"]
 
     def test_output_targets_extraction_list(self):
         """Test extracting output targets from list."""
-        config = {'to': ['target1', 'target2', 'target3']}
+        config = {"to": ["target1", "target2", "target3"]}
         component = MockIntegrationComponent(config=config)
 
-        assert component.output_targets == ['target1', 'target2', 'target3']
+        assert component.output_targets == ["target1", "target2", "target3"]
 
     def test_output_targets_extraction_none(self):
         """Test extracting output targets when none specified."""
@@ -69,9 +66,9 @@ class TestMessageBusIntegration:
     def test_session_id_extraction(self):
         """Test session ID extraction."""
         # With session_id in config
-        config1 = {'session_id': 'explicit_session'}
+        config1 = {"session_id": "explicit_session"}
         component1 = MockIntegrationComponent(config=config1)
-        assert component1.session_id == 'explicit_session'
+        assert component1.session_id == "explicit_session"
 
         # Without session_id in config - should get a generated one
         config2 = {}
@@ -100,18 +97,15 @@ class TestMessageBusIntegration:
                 self.name = name
                 super().__init__(**kwargs)
 
-        component = IntegratedComponent(
-            base_attr=99,
-            config={'to': ['target1'], 'session_id': 'test'}
-        )
+        component = IntegratedComponent(base_attr=99, config={"to": ["target1"], "session_id": "test"})
 
         assert component.base_attr == 99
         assert component.name == "integrated"
-        assert component.output_targets == ['target1']
-        assert component.session_id == 'test'
+        assert component.output_targets == ["target1"]
+        assert component.session_id == "test"
 
-    @patch('woodwork.core.message_bus.integration.get_global_message_bus')
-    @patch('woodwork.core.message_bus.integration.get_global_event_manager')
+    @patch("woodwork.core.message_bus.integration.get_global_message_bus")
+    @patch("woodwork.core.message_bus.integration.get_global_event_manager")
     def test_global_manager_integration(self, mock_event_manager, mock_message_bus):
         """Test integration with global managers."""
         # Mock the global managers
@@ -125,7 +119,7 @@ class TestMessageBusIntegration:
         # Component should be able to access global managers
         # (specific integration depends on implementation)
         assert component._message_bus is None  # Initially None
-        assert component._router is None       # Initially None
+        assert component._router is None  # Initially None
 
     def test_configuration_edge_cases(self):
         """Test edge cases in configuration handling."""
@@ -140,7 +134,7 @@ class TestMessageBusIntegration:
         assert component2.session_id is not None
 
         # Config with unexpected types
-        config3 = {'to': 123, 'session_id': ['invalid_type']}
+        config3 = {"to": 123, "session_id": ["invalid_type"]}
         component3 = MockIntegrationComponent(config=config3)
         # Should handle gracefully without crashing
         assert component3.output_targets is not None
@@ -155,13 +149,13 @@ class TestMessageBusIntegrationMethods:
         component = MockIntegrationComponent()
 
         # Test different input types
-        targets_list = component._extract_output_targets({'to': ['a', 'b']})
-        assert targets_list == ['a', 'b']
+        targets_list = component._extract_output_targets({"to": ["a", "b"]})
+        assert targets_list == ["a", "b"]
 
-        targets_string = component._extract_output_targets({'to': 'single'})
+        component._extract_output_targets({"to": "single"})
         # Should handle string appropriately
 
-        targets_none = component._extract_output_targets({})
+        component._extract_output_targets({})
         # Should handle missing key appropriately
 
     def test_extract_session_id_private_method(self):
@@ -169,8 +163,8 @@ class TestMessageBusIntegrationMethods:
         component = MockIntegrationComponent()
 
         # Test with explicit session_id
-        session_explicit = component._extract_session_id({'session_id': 'test123'})
-        assert session_explicit == 'test123'
+        session_explicit = component._extract_session_id({"session_id": "test123"})
+        assert session_explicit == "test123"
 
         # Test without session_id
         session_default = component._extract_session_id({})

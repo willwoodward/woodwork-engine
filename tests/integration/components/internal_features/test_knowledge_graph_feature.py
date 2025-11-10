@@ -19,9 +19,10 @@ class TestKnowledgeGraphFeature:
         """Ensure knowledge graph feature is registered before each test."""
         from woodwork.components.internal_features.knowledge_graph import KnowledgeGraphFeature
         from woodwork.components.internal_features.base import InternalFeatureRegistry
+
         InternalFeatureRegistry.register("knowledge_graph", KnowledgeGraphFeature)
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_knowledge_graph_feature_creation(self, mock_neo4j_factory):
         """Test that knowledge_graph: true creates the feature automatically."""
         # Setup mocks
@@ -40,7 +41,7 @@ class TestKnowledgeGraphFeature:
 
         print("✓ knowledge_graph: true automatically creates KnowledgeGraphFeature")
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_knowledge_graph_spins_up_neo4j_component(self, mock_neo4j_factory):
         """Test that the feature automatically creates Neo4j component."""
         # Setup mocks
@@ -70,7 +71,7 @@ class TestKnowledgeGraphFeature:
         # Check that API key was passed to Neo4j
         call_kwargs = None
         for call in mock_neo4j_factory.call_args_list:
-            if 'api_key' in call[1]:
+            if "api_key" in call[1]:
                 call_kwargs = call[1]
                 break
 
@@ -79,8 +80,8 @@ class TestKnowledgeGraphFeature:
         assert "test_agent_knowledge_graph" in call_kwargs["name"]
 
         # Verify agent has knowledge graph attached
-        assert hasattr(mock_agent, '_knowledge_graph')
-        assert hasattr(mock_agent, '_knowledge_mode')
+        assert hasattr(mock_agent, "_knowledge_graph")
+        assert hasattr(mock_agent, "_knowledge_mode")
         assert mock_agent._knowledge_graph is mock_neo4j_instance
         assert mock_agent._knowledge_mode is True
 
@@ -108,7 +109,7 @@ class TestKnowledgeGraphFeature:
 
         print("✓ Feature provides intelligent hooks and pipes for knowledge management")
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_complete_workflow_from_config_to_components(self, mock_neo4j_factory):
         """Test the complete workflow: config → feature → component → hooks/pipes."""
         # Setup mocks
@@ -151,10 +152,9 @@ class TestKnowledgeGraphFeature:
 
         # Test thought capture hook
         from woodwork.types.events import AgentThoughtPayload
+
         thought_payload = AgentThoughtPayload(
-            thought="I need to analyze this data carefully",
-            component_id="intelligent_agent",
-            component_type="agent"
+            thought="I need to analyze this data carefully", component_id="intelligent_agent", component_type="agent"
         )
 
         thought_hook = None
@@ -171,12 +171,13 @@ class TestKnowledgeGraphFeature:
 
         # Test input enhancement pipe
         from woodwork.types.events import InputReceivedPayload
+
         input_payload = InputReceivedPayload(
             input="How do I analyze data?",
             inputs=["How do I analyze data?"],
             session_id="test_session",
             component_id="intelligent_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         enhancement_pipe = None
@@ -186,7 +187,7 @@ class TestKnowledgeGraphFeature:
                 break
 
         assert enhancement_pipe is not None
-        enhanced_payload = enhancement_pipe(input_payload)
+        enhancement_pipe(input_payload)
 
         # Verify similarity search was called to enhance input
         assert mock_neo4j_instance.similarity_search.called
@@ -197,9 +198,9 @@ class TestKnowledgeGraphFeature:
         """Demonstrate how easy it is to extend with new features."""
 
         # Here's how simple it is to add a new feature:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("🚀 DEVELOPER EXPERIENCE DEMO:")
-        print("="*60)
+        print("=" * 60)
 
         print("\n1️⃣  CREATE FEATURE (~/my_feature.py):")
         print("""
@@ -242,9 +243,9 @@ my_agent = agent llm {
 ✅ All from one line in config!
 """)
 
-        print("="*60)
+        print("=" * 60)
         print("🎉 THAT'S IT! Adding new features is incredibly easy!")
-        print("="*60)
+        print("=" * 60)
 
         # Actual test
         from woodwork.components.internal_features.knowledge_graph import KnowledgeGraphFeature

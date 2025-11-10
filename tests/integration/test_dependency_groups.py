@@ -3,10 +3,10 @@
 These tests verify that the dependency groups ([test], [dev], [all]) are properly
 configured and include all necessary dependencies for their intended purpose.
 """
+
 import subprocess
 import sys
 import tempfile
-import shutil
 from pathlib import Path
 import pytest
 
@@ -23,11 +23,7 @@ class TestDependencyGroups:
             venv_path = Path(tmpdir) / "test_venv"
 
             # Create venv
-            subprocess.run(
-                [sys.executable, "-m", "venv", str(venv_path)],
-                check=True,
-                capture_output=True
-            )
+            subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True, capture_output=True)
 
             # Get python and pip paths
             if sys.platform == "win32":
@@ -37,11 +33,7 @@ class TestDependencyGroups:
                 python_path = venv_path / "bin" / "python"
                 pip_path = venv_path / "bin" / "pip"
 
-            yield {
-                "venv_path": venv_path,
-                "python": str(python_path),
-                "pip": str(pip_path)
-            }
+            yield {"venv_path": venv_path, "python": str(python_path), "pip": str(pip_path)}
 
     def test_test_group_installs_pytest(self, temp_venv):
         """Test that [test] group installs pytest and pytest-asyncio."""
@@ -50,26 +42,18 @@ class TestDependencyGroups:
             [temp_venv["pip"], "install", "-e", ".[test]"],
             cwd=Path(__file__).parent.parent.parent,
             capture_output=True,
-            text=True
+            text=True,
         )
 
         assert result.returncode == 0, f"Installation failed: {result.stderr}"
 
         # Verify pytest is installed
-        result = subprocess.run(
-            [temp_venv["python"], "-m", "pytest", "--version"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-m", "pytest", "--version"], capture_output=True, text=True)
         assert result.returncode == 0, "pytest not installed"
         assert "pytest" in result.stdout
 
         # Verify pytest-asyncio is available
-        result = subprocess.run(
-            [temp_venv["python"], "-c", "import pytest_asyncio"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-c", "import pytest_asyncio"], capture_output=True, text=True)
         assert result.returncode == 0, "pytest-asyncio not installed"
 
     def test_test_group_can_run_tests(self, temp_venv):
@@ -79,7 +63,7 @@ class TestDependencyGroups:
             [temp_venv["pip"], "install", "-e", ".[test]"],
             cwd=Path(__file__).parent.parent.parent,
             check=True,
-            capture_output=True
+            capture_output=True,
         )
 
         # Try to run a simple test
@@ -89,7 +73,7 @@ class TestDependencyGroups:
                 [temp_venv["python"], "-m", "pytest", str(test_path), "-v"],
                 cwd=Path(__file__).parent.parent.parent,
                 capture_output=True,
-                text=True
+                text=True,
             )
             assert result.returncode == 0, f"Tests failed: {result.stdout}\n{result.stderr}"
 
@@ -100,17 +84,13 @@ class TestDependencyGroups:
             [temp_venv["pip"], "install", "-e", ".[dev]"],
             cwd=Path(__file__).parent.parent.parent,
             capture_output=True,
-            text=True
+            text=True,
         )
 
         assert result.returncode == 0, f"Installation failed: {result.stderr}"
 
         # Verify pytest is included
-        result = subprocess.run(
-            [temp_venv["python"], "-m", "pytest", "--version"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-m", "pytest", "--version"], capture_output=True, text=True)
         assert result.returncode == 0, "pytest not installed with [dev]"
 
     def test_dev_group_installs_dev_tools(self, temp_venv):
@@ -120,31 +100,19 @@ class TestDependencyGroups:
             [temp_venv["pip"], "install", "-e", ".[dev]"],
             cwd=Path(__file__).parent.parent.parent,
             check=True,
-            capture_output=True
+            capture_output=True,
         )
 
         # Check ruff
-        result = subprocess.run(
-            [temp_venv["python"], "-m", "ruff", "--version"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-m", "ruff", "--version"], capture_output=True, text=True)
         assert result.returncode == 0, "ruff not installed"
 
         # Check black
-        result = subprocess.run(
-            [temp_venv["python"], "-m", "black", "--version"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-m", "black", "--version"], capture_output=True, text=True)
         assert result.returncode == 0, "black not installed"
 
         # Check ty
-        result = subprocess.run(
-            [temp_venv["python"], "-c", "import ty"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-c", "import ty"], capture_output=True, text=True)
         assert result.returncode == 0, "ty not installed"
 
     def test_all_group_includes_dev_dependencies(self, temp_venv):
@@ -155,25 +123,17 @@ class TestDependencyGroups:
             cwd=Path(__file__).parent.parent.parent,
             capture_output=True,
             text=True,
-            timeout=300  # chromadb can take a while
+            timeout=300,  # chromadb can take a while
         )
 
         assert result.returncode == 0, f"Installation failed: {result.stderr}"
 
         # Verify pytest is included
-        result = subprocess.run(
-            [temp_venv["python"], "-m", "pytest", "--version"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-m", "pytest", "--version"], capture_output=True, text=True)
         assert result.returncode == 0, "pytest not installed with [all]"
 
         # Verify ruff is included
-        result = subprocess.run(
-            [temp_venv["python"], "-m", "ruff", "--version"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-m", "ruff", "--version"], capture_output=True, text=True)
         assert result.returncode == 0, "ruff not installed with [all]"
 
     @pytest.mark.slow
@@ -185,31 +145,19 @@ class TestDependencyGroups:
             cwd=Path(__file__).parent.parent.parent,
             check=True,
             capture_output=True,
-            timeout=300
+            timeout=300,
         )
 
         # Check chromadb
-        result = subprocess.run(
-            [temp_venv["python"], "-c", "import chromadb"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-c", "import chromadb"], capture_output=True, text=True)
         assert result.returncode == 0, "chromadb not installed"
 
         # Check langchain
-        result = subprocess.run(
-            [temp_venv["python"], "-c", "import langchain"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-c", "import langchain"], capture_output=True, text=True)
         assert result.returncode == 0, "langchain not installed"
 
         # Check docker
-        result = subprocess.run(
-            [temp_venv["python"], "-c", "import docker"],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run([temp_venv["python"], "-c", "import docker"], capture_output=True, text=True)
         assert result.returncode == 0, "docker not installed"
 
 

@@ -61,6 +61,7 @@ def dependency_resolver(commands, component):
         # Initialise component, return object reference
         if "object" not in component:
             import time
+
             component_name = component.get("variable", "unknown")
             log.debug(f"Creating component: {component_name}")
             start = time.time()
@@ -75,11 +76,13 @@ def dependency_resolver(commands, component):
         # Skip empty dependencies
         if not dependency or dependency.strip() == "":
             continue
-            
+
         # Check if dependency exists
         if dependency not in commands:
-            raise ValueError(f"Dependency '{dependency}' not found for component '{component.get('variable', 'unknown')}'")
-            
+            raise ValueError(
+                f"Dependency '{dependency}' not found for component '{component.get('variable', 'unknown')}'"
+            )
+
         # Resolve that dependency, replace those variables in the config
         component_object = dependency_resolver(commands, commands[dependency])
 
@@ -170,7 +173,7 @@ def create_object(command):
     config["name"] = variable
     config["component"] = component
     config["type"] = type
-    
+
     # Include hooks and pipes in config if they exist
     if "hooks" in command:
         config["hooks"] = command["hooks"]
@@ -278,7 +281,7 @@ def create_object(command):
             from woodwork.components.outputs.voice import voice
 
             return init_object(voice, **config)
-    
+
     if component == "mcp":
         if type == "server":
             from woodwork.components.mcp import MCPServer
@@ -403,7 +406,7 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
     i = 0
     while i < len(config_items):
         item = config_items[i]
-        
+
         # Check if this line starts an array
         if ":" in item and "[" in item and "]" not in item:
             # This is a multiline array - collect all lines until we find the closing ]
@@ -415,7 +418,7 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
             # Add the closing line
             if i < len(config_items):
                 array_lines.append(config_items[i])
-            
+
             # Join all array lines into one
             key_part = array_lines[0].split(":", 1)[0] + ":"
             array_content = " ".join([line.split(":", 1)[1] if ":" in line else line for line in array_lines])
@@ -423,7 +426,7 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
         else:
             merged_items.append(item)
         i += 1
-    
+
     config_items = merged_items
 
     # If the value is a {, delete the nested elements (will be parsed later)
@@ -451,9 +454,13 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
             # Check if this line is part of an array structure
             line = config_items[i]
             # If it contains array-like content or is indented (suggesting it's array content), keep it
-            if ("[" in line or "]" in line or 
-                line.startswith("    ") or line.startswith("\t") or
-                any(key in line for key in ["event:", "script_path:", "function_name:"])):
+            if (
+                "[" in line
+                or "]" in line
+                or line.startswith("    ")
+                or line.startswith("\t")
+                or any(key in line for key in ["event:", "script_path:", "function_name:"])
+            ):
                 # This looks like array content, keep it
                 i += 1
             else:
@@ -480,11 +487,11 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
         # Skip empty lines or lines without colons
         if not item.strip() or ":" not in item:
             continue
-            
+
         parts = item.split(":", 1)
         if len(parts) < 2:
             continue
-            
+
         key = parts[0].strip()
         value = parts[1].strip()
 
@@ -503,17 +510,17 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
         elif value[0] == "[":
             array_content = value[1:-1]  # Remove [ and ]
             array_items = []
-            
+
             # Parse array items that can be strings, dictionaries, or simple references
             current_item = ""
             in_quotes = False
             quote_char = None
             brace_count = 0
-            
+
             i = 0
             while i < len(array_content):
                 char = array_content[i]
-                
+
                 if not in_quotes and char in ['"', "'"]:
                     in_quotes = True
                     quote_char = char
@@ -522,32 +529,32 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
                     in_quotes = False
                     current_item += char
                     quote_char = None
-                elif not in_quotes and char == '{':
+                elif not in_quotes and char == "{":
                     brace_count += 1
                     current_item += char
-                elif not in_quotes and char == '}':
+                elif not in_quotes and char == "}":
                     brace_count -= 1
                     current_item += char
-                elif not in_quotes and char == ',' and brace_count == 0:
+                elif not in_quotes and char == "," and brace_count == 0:
                     # End of current item
                     cleaned_item = current_item.strip()
                     if cleaned_item:
                         # Check if it's a dictionary-like structure
-                        if cleaned_item.startswith('{') and cleaned_item.endswith('}'):
+                        if cleaned_item.startswith("{") and cleaned_item.endswith("}"):
                             # Parse as dictionary
                             dict_content = cleaned_item[1:-1].strip()  # Remove { and }
                             parsed_dict = {}
-                            
+
                             # Split by lines and parse key-value pairs
-                            dict_lines = [line.strip() for line in dict_content.split('\n') if line.strip()]
+                            dict_lines = [line.strip() for line in dict_content.split("\n") if line.strip()]
                             for line in dict_lines:
-                                if ':' in line:
-                                    line_key, line_value = line.split(':', 1)
-                                    line_key = line_key.strip().strip('"\'')
-                                    line_value = line_value.strip().strip('"\'')
-                                    
+                                if ":" in line:
+                                    line_key, line_value = line.split(":", 1)
+                                    line_key = line_key.strip().strip("\"'")
+                                    line_value = line_value.strip().strip("\"'")
+
                                     # Map common keys for hooks and pipes
-                                    if line_key in ['event', 'script_path', 'function_name']:
+                                    if line_key in ["event", "script_path", "function_name"]:
                                         parsed_dict[line_key] = line_value
                                 else:
                                     # Handle lines without colons (might be values from multiline parsing)
@@ -555,45 +562,47 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
                                     if '"' in line or "'" in line:
                                         parts = re.findall(r'["\']([^"\']*)["\']', line)
                                         if len(parts) == 3:  # event, script_path, function_name
-                                            parsed_dict['event'] = parts[0]
-                                            parsed_dict['script_path'] = parts[1] 
-                                            parsed_dict['function_name'] = parts[2]
-                            
+                                            parsed_dict["event"] = parts[0]
+                                            parsed_dict["script_path"] = parts[1]
+                                            parsed_dict["function_name"] = parts[2]
+
                             array_items.append(parsed_dict)
                         else:
                             # Remove outer quotes if present
-                            if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
-                                (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
+                            if (cleaned_item.startswith('"') and cleaned_item.endswith('"')) or (
+                                cleaned_item.startswith("'") and cleaned_item.endswith("'")
+                            ):
                                 cleaned_item = cleaned_item[1:-1]
                             array_items.append(cleaned_item)
                     current_item = ""
                 else:
                     current_item += char
                 i += 1
-            
+
             # Don't forget the last item
             if current_item.strip():
                 cleaned_item = current_item.strip()
-                if cleaned_item.startswith('{') and cleaned_item.endswith('}'):
+                if cleaned_item.startswith("{") and cleaned_item.endswith("}"):
                     # Parse as dictionary
                     dict_content = cleaned_item[1:-1].strip()
                     parsed_dict = {}
-                    
+
                     # Handle the case where we have space-separated quoted strings
                     if '"' in dict_content or "'" in dict_content:
                         parts = re.findall(r'["\']([^"\']*)["\']', dict_content)
                         if len(parts) == 3:  # event, script_path, function_name
-                            parsed_dict['event'] = parts[0]
-                            parsed_dict['script_path'] = parts[1]
-                            parsed_dict['function_name'] = parts[2]
-                    
+                            parsed_dict["event"] = parts[0]
+                            parsed_dict["script_path"] = parts[1]
+                            parsed_dict["function_name"] = parts[2]
+
                     array_items.append(parsed_dict)
                 else:
-                    if ((cleaned_item.startswith('"') and cleaned_item.endswith('"')) or 
-                        (cleaned_item.startswith("'") and cleaned_item.endswith("'"))):
+                    if (cleaned_item.startswith('"') and cleaned_item.endswith('"')) or (
+                        cleaned_item.startswith("'") and cleaned_item.endswith("'")
+                    ):
                         cleaned_item = cleaned_item[1:-1]
                     array_items.append(cleaned_item)
-            
+
             value = array_items
 
             # Note: Array items are not treated as dependencies because we can't distinguish
@@ -616,7 +625,7 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
             # Check if it's a numeric value
             try:
                 # Try to convert to int or float
-                if '.' in value:
+                if "." in value:
                     value = float(value)
                 else:
                     value = int(value)
@@ -692,6 +701,7 @@ def parse(config: str, registry=None) -> dict:
     # NOTE: Just set the flag to activate message bus mode
     # Full initialization will be handled by DistributedStartupCoordinator in proper event loop
     import woodwork.globals as globals
+
     globals.global_config["message_bus_active"] = True
     log.info("[ConfigParser] Message bus mode activated - initialization deferred to DistributedStartupCoordinator")
 
@@ -704,9 +714,8 @@ def _initialize_message_bus_integration(commands: dict) -> None:
     """Synchronously initialize message bus integration with component configurations"""
     try:
         from woodwork.core.message_bus.integration import (
-            initialize_global_message_bus_integration,
             initialize_global_message_bus_integration_sync,
-            get_global_message_bus_manager
+            get_global_message_bus_manager,
         )
         from woodwork.core.message_bus.factory import configure_global_message_bus
 
@@ -725,7 +734,7 @@ def _initialize_message_bus_integration(commands: dict) -> None:
                     **obj.config,
                     "component": obj.component,
                     "type": obj.type,
-                    "name": name
+                    "name": name,
                 }
             elif isinstance(obj, Deployment):
                 if name == "deployment" or obj.component == "deployment":
@@ -735,6 +744,7 @@ def _initialize_message_bus_integration(commands: dict) -> None:
 
         # Activate message bus globally
         import woodwork.globals as globals
+
         globals.global_config["message_bus_active"] = True
         log.info("[ConfigParser] Message bus mode activated - Task Master will be disabled")
 
@@ -770,7 +780,6 @@ def _initialize_message_bus_integration(commands: dict) -> None:
 
                 # Set unified event bus router if not already set
                 if not hasattr(comp, "_router") or comp._router is None:
-                    from woodwork.core.unified_event_bus import get_global_event_bus
                     try:
                         # This is sync context, so we need to handle async differently
                         log.debug("[ConfigParser] Setting unified event bus router on component '%s'", comp.name)
@@ -782,11 +791,14 @@ def _initialize_message_bus_integration(commands: dict) -> None:
         # Log status
         manager = get_global_message_bus_manager()
         stats = manager.get_manager_stats()
-        log.info("[ConfigParser] Message bus status: %s", {
-            "integration_active": stats["integration_active"],
-            "registered_components": stats["registered_components"],
-            "message_bus_healthy": stats["message_bus_healthy"]
-        })
+        log.info(
+            "[ConfigParser] Message bus status: %s",
+            {
+                "integration_active": stats["integration_active"],
+                "registered_components": stats["registered_components"],
+                "message_bus_healthy": stats["message_bus_healthy"],
+            },
+        )
         if stats.get("router_stats", {}).get("routing_table"):
             log.debug("[ConfigParser] Routing table: %s", stats["router_stats"]["routing_table"])
 
@@ -795,29 +807,32 @@ def _initialize_message_bus_integration(commands: dict) -> None:
         log.error("[ConfigParser] Components will work without distributed messaging")
 
 
-
 async def _async_initialize_message_bus(component_configs: dict) -> None:
     """Async helper for message bus initialization"""
     try:
         from woodwork.core.message_bus.integration import initialize_global_message_bus_integration
-        
+
         await initialize_global_message_bus_integration(component_configs)
         log.info("[ConfigParser] Message bus integration initialized with %d components", len(component_configs))
-        
+
         # Log routing configuration for debugging
         from woodwork.core.message_bus.integration import get_global_message_bus_manager
+
         manager = get_global_message_bus_manager()
         stats = manager.get_manager_stats()
-        
-        log.info("[ConfigParser] Message bus status: %s", {
-            "integration_active": stats["integration_active"],
-            "registered_components": stats["registered_components"],
-            "message_bus_healthy": stats["message_bus_healthy"]
-        })
-        
+
+        log.info(
+            "[ConfigParser] Message bus status: %s",
+            {
+                "integration_active": stats["integration_active"],
+                "registered_components": stats["registered_components"],
+                "message_bus_healthy": stats["message_bus_healthy"],
+            },
+        )
+
         if stats.get("router_stats", {}).get("routing_table"):
             log.debug("[ConfigParser] Routing table: %s", stats["router_stats"]["routing_table"])
-        
+
     except Exception as e:
         log.error("[ConfigParser] Error in async message bus initialization: %s", e)
 
@@ -898,8 +913,7 @@ def parse_config_dict(config_dict: dict) -> dict:
             component_type = component_config.get("component", "unknown")
             type_name = component_config.get("type", "unknown")
 
-            log.debug("[ConfigParser] Creating component: %s (%s/%s)",
-                     component_name, component_type, type_name)
+            log.debug("[ConfigParser] Creating component: %s (%s/%s)", component_name, component_type, type_name)
 
             # Create component using existing factory functions
             config_copy = component_config.copy()
@@ -913,7 +927,7 @@ def parse_config_dict(config_dict: dict) -> dict:
                     "object": component_obj,
                     "component": component_type,
                     "variable": component_name,
-                    "config": config_copy
+                    "config": config_copy,
                 }
 
                 log.debug("[ConfigParser] Created component: %s", component_name)
@@ -925,10 +939,7 @@ def parse_config_dict(config_dict: dict) -> dict:
 
     log.info("[ConfigParser] Parsed %d components from dictionary", len(components))
 
-    return {
-        "components": components,
-        "component_configs": component_configs
-    }
+    return {"components": components, "component_configs": component_configs}
 
 
 def create_component_object(component_type: str, type_name: str, config: dict):
@@ -937,29 +948,35 @@ def create_component_object(component_type: str, type_name: str, config: dict):
         if component_type == "input" or component_type == "inputs":
             if type_name == "api":
                 from woodwork.components.inputs.api_input import api_input
+
                 return init_object(api_input, **config)
             elif type_name == "command_line":
                 from woodwork.components.inputs.command_line import command_line
+
                 config["task_master"] = task_m
                 return init_object(command_line, **config)
 
         elif component_type == "llm" or component_type == "llms":
             if type_name == "openai":
                 from woodwork.components.llms.openai import openai
+
                 return init_object(openai, **config)
             elif type_name == "ollama":
                 from woodwork.components.llms.ollama import ollama
+
                 return init_object(ollama, **config)
 
         elif component_type == "agent" or component_type == "agents":
             if type_name == "llm":
                 from woodwork.components.agents.llm import llm
+
                 config["task_m"] = task_m
                 return init_object(llm, **config)
 
         elif component_type == "output" or component_type == "outputs":
             if type_name == "console":
                 from woodwork.components.outputs.console import console
+
                 return init_object(console, **config)
 
         # Add more component types as needed
@@ -977,8 +994,8 @@ def parse_config_file(file_path: str) -> dict:
     # but returns format compatible with AsyncRuntime
 
     # Read and parse the file (use existing logic)
-    with open(file_path, 'r') as f:
-        content = f.read()
+    with open(file_path, "r") as f:
+        f.read()
 
     # Use existing parsing logic but adapt output format
     # This is a simplified version - you may need to adapt based on your existing parse logic

@@ -5,9 +5,8 @@ Handles lifecycle management for MCP servers including registry lookup,
 channel creation, and health monitoring.
 """
 
-import asyncio
 import logging
-from typing import Dict, Optional, Any
+from typing import Dict
 
 from .registry import MCPRegistry, ServerMetadata, TransportType
 from .channels import MCPChannel, StdioChannel, SSEChannel, WebSocketChannel, HTTPChannel
@@ -22,11 +21,7 @@ class MCPServerManager:
         self.registry = MCPRegistry()
         self._health_check_interval = 30.0  # seconds
 
-    async def create_channel(
-        self,
-        metadata: ServerMetadata,
-        env_vars: Dict[str, str]
-    ) -> MCPChannel:
+    async def create_channel(self, metadata: ServerMetadata, env_vars: Dict[str, str]) -> MCPChannel:
         """
         Create and connect appropriate channel for server.
 
@@ -61,11 +56,7 @@ class MCPServerManager:
             log.error(f"[MCPServerManager] Failed to create channel for {metadata.name}: {e}")
             raise
 
-    async def _create_stdio_channel(
-        self,
-        metadata: ServerMetadata,
-        env_vars: Dict[str, str]
-    ) -> StdioChannel:
+    async def _create_stdio_channel(self, metadata: ServerMetadata, env_vars: Dict[str, str]) -> StdioChannel:
         """Create STDIO channel for local Docker container."""
         if not metadata.packages:
             raise ValueError("No packages available for STDIO transport")
@@ -90,11 +81,7 @@ class MCPServerManager:
         log.info(f"[MCPServerManager] Created STDIO channel for {metadata.name}")
         return channel
 
-    async def _create_sse_channel(
-        self,
-        metadata: ServerMetadata,
-        env_vars: Dict[str, str]
-    ) -> SSEChannel:
+    async def _create_sse_channel(self, metadata: ServerMetadata, env_vars: Dict[str, str]) -> SSEChannel:
         """Create SSE channel for remote server."""
         if not metadata.remotes:
             raise ValueError("No remotes available for SSE transport")
@@ -122,19 +109,11 @@ class MCPServerManager:
         log.info(f"[MCPServerManager] Created SSE channel for {metadata.name}")
         return channel
 
-    async def _create_websocket_channel(
-        self,
-        metadata: ServerMetadata,
-        env_vars: Dict[str, str]
-    ) -> WebSocketChannel:
+    async def _create_websocket_channel(self, metadata: ServerMetadata, env_vars: Dict[str, str]) -> WebSocketChannel:
         """Create WebSocket channel (future implementation)."""
         raise NotImplementedError("WebSocket transport not yet implemented")
 
-    async def _create_http_channel(
-        self,
-        metadata: ServerMetadata,
-        env_vars: Dict[str, str]
-    ) -> HTTPChannel:
+    async def _create_http_channel(self, metadata: ServerMetadata, env_vars: Dict[str, str]) -> HTTPChannel:
         """Create HTTP channel for simple request/response."""
         if not metadata.remotes:
             raise ValueError("No remotes available for HTTP transport")
@@ -188,16 +167,9 @@ class MCPServerManager:
                     if placeholder in value:
                         value = value.replace(placeholder, env_value)
 
-            processed_headers.append({
-                "name": header["name"],
-                "value": value
-            })
+            processed_headers.append({"name": header["name"], "value": value})
 
-        return RemoteInfo(
-            type=remote.type,
-            url=remote.url,
-            headers=processed_headers
-        )
+        return RemoteInfo(type=remote.type, url=remote.url, headers=processed_headers)
 
     async def start_health_monitoring(self, channel: MCPChannel, metadata: ServerMetadata):
         """Start health monitoring for the channel (future implementation)."""

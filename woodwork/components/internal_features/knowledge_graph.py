@@ -12,8 +12,16 @@ Usage in .ww config:
 """
 
 import logging
-from typing import Dict, List, Tuple, Callable, Any
-from woodwork.types.events import AgentThoughtPayload, AgentActionPayload, AgentStepCompletePayload, InputReceivedPayload
+from typing import Dict, List, Tuple, Callable, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from woodwork.components.component import component
+from woodwork.types.events import (
+    AgentThoughtPayload,
+    AgentActionPayload,
+    AgentStepCompletePayload,
+    InputReceivedPayload,
+)
 from .base import InternalFeature
 
 log = logging.getLogger(__name__)
@@ -45,13 +53,13 @@ class KnowledgeGraphFeature(InternalFeature):
                     "uri": "bolt://localhost:7687",
                     "user": "neo4j",
                     "password": "testpassword",
-                    "name": "knowledge_graph_db"
+                    "name": "knowledge_graph_db",
                 },
-                "optional": False
+                "optional": False,
             }
         ]
 
-    def _setup_feature(self, component: 'component', config: Dict, component_manager) -> None:
+    def _setup_feature(self, component: "component", config: Dict, component_manager) -> None:
         """Initialize knowledge graph with auto-created Neo4j component."""
         log.debug(f"Setting up KnowledgeGraphFeature for component: {component.name}")
         self._component_ref = component
@@ -67,14 +75,12 @@ class KnowledgeGraphFeature(InternalFeature):
             "user": config.get("knowledge_graph_user", "neo4j"),
             "password": config.get("knowledge_graph_password", "testpassword"),
             "name": f"{component.name}_knowledge_graph",
-            "api_key": api_key
+            "api_key": api_key,
         }
 
         log.debug(f"Creating Neo4j component with config: {neo4j_config}")
         self._neo4j_component = component_manager.get_or_create_component(
-            component_id=f"{component.name}_knowledge_graph_neo4j",
-            component_type="neo4j",
-            config=neo4j_config
+            component_id=f"{component.name}_knowledge_graph_neo4j", component_type="neo4j", config=neo4j_config
         )
 
         # Initialize knowledge graph schema
@@ -97,7 +103,7 @@ class KnowledgeGraphFeature(InternalFeature):
             "CREATE CONSTRAINT IF NOT EXISTS FOR (t:Thought) REQUIRE t.id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (a:Action) REQUIRE a.id IS UNIQUE",
             "CREATE INDEX IF NOT EXISTS FOR (c:Concept) ON (c.embedding)",
-            "CREATE INDEX IF NOT EXISTS FOR (t:Thought) ON (t.timestamp)"
+            "CREATE INDEX IF NOT EXISTS FOR (t:Thought) ON (t.timestamp)",
         ]
 
         for query in schema_queries:
@@ -106,15 +112,15 @@ class KnowledgeGraphFeature(InternalFeature):
             except Exception as e:
                 log.debug(f"Schema query failed (may already exist): {e}")
 
-    def teardown(self, component: 'component', component_manager) -> None:
+    def teardown(self, component: "component", component_manager) -> None:
         """Clean up knowledge graph (component manager handles Neo4j cleanup)."""
         log.debug(f"Tearing down KnowledgeGraphFeature for component: {component.name}")
 
         # Remove references from component
-        if hasattr(component, '_knowledge_graph'):
-            delattr(component, '_knowledge_graph')
-        if hasattr(component, '_knowledge_mode'):
-            delattr(component, '_knowledge_mode')
+        if hasattr(component, "_knowledge_graph"):
+            delattr(component, "_knowledge_graph")
+        if hasattr(component, "_knowledge_mode"):
+            delattr(component, "_knowledge_mode")
 
         # Component manager will handle actual Neo4j component cleanup
         self._neo4j_component = None
@@ -125,18 +131,16 @@ class KnowledgeGraphFeature(InternalFeature):
         return [
             ("agent.thought", self._capture_thought_hook),
             ("agent.action", self._capture_action_hook),
-            ("agent.step_complete", self._update_knowledge_hook)
+            ("agent.step_complete", self._update_knowledge_hook),
         ]
 
     def get_pipes(self) -> List[Tuple[str, Callable]]:
         """Return knowledge graph pipes."""
-        return [
-            ("input.received", self._enhance_with_knowledge_pipe)
-        ]
+        return [("input.received", self._enhance_with_knowledge_pipe)]
 
     def _extract_api_key(self, component) -> str:
         """Extract API key from component's model."""
-        if hasattr(component, 'model') and hasattr(component.model, '_api_key'):
+        if hasattr(component, "model") and hasattr(component.model, "_api_key"):
             return component.model._api_key
         return None
 
@@ -149,9 +153,7 @@ class KnowledgeGraphFeature(InternalFeature):
             log.debug(f"Enhancing input with knowledge graph: {payload.input[:50]}...")
 
             # Search for relevant concepts in the knowledge graph
-            relevant_concepts = self._neo4j_component.similarity_search(
-                payload.input, "Concept", "description"
-            )
+            relevant_concepts = self._neo4j_component.similarity_search(payload.input, "Concept", "description")
 
             if relevant_concepts:
                 # Extract the most relevant knowledge
@@ -169,7 +171,7 @@ class KnowledgeGraphFeature(InternalFeature):
                         inputs=payload.inputs,
                         session_id=payload.session_id,
                         component_id=payload.component_id,
-                        component_type=payload.component_type
+                        component_type=payload.component_type,
                     )
 
                     log.debug(f"Enhanced input with {len(knowledge_context)} knowledge items")
@@ -193,7 +195,7 @@ class KnowledgeGraphFeature(InternalFeature):
                 "id": f"thought_{payload.component_id}_{hash(payload.thought)}",
                 "thought": payload.thought,
                 "component_id": payload.component_id,
-                "timestamp": getattr(payload, 'timestamp', None)
+                "timestamp": getattr(payload, "timestamp", None),
             }
 
             self._neo4j_component.create_node("Thought", thought_data)
@@ -201,19 +203,15 @@ class KnowledgeGraphFeature(InternalFeature):
             # Extract concepts from the thought and create relationships
             concepts = self._extract_concepts_from_text(payload.thought)
             for concept in concepts:
-                concept_data = {
-                    "id": f"concept_{hash(concept)}",
-                    "description": concept
-                }
+                concept_data = {"id": f"concept_{hash(concept)}", "description": concept}
 
                 # Create concept node if it doesn't exist
                 self._neo4j_component.create_node("Concept", concept_data)
 
                 # Create relationship between thought and concept
                 self._neo4j_component.run_query(
-                    "MATCH (t:Thought {id: $thought_id}), (c:Concept {id: $concept_id}) "
-                    "MERGE (t)-[:RELATES_TO]->(c)",
-                    {"thought_id": thought_data["id"], "concept_id": concept_data["id"]}
+                    "MATCH (t:Thought {id: $thought_id}), (c:Concept {id: $concept_id}) MERGE (t)-[:RELATES_TO]->(c)",
+                    {"thought_id": thought_data["id"], "concept_id": concept_data["id"]},
                 )
 
         except Exception as e:
@@ -232,7 +230,7 @@ class KnowledgeGraphFeature(InternalFeature):
                 "id": f"action_{payload.component_id}_{hash(payload.action)}",
                 "action": payload.action,
                 "component_id": payload.component_id,
-                "timestamp": getattr(payload, 'timestamp', None)
+                "timestamp": getattr(payload, "timestamp", None),
             }
 
             self._neo4j_component.create_node("Action", action_data)
@@ -252,8 +250,8 @@ class KnowledgeGraphFeature(InternalFeature):
             step_data = {
                 "id": f"step_{payload.component_id}_{hash(str(payload))}",
                 "component_id": payload.component_id,
-                "result": getattr(payload, 'result', None),
-                "timestamp": getattr(payload, 'timestamp', None)
+                "result": getattr(payload, "result", None),
+                "timestamp": getattr(payload, "timestamp", None),
             }
 
             self._neo4j_component.create_node("StepComplete", step_data)
@@ -277,7 +275,9 @@ class KnowledgeGraphFeature(InternalFeature):
 # Auto-register the feature when module is imported
 def _register_feature():
     from .base import InternalFeatureRegistry
+
     InternalFeatureRegistry.register("knowledge_graph", KnowledgeGraphFeature)
+
 
 # Register when module is imported
 _register_feature()

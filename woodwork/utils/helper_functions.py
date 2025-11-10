@@ -101,6 +101,7 @@ def get_prompt(path: str) -> str:
         prompt = f.read()
     return prompt
 
+
 def sync_async(func, *args, **kwargs):
     """
     Run an async function from synchronous code.
@@ -117,7 +118,7 @@ def sync_async(func, *args, **kwargs):
             return loop.run_until_complete(func(*args, **kwargs))
     else:
         return func(*args, **kwargs)
-    
+
 
 async def maybe_async(func, *args, **kwargs):
     """Helper to call either sync or async functions properly"""

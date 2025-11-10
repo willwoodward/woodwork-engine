@@ -61,8 +61,7 @@ class Docker:
             # images.build returns (image, logs) in the docker SDK
             try:
                 built_image, _ = self.docker_client.images.build(
-                    fileobj=io.BytesIO(self.dockerfile.encode("utf-8")),
-                    tag=self.image_name
+                    fileobj=io.BytesIO(self.dockerfile.encode("utf-8")), tag=self.image_name
                 )
                 log.debug(f"Successfully built image: {self.image_name}")
             except Exception as e:
@@ -90,6 +89,7 @@ class Docker:
     def _run_docker_container(self):
         """Run the Docker container."""
         from docker.errors import APIError
+
         log.debug("Running Docker container...")
 
         # Check if the container already exists

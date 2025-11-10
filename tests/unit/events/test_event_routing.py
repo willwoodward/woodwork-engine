@@ -1,8 +1,7 @@
 """Tests for event routing and distribution using UnifiedEventBus."""
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 from woodwork.core.unified_event_bus import UnifiedEventBus
 from tests.unit.fixtures.event_fixtures import MockPayload, create_mock_hooks, create_mock_pipes
 
@@ -31,7 +30,7 @@ class TestEventRouting:
 
         # Simulate event routing
         payload = MockPayload({"test": "data"})
-        result = await event_router.emit("test.event", payload)
+        await event_router.emit("test.event", payload)
 
         # Verify hook was registered
         assert "test.event" in event_router._hooks
@@ -154,13 +153,14 @@ class TestEventRoutingErrorHandling:
 
     async def test_pipe_failure_handling(self, error_router):
         """Test pipe registration and basic functionality."""
+
         def working_pipe(payload):
             return payload
 
         error_router.register_pipe("test.event", working_pipe)
 
         # Emit event through pipe
-        result = await error_router.emit("test.event", {"test": "data"})
+        await error_router.emit("test.event", {"test": "data"})
 
         # Verify pipe was registered
         assert "test.event" in error_router._pipes

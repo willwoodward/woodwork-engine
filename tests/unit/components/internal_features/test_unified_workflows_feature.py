@@ -6,8 +6,7 @@ Following TDD - these tests are written BEFORE implementation.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from dataclasses import replace
+from unittest.mock import Mock, AsyncMock
 import json
 
 
@@ -53,6 +52,7 @@ class TestUnifiedWorkflowsFeature:
     def feature(self):
         """Create WorkflowsFeature instance."""
         from woodwork.components.internal_features.workflows import WorkflowsFeature
+
         return WorkflowsFeature()
 
     def test_feature_initialization(self, feature):
@@ -67,9 +67,9 @@ class TestUnifiedWorkflowsFeature:
         required = feature.get_required_components()
 
         assert len(required) == 1
-        assert required[0]['component_type'] == 'neo4j'
-        assert 'workflows_neo4j' in required[0]['component_id']
-        assert not required[0]['optional']
+        assert required[0]["component_type"] == "neo4j"
+        assert "workflows_neo4j" in required[0]["component_id"]
+        assert not required[0]["optional"]
 
     def test_setup_feature_creates_neo4j_component(self, feature, mock_component, mock_neo4j, mock_component_manager):
         """Test that setup creates Neo4j component through manager."""
@@ -81,11 +81,13 @@ class TestUnifiedWorkflowsFeature:
         mock_component_manager.get_or_create_component.assert_called_once()
         call_args = mock_component_manager.get_or_create_component.call_args
 
-        assert 'neo4j' in str(call_args)
+        assert "neo4j" in str(call_args)
         assert mock_component._workflows_db == mock_neo4j
         assert mock_component._workflows_mode is True
 
-    def test_setup_feature_initializes_vector_indices(self, feature, mock_component, mock_neo4j, mock_component_manager):
+    def test_setup_feature_initializes_vector_indices(
+        self, feature, mock_component, mock_neo4j, mock_component_manager
+    ):
         """Test that setup initializes vector indices for prompts and actions."""
         mock_component_manager.get_or_create_component.return_value = mock_neo4j
 
@@ -96,8 +98,8 @@ class TestUnifiedWorkflowsFeature:
 
         # Check for prompt and action indices
         calls = [str(call) for call in mock_neo4j.init_vector_index.call_args_list]
-        assert any('Prompt' in call for call in calls)
-        assert any('Action' in call for call in calls)
+        assert any("Prompt" in call for call in calls)
+        assert any("Action" in call for call in calls)
 
     def test_setup_feature_initializes_graph_schema(self, feature, mock_component, mock_neo4j, mock_component_manager):
         """Test that setup initializes graph schema with constraints."""
@@ -110,7 +112,7 @@ class TestUnifiedWorkflowsFeature:
 
         # Check for constraint creation
         calls = [str(call) for call in mock_neo4j.run.call_args_list]
-        schema_calls = [c for c in calls if 'CONSTRAINT' in c or 'INDEX' in c]
+        schema_calls = [c for c in calls if "CONSTRAINT" in c or "INDEX" in c]
         assert len(schema_calls) > 0
 
     def test_setup_feature_raises_without_api_key(self, feature, mock_component_manager):
@@ -129,17 +131,17 @@ class TestUnifiedWorkflowsFeature:
         config = {
             "workflows_uri": "bolt://custom:7687",
             "workflows_user": "custom_user",
-            "workflows_password": "custom_pass"
+            "workflows_password": "custom_pass",
         }
 
         feature._setup_feature(mock_component, config, mock_component_manager)
 
         call_args = mock_component_manager.get_or_create_component.call_args
-        neo4j_config = call_args[1]['config']
+        neo4j_config = call_args[1]["config"]
 
-        assert neo4j_config['uri'] == "bolt://custom:7687"
-        assert neo4j_config['user'] == "custom_user"
-        assert neo4j_config['password'] == "custom_pass"
+        assert neo4j_config["uri"] == "bolt://custom:7687"
+        assert neo4j_config["user"] == "custom_user"
+        assert neo4j_config["password"] == "custom_pass"
 
     def test_teardown_removes_component_references(self, feature, mock_component, mock_component_manager):
         """Test that teardown removes component references."""
@@ -151,8 +153,8 @@ class TestUnifiedWorkflowsFeature:
         # Teardown
         feature.teardown(mock_component, mock_component_manager)
 
-        assert not hasattr(mock_component, '_workflows_db')
-        assert not hasattr(mock_component, '_workflows_mode')
+        assert not hasattr(mock_component, "_workflows_db")
+        assert not hasattr(mock_component, "_workflows_mode")
         assert feature._neo4j_component is None
 
     def test_get_hooks_returns_expected_events(self, feature):
@@ -160,15 +162,15 @@ class TestUnifiedWorkflowsFeature:
         hooks = feature.get_hooks()
 
         hook_events = [event for event, _ in hooks]
-        assert 'agent.action' in hook_events
-        assert 'agent.step_complete' in hook_events
+        assert "agent.action" in hook_events
+        assert "agent.step_complete" in hook_events
 
     def test_get_pipes_returns_input_pipe(self, feature):
         """Test that feature registers input pipe for similarity check."""
         pipes = feature.get_pipes()
 
         pipe_events = [event for event, _ in pipes]
-        assert 'input.received' in pipe_events
+        assert "input.received" in pipe_events
 
     def test_start_new_workflow_creates_nodes(self, feature, mock_neo4j):
         """Test that _start_new_workflow creates Workflow and Prompt nodes."""
@@ -184,8 +186,8 @@ class TestUnifiedWorkflowsFeature:
         assert mock_neo4j.run.called
         call_args = str(mock_neo4j.run.call_args_list)
 
-        assert 'Workflow' in call_args
-        assert 'Prompt' in call_args
+        assert "Workflow" in call_args
+        assert "Prompt" in call_args
         assert feature._current_workflow_id is not None
 
     def test_sync_action_hook_creates_action_node(self, feature, mock_neo4j):
@@ -199,18 +201,9 @@ class TestUnifiedWorkflowsFeature:
         feature._component_ref.model._api_key = "test-key"
         feature._current_workflow_id = "w1"
 
-        action_data = {
-            "tool": "file_tool",
-            "action": "read",
-            "inputs": {"path": "test.txt"},
-            "output": "file_content"
-        }
+        action_data = {"tool": "file_tool", "action": "read", "inputs": {"path": "test.txt"}, "output": "file_content"}
 
-        payload = AgentActionPayload(
-            action=json.dumps(action_data),
-            component_id="test_agent",
-            component_type="agent"
-        )
+        payload = AgentActionPayload(action=json.dumps(action_data), component_id="test_agent", component_type="agent")
 
         feature._sync_action_hook(payload)
 
@@ -218,8 +211,8 @@ class TestUnifiedWorkflowsFeature:
         assert mock_neo4j.run.called
         call_args = str(mock_neo4j.run.call_args_list)
 
-        assert 'Action' in call_args
-        assert 'file_tool' in call_args
+        assert "Action" in call_args
+        assert "file_tool" in call_args
         assert len(feature._workflow_actions) == 1
 
     def test_sync_action_hook_tracks_dependencies(self, feature, mock_neo4j):
@@ -234,17 +227,10 @@ class TestUnifiedWorkflowsFeature:
         feature._current_workflow_id = "w1"
 
         # First action
-        action1_data = {
-            "tool": "file_tool",
-            "action": "read",
-            "inputs": {},
-            "output": "file_data"
-        }
+        action1_data = {"tool": "file_tool", "action": "read", "inputs": {}, "output": "file_data"}
 
         payload1 = AgentActionPayload(
-            action=json.dumps(action1_data),
-            component_id="test_agent",
-            component_type="agent"
+            action=json.dumps(action1_data), component_id="test_agent", component_type="agent"
         )
 
         feature._sync_action_hook(payload1)
@@ -254,13 +240,11 @@ class TestUnifiedWorkflowsFeature:
             "tool": "process_tool",
             "action": "process",
             "inputs": {"data": "file_data"},  # References first action's output
-            "output": "result"
+            "output": "result",
         }
 
         payload2 = AgentActionPayload(
-            action=json.dumps(action2_data),
-            component_id="test_agent",
-            component_type="agent"
+            action=json.dumps(action2_data), component_id="test_agent", component_type="agent"
         )
 
         feature._sync_action_hook(payload2)
@@ -270,7 +254,7 @@ class TestUnifiedWorkflowsFeature:
 
         # Check that DEPENDS_ON or NEXT relationship was created
         call_args = str(mock_neo4j.run.call_args_list)
-        assert 'DEPENDS_ON' in call_args or 'NEXT' in call_args
+        assert "DEPENDS_ON" in call_args or "NEXT" in call_args
 
     def test_complete_workflow_hook_marks_complete(self, feature, mock_neo4j):
         """Test that _complete_workflow_hook marks workflow as completed."""
@@ -281,10 +265,7 @@ class TestUnifiedWorkflowsFeature:
         feature._workflow_actions = [{"id": "a1"}]
 
         payload = AgentStepCompletePayload(
-            step=5,
-            session_id="test_session",
-            component_id="test_agent",
-            component_type="agent"
+            step=5, session_id="test_session", component_id="test_agent", component_type="agent"
         )
 
         feature._complete_workflow_hook(payload)
@@ -293,7 +274,7 @@ class TestUnifiedWorkflowsFeature:
         assert mock_neo4j.run.called
         call_args = str(mock_neo4j.run.call_args_list)
 
-        assert 'completed' in call_args
+        assert "completed" in call_args
 
         # Verify state reset
         assert feature._current_workflow_id is None
@@ -312,11 +293,7 @@ class TestUnifiedWorkflowsFeature:
         mock_neo4j.similarity_search.return_value = []
 
         payload = InputReceivedPayload(
-            input="Test input",
-            inputs={},
-            session_id="test",
-            component_id="agent",
-            component_type="agent"
+            input="Test input", inputs={}, session_id="test", component_id="agent", component_type="agent"
         )
 
         result = feature._check_similar_workflows_pipe(payload)
@@ -336,16 +313,10 @@ class TestUnifiedWorkflowsFeature:
         feature._component_ref.model._api_key = "test-key"
 
         # Low similarity match (below 0.75 threshold)
-        mock_neo4j.similarity_search.return_value = [
-            {"nodeID": "p1", "score": 0.5, "text": "Different task"}
-        ]
+        mock_neo4j.similarity_search.return_value = [{"nodeID": "p1", "score": 0.5, "text": "Different task"}]
 
         payload = InputReceivedPayload(
-            input="Test input",
-            inputs={},
-            session_id="test",
-            component_id="agent",
-            component_type="agent"
+            input="Test input", inputs={}, session_id="test", component_id="agent", component_type="agent"
         )
 
         result = feature._check_similar_workflows_pipe(payload)
@@ -376,12 +347,7 @@ class TestUnifiedWorkflowsFeature:
         feature._neo4j_component = mock_neo4j
 
         mock_neo4j.run.return_value = [
-            {
-                "prompt": "Test prompt",
-                "workflow": [
-                    {"tool": "t1", "action": "a1", "output": "o1"}
-                ]
-            }
+            {"prompt": "Test prompt", "workflow": [{"tool": "t1", "action": "a1", "output": "o1"}]}
         ]
 
         result = feature._get_workflow_context("prompt_node_id")
@@ -392,29 +358,25 @@ class TestUnifiedWorkflowsFeature:
     def test_create_action_relationships_creates_next_relationship(self, feature, mock_neo4j):
         """Test that sequential actions get NEXT relationship."""
         feature._neo4j_component = mock_neo4j
-        feature._workflow_actions = [
-            {"id": "a1", "output": "result1"}
-        ]
+        feature._workflow_actions = [{"id": "a1", "output": "result1"}]
 
         feature._create_action_relationships("a2", {}, "result2")
 
         # Verify NEXT relationship created
         call_args = str(mock_neo4j.run.call_args_list)
-        assert 'NEXT' in call_args
+        assert "NEXT" in call_args
 
     def test_create_action_relationships_creates_depends_on(self, feature, mock_neo4j):
         """Test that dependent actions get DEPENDS_ON relationship."""
         feature._neo4j_component = mock_neo4j
-        feature._workflow_actions = [
-            {"id": "a1", "output": "data"}
-        ]
+        feature._workflow_actions = [{"id": "a1", "output": "data"}]
 
         # Action that uses previous output as input
         feature._create_action_relationships("a2", {"input": "data"}, "result")
 
         # Verify DEPENDS_ON relationship created
         call_args = str(mock_neo4j.run.call_args_list)
-        assert 'DEPENDS_ON' in call_args
+        assert "DEPENDS_ON" in call_args
 
     def test_create_action_relationships_links_first_to_prompt(self, feature, mock_neo4j):
         """Test that first action gets linked to prompt with STARTS."""
@@ -426,4 +388,4 @@ class TestUnifiedWorkflowsFeature:
 
         # Verify STARTS relationship created
         call_args = str(mock_neo4j.run.call_args_list)
-        assert 'STARTS' in call_args
+        assert "STARTS" in call_args

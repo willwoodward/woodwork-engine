@@ -72,7 +72,7 @@ class TestInternalFeatureRegistry:
         features = InternalFeatureRegistry.get_registered_features()
         assert features["test_feature"] is test_feature_class
 
-    @patch('woodwork.components.internal_features.workflows.WorkflowsFeature')
+    @patch("woodwork.components.internal_features.workflows.WorkflowsFeature")
     def test_ensure_features_loaded(self, mock_workflows):
         """Test that _ensure_features_loaded imports available features."""
         # Clear registry

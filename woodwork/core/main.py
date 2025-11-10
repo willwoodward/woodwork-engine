@@ -60,8 +60,7 @@ def main():
 
     # Setup logging
     logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        level=getattr(logging, args.log_level), format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     # Default config if none provided
@@ -69,6 +68,7 @@ def main():
 
     # Check if config file exists
     import os
+
     if not os.path.exists(config_path):
         log.error("Configuration file not found: %s", config_path)
         sys.exit(1)

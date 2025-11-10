@@ -3,7 +3,6 @@
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from tests.unit.fixtures.mock_components import MockStream
 
 
 @pytest.mark.slow
@@ -65,14 +64,14 @@ class TestStreamingFlow:
             "stream_manager": stream_manager,
             "producer": StreamProducer(),
             "consumer": StreamConsumer(),
-            "processor": StreamProcessor(lambda x: x.upper())
+            "processor": StreamProcessor(lambda x: x.upper()),
         }
 
     async def test_producer_consumer_flow(self, streaming_setup):
         """Test basic producer-consumer streaming flow."""
         setup = streaming_setup
         producer = setup["producer"]
-        consumer = setup["consumer"]
+        setup["consumer"]
 
         # Producer creates data - should return a stream ID
         stream_id = await producer.produce_data(count=5)
@@ -102,6 +101,7 @@ class TestStreamingFlow:
 
         # Create multiple producer instances
         from woodwork.components.streaming_mixin import StreamingMixin
+
         stream_manager = setup["stream_manager"]
 
         class ConcurrentProducer(StreamingMixin):
@@ -131,7 +131,7 @@ class TestStreamingFlow:
         setup = streaming_setup
         producer = setup["producer"]
 
-        with patch('woodwork.core.stream_manager.StreamManager') as mock_manager_class:
+        with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
             mock_manager = Mock()
             mock_manager.create_stream = AsyncMock(return_value="error_stream")
             mock_manager.write_to_stream = AsyncMock(side_effect=Exception("Stream write failed"))
@@ -139,7 +139,7 @@ class TestStreamingFlow:
 
             # Producer should handle write errors gracefully
             try:
-                stream_id = await producer.produce_data(count=1)
+                await producer.produce_data(count=1)
                 # In real implementation, producer might handle errors internally
             except Exception as e:
                 assert "Stream write failed" in str(e)
@@ -227,10 +227,7 @@ class TestRealWorldStreamingScenarios:
                 if self.thought_stream:
                     await self.stream_output(self.thought_stream, "", is_final=True)
 
-        from woodwork.core.simple_message_bus import SimpleMessageBus
-        from woodwork.core.stream_manager import StreamManager
-
-        with patch('woodwork.core.stream_manager.StreamManager') as mock_manager_class:
+        with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
             mock_manager = Mock()
             mock_manager.create_stream = AsyncMock(return_value="thought_stream")
             mock_manager.send_chunk = AsyncMock(return_value=True)
@@ -273,7 +270,7 @@ class TestRealWorldStreamingScenarios:
                 await self.stream_output(stream_id, "", is_final=True)
                 return f"Tool executed: {action}"
 
-        with patch('woodwork.core.stream_manager.StreamManager') as mock_manager_class:
+        with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
             mock_manager = Mock()
             mock_manager.create_stream = AsyncMock(return_value="tool_stream")
             mock_manager.send_chunk = AsyncMock(return_value=True)
@@ -302,7 +299,7 @@ class TestRealWorldStreamingScenarios:
 
                 # Run components in sequence with streaming
                 for name, component in self.components.items():
-                    if hasattr(component, 'process_stream'):
+                    if hasattr(component, "process_stream"):
                         stream_id = await component.create_output_stream("workflow")
                         await component.stream_output(stream_id, data)
                         results[name] = stream_id
@@ -321,7 +318,7 @@ class TestRealWorldStreamingScenarios:
                 await self.stream_output(stream_id, "", is_final=True)
                 return stream_id
 
-        with patch('woodwork.core.stream_manager.StreamManager') as mock_manager_class:
+        with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
             stream_counter = 0
 
             def create_stream_id(*args, **kwargs):
@@ -372,9 +369,7 @@ class TestRealWorldStreamingScenarios:
                     await self.stream_output(stream_id, f"chunk_{i}")
                     chunk_end = time.time()
 
-                    self.performance_metrics[f"chunk_{i}"] = {
-                        "write_time": chunk_end - chunk_start
-                    }
+                    self.performance_metrics[f"chunk_{i}"] = {"write_time": chunk_end - chunk_start}
 
                 end_time = time.time()
                 self.performance_metrics["total_time"] = end_time - start_time
@@ -382,7 +377,7 @@ class TestRealWorldStreamingScenarios:
                 await self.stream_output(stream_id, "", is_final=True)
                 return stream_id
 
-        with patch('woodwork.core.stream_manager.StreamManager') as mock_manager_class:
+        with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
             mock_manager = Mock()
             mock_manager.create_stream = AsyncMock(return_value="monitored_stream")
             mock_manager.send_chunk = AsyncMock(return_value=True)

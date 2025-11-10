@@ -22,7 +22,7 @@ class tool_interface(ABC):
         """
         try:
             # Emit tool.execute event if component has event system
-            if hasattr(self, 'emit'):
+            if hasattr(self, "emit"):
                 log.debug(f"[Tool {self.name}] Executing via message bus: {action} with inputs {inputs}")
                 # Note: This is a sync emit since tools might be sync
                 # The event system handles async/sync automatically
@@ -31,14 +31,14 @@ class tool_interface(ABC):
             result = self.input(action, inputs)
 
             # Emit tool.result event if component has event system
-            if hasattr(self, 'emit'):
+            if hasattr(self, "emit"):
                 log.debug(f"[Tool {self.name}] Execution completed via message bus: {str(result)[:200]}")
 
             return result
 
         except Exception as e:
             # Emit tool.error event
-            if hasattr(self, 'emit'):
+            if hasattr(self, "emit"):
                 log.error(f"[Tool {self.name}] Execution failed via message bus: {e}")
             raise
 
@@ -54,24 +54,22 @@ class tool_interface(ABC):
             inputs = payload.get("inputs", {})
             request_id = payload.get("request_id")
 
-            log.info(f"[Tool {getattr(self, 'name', 'unknown')}] Received tool.execute message: {action} with inputs {inputs}")
+            log.info(
+                f"[Tool {getattr(self, 'name', 'unknown')}] Received tool.execute message: {action} with inputs {inputs}"
+            )
 
             # Execute the tool
             result = self.input(action, inputs)
 
             # Send result back via message bus if possible
-            if hasattr(self, 'send_to_component') and request_id:
+            if hasattr(self, "send_to_component") and request_id:
                 # Extract sender from request_id (format: sender_tool_id)
-                sender = request_id.split('_')[0] if '_' in request_id else None
+                sender = request_id.split("_")[0] if "_" in request_id else None
                 if sender:
                     await self.send_to_component(
                         sender,
                         "tool.result",
-                        {
-                            "request_id": request_id,
-                            "tool": getattr(self, 'name', 'unknown'),
-                            "result": result
-                        }
+                        {"request_id": request_id, "tool": getattr(self, "name", "unknown"), "result": result},
                     )
                     log.debug(f"[Tool {getattr(self, 'name', 'unknown')}] Sent result back to {sender} via message bus")
 
@@ -81,16 +79,12 @@ class tool_interface(ABC):
             log.error(f"[Tool {getattr(self, 'name', 'unknown')}] Error handling tool.execute message: {e}")
 
             # Send error back via message bus if possible
-            if hasattr(self, 'send_to_component') and request_id:
-                sender = request_id.split('_')[0] if '_' in request_id else None
+            if hasattr(self, "send_to_component") and request_id:
+                sender = request_id.split("_")[0] if "_" in request_id else None
                 if sender:
                     await self.send_to_component(
                         sender,
                         "tool.error",
-                        {
-                            "request_id": request_id,
-                            "tool": getattr(self, 'name', 'unknown'),
-                            "error": str(e)
-                        }
+                        {"request_id": request_id, "tool": getattr(self, "name", "unknown"), "error": str(e)},
                     )
             raise

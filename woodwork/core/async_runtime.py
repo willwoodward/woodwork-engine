@@ -7,10 +7,9 @@ that eliminates cross-thread communication and provides real-time event delivery
 
 import asyncio
 import logging
-import time
 from typing import Dict, Any, List, Optional
 
-from woodwork.core.unified_event_bus import UnifiedEventBus, get_global_event_bus
+from woodwork.core.unified_event_bus import get_global_event_bus
 from woodwork.core.session import ConversationSession
 from woodwork.types import InputReceivedPayload
 
@@ -104,11 +103,11 @@ class AsyncRuntime:
 
         # Find components that need async startup
         for component in self.components.values():
-            if hasattr(component, '_blocking_startup_task') and component._blocking_startup_task:
+            if hasattr(component, "_blocking_startup_task") and component._blocking_startup_task:
                 # MCP servers with blocking startup tasks
                 startup_tasks.append(component._blocking_startup_task)
                 log.debug("[AsyncRuntime] Found MCP server with blocking startup: %s", component.name)
-            elif hasattr(component, 'start') and asyncio.iscoroutinefunction(component.start):
+            elif hasattr(component, "start") and asyncio.iscoroutinefunction(component.start):
                 # Components with async start methods
                 startup_task = asyncio.create_task(component.start())
                 startup_tasks.append(startup_task)
@@ -121,7 +120,7 @@ class AsyncRuntime:
             try:
                 await asyncio.wait_for(
                     asyncio.gather(*startup_tasks, return_exceptions=True),
-                    timeout=30.0  # 30 second timeout for all components
+                    timeout=30.0,  # 30 second timeout for all components
                 )
                 log.info("[AsyncRuntime] All async components started successfully")
             except asyncio.TimeoutError:
@@ -148,8 +147,9 @@ class AsyncRuntime:
 
             # Use existing config parser for dictionary configs
             from woodwork.parser.config_parser import parse_config_dict
+
             parsed = parse_config_dict(config)
-            return parsed.get('components', [])
+            return parsed.get("components", [])
 
         except Exception as e:
             log.error("[AsyncRuntime] Error parsing components: %s", e)
@@ -159,7 +159,7 @@ class AsyncRuntime:
     def has_api_component(self) -> bool:
         """Check if any component is an API input component"""
         for component in self.components.values():
-            if hasattr(component, '__class__') and 'api' in component.__class__.__name__.lower():
+            if hasattr(component, "__class__") and "api" in component.__class__.__name__.lower():
                 return True
         return False
 
@@ -170,7 +170,7 @@ class AsyncRuntime:
         # Find API component
         api_component = None
         for component in self.components.values():
-            if hasattr(component, '__class__') and 'api' in component.__class__.__name__.lower():
+            if hasattr(component, "__class__") and "api" in component.__class__.__name__.lower():
                 api_component = component
                 break
 
@@ -179,16 +179,14 @@ class AsyncRuntime:
             return
 
         # Start API server as async task
-        self._api_server_task = asyncio.create_task(
-            self._run_api_server(api_component)
-        )
+        self._api_server_task = asyncio.create_task(self._run_api_server(api_component))
 
         log.info("[AsyncRuntime] API server task created")
 
     async def _run_api_server(self, api_component: Any) -> None:
         """Run API server for the component"""
         try:
-            if hasattr(api_component, 'start_server'):
+            if hasattr(api_component, "start_server"):
                 await api_component.start_server()
             else:
                 log.warning("[AsyncRuntime] API component has no start_server method")
@@ -234,7 +232,7 @@ class AsyncRuntime:
         # Find input component
         input_component = None
         for component in self.components.values():
-            if hasattr(component, 'input_function'):
+            if hasattr(component, "input_function"):
                 input_component = component
                 break
 
@@ -270,7 +268,7 @@ class AsyncRuntime:
         """Get user input asynchronously"""
         try:
             # If input_function is sync, run in executor
-            if hasattr(input_component, 'input_function'):
+            if hasattr(input_component, "input_function"):
                 if asyncio.iscoroutinefunction(input_component.input_function):
                     return await input_component.input_function()
                 else:
@@ -285,7 +283,9 @@ class AsyncRuntime:
             log.error("[AsyncRuntime] Error getting user input: %s", e)
             return ""
 
-    async def process_user_input(self, user_input: str, source_component: str, session: Optional[ConversationSession] = None) -> None:
+    async def process_user_input(
+        self, user_input: str, source_component: str, session: Optional[ConversationSession] = None
+    ) -> None:
         """Process user input through unified event system"""
         log.debug("[AsyncRuntime] Processing user input: %s", user_input[:100])
 
@@ -299,7 +299,7 @@ class AsyncRuntime:
             inputs=inputs,
             session_id=session.id if session else "default_session",
             component_id=source_component,
-            component_type="inputs"
+            component_type="inputs",
         )
 
         # Emit through unified event bus
@@ -307,7 +307,7 @@ class AsyncRuntime:
 
     async def process_component_input(self, component: Any, input_data: Any) -> Any:
         """Process input directly to component (for testing)"""
-        if hasattr(component, 'input'):
+        if hasattr(component, "input"):
             if asyncio.iscoroutinefunction(component.input):
                 return await component.input(input_data)
             else:
@@ -338,12 +338,12 @@ class AsyncRuntime:
         # Close components
         for component in self.components.values():
             try:
-                if hasattr(component, 'close') and asyncio.iscoroutinefunction(component.close):
+                if hasattr(component, "close") and asyncio.iscoroutinefunction(component.close):
                     await component.close()
-                elif hasattr(component, 'close'):
+                elif hasattr(component, "close"):
                     component.close()
             except Exception as e:
-                log.error("[AsyncRuntime] Error closing component %s: %s", getattr(component, 'name', 'unknown'), e)
+                log.error("[AsyncRuntime] Error closing component %s: %s", getattr(component, "name", "unknown"), e)
 
         log.info("[AsyncRuntime] Cleanup completed")
 
@@ -370,7 +370,7 @@ class AsyncRuntime:
         internal_components = {name: comp for name, comp in self.components.items() if name.startswith("internal_")}
 
         for component_name, component in internal_components.items():
-            if hasattr(component, 'start'):
+            if hasattr(component, "start"):
                 if asyncio.iscoroutinefunction(component.start):
                     log.debug("[AsyncRuntime] Scheduling async startup for internal component: %s", component_name)
                     startup_tasks.append(component.start())
@@ -413,6 +413,7 @@ class AsyncRuntime:
         except Exception as e:
             log.error("[AsyncRuntime] Failed to initialize message bus integration: %s", e)
             import traceback
+
             traceback.print_exc()
 
     def get_stats(self) -> Dict[str, Any]:
@@ -422,7 +423,7 @@ class AsyncRuntime:
             "components_count": len(self.components),
             "has_api_component": self.has_api_component(),
             "api_server_running": self._api_server_task is not None and not self._api_server_task.done(),
-            "event_bus_stats": self.event_bus.get_stats()
+            "event_bus_stats": self.event_bus.get_stats(),
         }
 
 

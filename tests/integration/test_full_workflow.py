@@ -28,23 +28,10 @@ class TestFullWorkflow:
         console_output = MockOutput("console_output")
 
         components = {
-            "coding_ag": {
-                "object": coding_agent,
-                "component": "llm",
-                "to": ["console_output"]
-            },
-            "planning_tools": {
-                "object": planning_tools,
-                "component": "planning_tools"
-            },
-            "github_api": {
-                "object": github_api,
-                "component": "functions"
-            },
-            "console_output": {
-                "object": console_output,
-                "component": "console"
-            }
+            "coding_ag": {"object": coding_agent, "component": "llm", "to": ["console_output"]},
+            "planning_tools": {"object": planning_tools, "component": "planning_tools"},
+            "github_api": {"object": github_api, "component": "functions"},
+            "console_output": {"object": console_output, "component": "console"},
         }
 
         # Register components and configure routing
@@ -53,8 +40,7 @@ class TestFullWorkflow:
         router.configure_routing()
 
         # Mock event system
-        from tests.unit.fixtures.event_fixtures import MockEventManager
-        event_manager = MockUnifiedEventBus()
+        event_manager = Mock()
 
         yield {
             "router": router,
@@ -64,7 +50,7 @@ class TestFullWorkflow:
             "planning_tools": planning_tools,
             "github_api": github_api,
             "console_output": console_output,
-            "components": components
+            "components": components,
         }
 
         await message_bus.stop()
@@ -72,7 +58,7 @@ class TestFullWorkflow:
     async def test_complete_issue_analysis_workflow(self, full_system_setup):
         """Test complete workflow: input -> planning -> GitHub -> analysis -> output."""
         setup = full_system_setup
-        router = setup["router"]
+        setup["router"]
         coding_agent = setup["coding_agent"]
         planning_tools = setup["planning_tools"]
         github_api = setup["github_api"]
@@ -94,26 +80,19 @@ class TestFullWorkflow:
 
         # Simulate complete workflow
         # 1. Agent creates plan
-        plan_result = await coding_agent.execute_tool("planning_tools", "create_plan", {
-            "task": "Analyze GitHub issue #113"
-        })
+        plan_result = await coding_agent.execute_tool(
+            "planning_tools", "create_plan", {"task": "Analyze GitHub issue #113"}
+        )
 
         # 2. Agent fetches GitHub data
-        github_result = await coding_agent.execute_tool("github_api", "get_issue", {
-            "repo": "willwoodward/woodwork-engine",
-            "issue": 113
-        })
+        github_result = await coding_agent.execute_tool(
+            "github_api", "get_issue", {"repo": "willwoodward/woodwork-engine", "issue": 113}
+        )
 
         # 3. Emit events for tracking
-        event_manager.emit("agent.step_complete", {
-            "step": "planning",
-            "result": plan_result
-        })
+        event_manager.emit("agent.step_complete", {"step": "planning", "result": plan_result})
 
-        event_manager.emit("agent.step_complete", {
-            "step": "data_fetch",
-            "result": github_result
-        })
+        event_manager.emit("agent.step_complete", {"step": "data_fetch", "result": github_result})
 
         # Verify workflow completion
         assert plan_result == "Planning completed"
@@ -123,8 +102,8 @@ class TestFullWorkflow:
     async def test_streaming_with_message_bus_workflow(self, full_system_setup):
         """Test workflow combining streaming and message bus communication."""
         setup = full_system_setup
-        router = setup["router"]
-        coding_agent = setup["coding_agent"]
+        setup["router"]
+        setup["coding_agent"]
 
         # Add streaming capabilities to agent
         from woodwork.components.streaming_mixin import StreamingMixin
@@ -152,7 +131,7 @@ class TestFullWorkflow:
                 return result
 
         # Mock streaming infrastructure
-        with patch('woodwork.core.stream_manager.StreamManager') as mock_manager_class:
+        with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
             mock_manager = Mock()
             mock_manager.create_stream = AsyncMock(return_value="agent_thoughts")
             mock_manager.send_chunk = AsyncMock(return_value=True)
@@ -162,9 +141,7 @@ class TestFullWorkflow:
             streaming_agent.set_stream_manager(mock_manager)
             streaming_agent.execute_tool = AsyncMock(return_value="Tool executed successfully")
 
-            result = await streaming_agent.execute_with_streaming(
-                "planning_tools", "create_plan", {"task": "test"}
-            )
+            result = await streaming_agent.execute_with_streaming("planning_tools", "create_plan", {"task": "test"})
 
             assert result == "Tool executed successfully"
             assert mock_manager.send_chunk.call_count == 4  # 3 stream writes + final
@@ -172,7 +149,7 @@ class TestFullWorkflow:
     async def test_error_handling_across_systems(self, full_system_setup):
         """Test error handling across message bus, streaming, and events."""
         setup = full_system_setup
-        router = setup["router"]
+        setup["router"]
         coding_agent = setup["coding_agent"]
         planning_tools = setup["planning_tools"]
         event_manager = setup["event_manager"]
@@ -189,11 +166,7 @@ class TestFullWorkflow:
                 return "Success"
             except Exception as e:
                 # Emit error event
-                event_manager.emit("agent.error", {
-                    "tool": tool_name,
-                    "error": str(e),
-                    "action": action
-                })
+                event_manager.emit("agent.error", {"tool": tool_name, "error": str(e), "action": action})
                 return f"Error: {str(e)}"
 
         coding_agent.execute_tool = mock_execute_with_error_handling
@@ -221,14 +194,14 @@ class TestFullWorkflow:
 
         # Mock agent executions
         async def mock_workflow(agent_idx):
-            agent = agents[agent_idx]
-            tool = tools[agent_idx]
+            agents[agent_idx]
+            tools[agent_idx]
 
             # Simulate tool execution
             success, request_id = await router.send_to_component_with_response(
                 name=f"tool_{agent_idx}",
                 source_component_name=f"agent_{agent_idx}",
-                data={"action": "execute", "inputs": {}}
+                data={"action": "execute", "inputs": {}},
             )
             return success
 
@@ -241,7 +214,7 @@ class TestFullWorkflow:
     async def test_performance_under_load(self, full_system_setup):
         """Test system performance under load."""
         setup = full_system_setup
-        router = setup["router"]
+        setup["router"]
         message_bus = setup["message_bus"]
 
         # Register many components
@@ -257,14 +230,13 @@ class TestFullWorkflow:
 
         async def send_message(i):
             message = create_component_message(
-                source="load_test_source",
-                target=f"load_test_component_{i % 50}",
-                data={"task_id": i}
+                source="load_test_source", target=f"load_test_component_{i % 50}", data={"task_id": i}
             )
             return await message_bus.send_to_component(message)
 
         # Measure performance
         import time
+
         start_time = time.time()
 
         tasks = [send_message(i) for i in range(500)]  # 500 messages
@@ -286,16 +258,11 @@ class TestFullWorkflow:
         # Simulate long-running workflow
         for iteration in range(100):
             # Emit events
-            event_manager.emit("agent.thought", {
-                "iteration": iteration,
-                "thought": f"Processing step {iteration}"
-            })
+            event_manager.emit("agent.thought", {"iteration": iteration, "thought": f"Processing step {iteration}"})
 
             # Send messages
             success, request_id = await router.send_to_component_with_response(
-                name="planning_tools",
-                source_component_name="coding_ag",
-                data={"iteration": iteration}
+                name="planning_tools", source_component_name="coding_ag", data={"iteration": iteration}
             )
 
             # Simulate cleanup every 10 iterations
@@ -398,18 +365,14 @@ class TestRealWorldCompleteScenarios:
         # Process support ticket
         ticket_data = {"issue": "Login problems", "user": "customer@example.com"}
 
-        classification = await ticket_classifier.execute_tool(
-            "classify_ticket", "analyze", ticket_data
-        )
+        classification = await ticket_classifier.execute_tool("classify_ticket", "analyze", ticket_data)
 
         kb_result = knowledge_base.input("search", {"query": "login problems"})
 
         response = await response_generator.execute_tool(
-            "generate_response", "create", {
-                "classification": classification,
-                "kb_info": kb_result,
-                "ticket": ticket_data
-            }
+            "generate_response",
+            "create",
+            {"classification": classification, "kb_info": kb_result, "ticket": ticket_data},
         )
 
         assert "Technical Issue" in classification

@@ -6,14 +6,19 @@ the new message API with the existing StreamManager infrastructure.
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.core.message_bus.integration import (
-    MessageBusIntegration,
-    StreamingChunk
-)
+from woodwork.core.message_bus.integration import MessageBusIntegration, StreamingChunk
+
+
+class MockRequestingComponent(MessageBusIntegration):
+    """Mock component for testing requests."""
+
+    def __init__(self, name, router):
+        super().__init__()
+        self.name = name
+        self._router = router
 
 
 @pytest.mark.slow
@@ -76,8 +81,9 @@ class TestStreamingMessageAPIDesign:
         router = setup["router"]
 
         # TDD: Router should have streaming support
-        assert not hasattr(router, 'send_to_component_with_stream'), \
+        assert not hasattr(router, "send_to_component_with_stream"), (
             "Router should not have streaming support yet (drives implementation)"
+        )
 
         # This is what we want to implement
         # success, stream_id = await router.send_to_component_with_stream(
@@ -115,11 +121,7 @@ class TestStreamingMessageAPIDesign:
 
         # TDD: This drives us to implement stream request handling
         with pytest.raises(NotImplementedError):
-            await target.handle_stream_request(
-                {"prompt": "test"},
-                "stream_123",
-                "requesting_component"
-            )
+            await target.handle_stream_request({"prompt": "test"}, "stream_123", "requesting_component")
 
     @pytest.mark.asyncio
     async def test_stream_manager_should_integrate_with_message_bus(self, streaming_setup):
@@ -129,7 +131,6 @@ class TestStreamingMessageAPIDesign:
         Currently StreamManager is used within components. We need it to work
         across components via the message bus.
         """
-        setup = streaming_setup
 
         # TDD: We need a message bus aware StreamManager
         from woodwork.core.stream_manager import StreamManager
@@ -138,8 +139,9 @@ class TestStreamingMessageAPIDesign:
         stream_manager = StreamManager()
 
         # This should be possible but isn't implemented yet
-        assert not hasattr(stream_manager, 'send_chunk_via_message_bus'), \
+        assert not hasattr(stream_manager, "send_chunk_via_message_bus"), (
             "StreamManager should not have message bus integration yet"
+        )
 
         # This is what we want to implement:
         # await stream_manager.send_chunk_via_message_bus(
@@ -157,7 +159,6 @@ class TestStreamingMessageAPIDesign:
         When converting from StreamManager chunks to StreamingChunk objects,
         we need to preserve all metadata, timing, and ordering information.
         """
-        setup = streaming_setup
 
         # Create a realistic streaming chunk with metadata
         chunk = StreamingChunk(
@@ -169,8 +170,8 @@ class TestStreamingMessageAPIDesign:
                 "stream_id": "stream_123",
                 "source_component": "llm_component",
                 "chunk_type": "text",
-                "encoding": "utf-8"
-            }
+                "encoding": "utf-8",
+            },
         )
 
         # TDD: All metadata should be preserved
@@ -228,11 +229,7 @@ class TestStreamingMessageAPIIntegration:
         mock_stream_manager.send_chunk = AsyncMock(return_value=True)
         mock_stream_manager.close_stream = AsyncMock(return_value=True)
 
-        yield {
-            "bus": bus,
-            "router": router,
-            "stream_manager": mock_stream_manager
-        }
+        yield {"bus": bus, "router": router, "stream_manager": mock_stream_manager}
 
         await bus.stop()
 
@@ -263,7 +260,7 @@ class TestStreamingMessageAPIIntegration:
                 # Simulate generating streaming output
                 chunks = ["Hello", " world", "!", ""]
                 for i, chunk_data in enumerate(chunks):
-                    is_final = (i == len(chunks) - 1)
+                    is_final = i == len(chunks) - 1
                     await self.stream_output(stream_id, chunk_data, is_final)
 
             async def stream_output(self, stream_id, data, is_final=False):
@@ -284,7 +281,7 @@ class TestStreamingMessageAPIIntegration:
         # Configure router with both components
         components = {
             "test_llm": {"object": llm, "component": "llm"},
-            "test_requester": {"object": requester, "component": "agent"}
+            "test_requester": {"object": requester, "component": "agent"},
         }
         setup["router"].configure_from_components(components)
 
@@ -330,7 +327,7 @@ class TestStreamingMessageAPIIntegration:
                 """Mock stream output."""
                 pass  # Success
 
-        component = MockFailingStreamComponent("failing_stream", setup["router"])
+        MockFailingStreamComponent("failing_stream", setup["router"])
 
         # Mock requesting component
         requester = MockRequestingComponent("requester", setup["router"])
@@ -373,8 +370,7 @@ class TestStreamingRouterIntegration:
         router = setup["router"]
 
         # TDD: This method should exist after implementation
-        assert not hasattr(router, 'send_to_component_with_stream'), \
-            "Router streaming not implemented yet"
+        assert not hasattr(router, "send_to_component_with_stream"), "Router streaming not implemented yet"
 
         # After implementation, this should work:
         # success, stream_id = await router.send_to_component_with_stream(
@@ -392,14 +388,13 @@ class TestStreamingRouterIntegration:
 
         The router needs new message types for streaming communication.
         """
-        setup = router_setup
 
         # TDD: These message types should be supported
         expected_stream_message_types = [
-            "stream_request",   # Request to start streaming
-            "stream_chunk",     # Individual streaming chunks
+            "stream_request",  # Request to start streaming
+            "stream_chunk",  # Individual streaming chunks
             "stream_complete",  # Stream finished
-            "stream_error"      # Stream error
+            "stream_error",  # Stream error
         ]
 
         # Currently not implemented

@@ -6,7 +6,7 @@ Handles JSON-RPC message format used by Model Context Protocol.
 
 import json
 import uuid
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 from dataclasses import dataclass
 
 
@@ -100,7 +100,7 @@ class MCPMessage:
             method=data.get("method"),
             params=data.get("params"),
             result=data.get("result"),
-            error=data.get("error")
+            error=data.get("error"),
         )
 
 

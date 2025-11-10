@@ -9,10 +9,9 @@ This test reproduces the exact scenario from the user's logs where:
 
 import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
-from woodwork.core.unified_event_bus import UnifiedEventBus, get_global_event_bus
+from unittest.mock import Mock
+from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.message_bus.integration import GlobalMessageBusManager
 from woodwork.types.events import GenericPayload
 
 
@@ -29,8 +28,8 @@ class TestAgentConsoleOutputIssue:
         mock_agent.name = "coding_ag"
         mock_agent.type = "agent"
         # Agent doesn't have 'to' attribute
-        if hasattr(mock_agent, 'to'):
-            delattr(mock_agent, 'to')
+        if hasattr(mock_agent, "to"):
+            delattr(mock_agent, "to")
 
         event_bus.register_component(mock_agent)
         event_bus.configure_routing()
@@ -52,11 +51,11 @@ class TestAgentConsoleOutputIssue:
         event_bus = UnifiedEventBus()
 
         # Create agent without explicit output - use spec to prevent auto-creation of attributes
-        mock_agent = Mock(spec=['name', 'type', '__class__'])
+        mock_agent = Mock(spec=["name", "type", "__class__"])
         mock_agent.name = "coding_ag"
         mock_agent.type = "agent"
         # Set __class__ for type inference to work
-        mock_agent.__class__ = type('llm', (), {})
+        mock_agent.__class__ = type("llm", (), {})
 
         event_bus.register_component(mock_agent)
         event_bus.configure_routing()
@@ -66,8 +65,9 @@ class TestAgentConsoleOutputIssue:
 
         print(f"\n[TEST] After inference, targets: {targets}")
 
-        assert "_console_output" in targets, \
+        assert "_console_output" in targets, (
             "Agents without explicit 'to' should be routed to _console_output by inference"
+        )
 
     @pytest.mark.asyncio
     async def test_emit_from_component_without_routing_targets(self):
@@ -91,9 +91,9 @@ class TestAgentConsoleOutputIssue:
         message_bus.register_component_handler("_console_output", console_handler)
 
         # Create agent WITHOUT routing - use spec to prevent auto-creation
-        mock_agent = Mock(spec=['name', '__class__'])
+        mock_agent = Mock(spec=["name", "__class__"])
         mock_agent.name = "coding_ag"
-        mock_agent.__class__ = type('llm', (), {})
+        mock_agent.__class__ = type("llm", (), {})
 
         event_bus.register_component(mock_agent)
         event_bus.configure_routing()
@@ -104,10 +104,7 @@ class TestAgentConsoleOutputIssue:
         payload = GenericPayload(
             component_id="coding_ag",
             component_type="agent",
-            data={
-                "response": "Final Answer: Test response",
-                "source_component": "coding_ag"
-            }
+            data={"response": "Final Answer: Test response", "source_component": "coding_ag"},
         )
 
         await event_bus.emit_from_component("coding_ag", "agent.response", payload)
@@ -124,8 +121,7 @@ class TestAgentConsoleOutputIssue:
         await message_bus.stop()
 
         # This assertion should fail, identifying the issue
-        assert received_data is not None, \
-            "Console handler should have received the agent response"
+        assert received_data is not None, "Console handler should have received the agent response"
 
     @pytest.mark.asyncio
     async def test_full_scenario_with_manual_routing(self):
@@ -162,10 +158,7 @@ class TestAgentConsoleOutputIssue:
         payload = GenericPayload(
             component_id="coding_ag",
             component_type="agent",
-            data={
-                "response": "Final Answer: Test response",
-                "source_component": "coding_ag"
-            }
+            data={"response": "Final Answer: Test response", "source_component": "coding_ag"},
         )
 
         await event_bus.emit_from_component("coding_ag", "agent.response", payload)
@@ -184,15 +177,16 @@ class TestAgentConsoleOutputIssue:
         event_bus = UnifiedEventBus()
 
         # Check if method exists
-        assert hasattr(event_bus, '_infer_routing_patterns'), \
+        assert hasattr(event_bus, "_infer_routing_patterns"), (
             "UnifiedEventBus should have _infer_routing_patterns method"
+        )
 
         # Create agent without routing
         mock_agent = Mock()
         mock_agent.name = "coding_ag"
         mock_agent.type = "agent"
-        if hasattr(mock_agent, 'to'):
-            delattr(mock_agent, 'to')
+        if hasattr(mock_agent, "to"):
+            delattr(mock_agent, "to")
 
         event_bus.register_component(mock_agent)
 

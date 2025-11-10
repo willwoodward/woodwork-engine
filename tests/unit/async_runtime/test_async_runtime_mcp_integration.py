@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import pytest
 """
 Unit tests for AsyncRuntime MCP server integration and blocking initialization.
 
@@ -10,7 +9,6 @@ async initialization before LLM agents access their descriptions.
 import asyncio
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-import logging
 
 from woodwork.core.async_runtime import AsyncRuntime
 from woodwork.components.mcp.mcp_server import MCPServer
@@ -25,17 +23,13 @@ class TestAsyncRuntimeMCPIntegration:
     @pytest.fixture
     def mock_mcp_server(self):
         """Create a mock MCP server for testing."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0",
-            env={"TEST_TOKEN": "test-value"}
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0", env={"TEST_TOKEN": "test-value"})
         return server
 
     @pytest.fixture
     def mock_agent(self):
         """Create a mock agent that accesses tool descriptions."""
+
         class MockAgent:
             def __init__(self):
                 self.name = "test_agent"
@@ -66,9 +60,7 @@ class TestAsyncRuntimeMCPIntegration:
             await asyncio.sleep(0.1)  # Simulate startup delay
             mock_mcp_server._started = True
             mock_mcp_server._capabilities_fetched = True
-            mock_mcp_server._capabilities = {
-                "tools": [{"name": "test_tool", "description": "Test tool"}]
-            }
+            mock_mcp_server._capabilities = {"tools": [{"name": "test_tool", "description": "Test tool"}]}
             nonlocal startup_completed
             startup_completed = True
 
@@ -99,6 +91,7 @@ class TestAsyncRuntimeMCPIntegration:
     @pytest.mark.asyncio
     async def test_startup_async_components_handles_timeout(self, mock_mcp_server):
         """Test that startup_async_components handles slow-starting components gracefully."""
+
         # Setup mock for slow startup that times out
         async def slow_blocking_startup():
             await asyncio.sleep(35)  # Longer than 30s timeout
@@ -122,6 +115,7 @@ class TestAsyncRuntimeMCPIntegration:
     @pytest.mark.asyncio
     async def test_startup_async_components_handles_exceptions(self, mock_mcp_server):
         """Test that startup_async_components handles component startup exceptions."""
+
         # Setup mock that raises an exception
         async def failing_startup():
             await asyncio.sleep(0.1)
@@ -143,11 +137,7 @@ class TestAsyncRuntimeMCPIntegration:
     async def test_startup_async_components_with_mixed_components(self):
         """Test startup with mix of sync and async components."""
         # Create mock MCP server with async startup
-        mcp_server = MCPServer(
-            name="async_mcp",
-            server="test/async",
-            version="1.0"
-        )
+        mcp_server = MCPServer(name="async_mcp", server="test/async", version="1.0")
 
         async def mock_startup():
             await asyncio.sleep(0.1)
@@ -174,13 +164,14 @@ class TestAsyncRuntimeMCPIntegration:
 
         # Verify async component started, sync component unaffected
         assert mcp_server._started
-        assert hasattr(sync_comp, 'name')
+        assert hasattr(sync_comp, "name")
 
         await runtime._cleanup()
 
     @pytest.mark.asyncio
     async def test_startup_async_components_no_async_components(self):
         """Test startup when no async components are present."""
+
         # Create only sync components
         class SyncComponent:
             def __init__(self, name):
@@ -210,25 +201,17 @@ class TestMCPServerBlockingInitialization:
 
     async def test_mcp_server_creates_blocking_startup_task(self):
         """Test that MCP server creates blocking startup task during initialization."""
-        with patch.object(asyncio, 'get_running_loop', return_value=Mock()):
-            server = MCPServer(
-                name="test_server",
-                server="test/server",
-                version="1.0"
-            )
+        with patch.object(asyncio, "get_running_loop", return_value=Mock()):
+            server = MCPServer(name="test_server", server="test/server", version="1.0")
 
             # Should have created a blocking startup task
-            assert hasattr(server, '_blocking_startup_task')
+            assert hasattr(server, "_blocking_startup_task")
             assert server._blocking_startup_task is not None
 
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_success(self):
         """Test successful blocking startup sequence."""
-        server = MCPServer(
-            name="test_server",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_server", server="test/server", version="1.0")
 
         # Mock successful startup methods
         async def mock_start():
@@ -237,9 +220,7 @@ class TestMCPServerBlockingInitialization:
             server.metadata.description = "Test Server"
 
         async def mock_fetch_capabilities():
-            server._capabilities = {
-                "tools": [{"name": "test_tool", "description": "Test"}]
-            }
+            server._capabilities = {"tools": [{"name": "test_tool", "description": "Test"}]}
             server._capabilities_fetched = True
 
         server.start = mock_start
@@ -256,11 +237,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_timeout(self):
         """Test blocking startup sequence with timeout."""
-        server = MCPServer(
-            name="test_server",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_server", server="test/server", version="1.0")
 
         # Mock slow startup
         async def slow_start():
@@ -284,11 +261,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_handles_exceptions(self):
         """Test that blocking startup handles exceptions gracefully."""
-        server = MCPServer(
-            name="test_server",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_server", server="test/server", version="1.0")
 
         # Mock failing startup
         async def failing_start():
@@ -310,11 +283,7 @@ class TestMCPServerDescriptionIntegration:
 
     def test_description_before_startup(self):
         """Test description property before startup completes."""
-        server = MCPServer(
-            name="test_server",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_server", server="test/server", version="1.0")
 
         description = server.description
 
@@ -324,11 +293,7 @@ class TestMCPServerDescriptionIntegration:
 
     def test_description_after_successful_startup(self):
         """Test description property after successful startup."""
-        server = MCPServer(
-            name="test_server",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_server", server="test/server", version="1.0")
 
         # Mock successful state
         server._started = True
@@ -338,10 +303,10 @@ class TestMCPServerDescriptionIntegration:
         server._capabilities = {
             "tools": [
                 {"name": "get_issue", "description": "Get issue"},
-                {"name": "create_pr", "description": "Create PR"}
+                {"name": "create_pr", "description": "Create PR"},
             ],
             "resources": [{"name": "repo", "description": "Repository"}],
-            "prompts": []
+            "prompts": [],
         }
 
         description = server.description
@@ -354,11 +319,7 @@ class TestMCPServerDescriptionIntegration:
 
     def test_description_with_many_tools(self):
         """Test description property with many tools (should truncate)."""
-        server = MCPServer(
-            name="test_server",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_server", server="test/server", version="1.0")
 
         # Mock state with many tools
         server._started = True
@@ -368,7 +329,7 @@ class TestMCPServerDescriptionIntegration:
         server._capabilities = {
             "tools": [{"name": f"tool_{i}", "description": f"Tool {i}"} for i in range(10)],
             "resources": [],
-            "prompts": []
+            "prompts": [],
         }
 
         description = server.description
@@ -389,10 +350,7 @@ class TestEndToEndIntegration:
         """Test the complete flow from component creation to tool documentation."""
         # Create MCP server
         server = MCPServer(
-            name="github_mcp",
-            server="github/mcp-server",
-            version="latest",
-            env={"GITHUB_TOKEN": "test-token"}
+            name="github_mcp", server="github/mcp-server", version="latest", env={"GITHUB_TOKEN": "test-token"}
         )
 
         # Mock successful capabilities
@@ -405,7 +363,7 @@ class TestEndToEndIntegration:
             server._capabilities = {
                 "tools": [
                     {"name": "get_issue", "description": "Get GitHub issue"},
-                    {"name": "create_pr", "description": "Create pull request"}
+                    {"name": "create_pr", "description": "Create pull request"},
                 ]
             }
             server._capabilities_fetched = True
@@ -459,11 +417,7 @@ class TestEndToEndIntegration:
     async def test_integration_with_runtime_start_method(self):
         """Test integration with AsyncRuntime.start() method."""
         # Mock the config parsing to return our test components
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mock successful startup
         async def mock_start():
@@ -484,10 +438,10 @@ class TestEndToEndIntegration:
         async def mock_parse_components(config_dict):
             return [server]
 
-        with patch.object(runtime, '_parse_components', mock_parse_components):
-            with patch.object(runtime, '_main_loop', AsyncMock()):  # Skip main loop
-                with patch.object(runtime.event_bus, 'configure_routing'):
-                    with patch.object(runtime, 'has_api_component', return_value=False):
+        with patch.object(runtime, "_parse_components", mock_parse_components):
+            with patch.object(runtime, "_main_loop", AsyncMock()):  # Skip main loop
+                with patch.object(runtime.event_bus, "configure_routing"):
+                    with patch.object(runtime, "has_api_component", return_value=False):
                         # This should call startup_async_components as part of the flow
                         await runtime.start(config)
 

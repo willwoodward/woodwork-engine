@@ -7,9 +7,8 @@ component-to-component routing, message bus compatibility, and edge cases.
 
 import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.types import InputReceivedPayload, AgentThoughtPayload
 
 
 @pytest.mark.slow
@@ -165,12 +164,14 @@ class TestUnifiedEventBusRouting:
             "api_input": ["coding_agent"],
             "llm": ["memory", "console"],
             "tool": ["response_handler"],
-            "standalone": []
+            "standalone": [],
         }
 
         for component_name, expected_targets in expected_routes.items():
             actual_targets = router._routing_table.get(component_name, [])
-            assert actual_targets == expected_targets, f"Failed for {component_name}: expected {expected_targets}, got {actual_targets}"
+            assert actual_targets == expected_targets, (
+                f"Failed for {component_name}: expected {expected_targets}, got {actual_targets}"
+            )
 
     def test_routing_inference_for_undefined_components(self, router):
         """Test routing with components that have no explicit routing."""
@@ -234,9 +235,7 @@ class TestUnifiedEventBusRouting:
 
         # Test send_to_component_with_response
         success, request_id = await router.send_to_component_with_response(
-            name="target",
-            source_component_name="source",
-            data={"action": "test", "inputs": {"key": "value"}}
+            name="target", source_component_name="source", data={"action": "test", "inputs": {"key": "value"}}
         )
 
         # Verify success
@@ -285,21 +284,21 @@ class TestUnifiedEventBusRouting:
         info = router.get_routing_info("agent")
         assert info["component_name"] == "agent"
         assert info["targets"] == ["tool1", "tool2", "output"]
-        assert info["is_registered"] == True
+        assert info["is_registered"]
         assert info["target_count"] == 3
 
         # Test routing info for component without targets
         info = router.get_routing_info("standalone")
         assert info["component_name"] == "standalone"
         assert info["targets"] == []
-        assert info["is_registered"] == True
+        assert info["is_registered"]
         assert info["target_count"] == 0
 
         # Test routing info for non-existent component
         info = router.get_routing_info("nonexistent")
         assert info["component_name"] == "nonexistent"
         assert info["targets"] == []
-        assert info["is_registered"] == False
+        assert not info["is_registered"]
         assert info["target_count"] == 0
 
     async def test_routing_with_async_components(self, router):
@@ -313,9 +312,7 @@ class TestUnifiedEventBusRouting:
 
         # Test async delivery
         success, request_id = await router.send_to_component_with_response(
-            name="async_target",
-            source_component_name="test_source",
-            data={"test": "data"}
+            name="async_target", source_component_name="test_source", data={"test": "data"}
         )
 
         assert success
@@ -325,9 +322,7 @@ class TestUnifiedEventBusRouting:
         """Test routing error handling for missing components."""
         # Try to route to non-existent component
         success, request_id = await router.send_to_component_with_response(
-            name="nonexistent",
-            source_component_name="test_source",
-            data={"test": "data"}
+            name="nonexistent", source_component_name="test_source", data={"test": "data"}
         )
 
         assert not success
@@ -358,7 +353,7 @@ class TestUnifiedEventBusRouting:
         success, request_id = await router.send_to_component_with_response(
             name="planning_tools",
             source_component_name="test_agent",
-            data={"action": "write_todos", "inputs": {"todos": ["task1", "task2"]}}
+            data={"action": "write_todos", "inputs": {"todos": ["task1", "task2"]}},
         )
 
         assert success
@@ -392,9 +387,7 @@ class TestUnifiedEventBusRouting:
         tasks = []
         for i, target in enumerate(targets):
             task = router.send_to_component_with_response(
-                name=f"target_{i}",
-                source_component_name="test_source",
-                data={"test": f"data_{i}"}
+                name=f"target_{i}", source_component_name="test_source", data={"test": f"data_{i}"}
             )
             tasks.append(task)
 

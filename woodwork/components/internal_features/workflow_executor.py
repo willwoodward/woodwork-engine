@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class WorkflowExecutionContext:
     """Context for workflow execution."""
+
     workflow_id: str
     inputs: Dict[str, Any]
     session_id: str
@@ -39,12 +40,7 @@ class WorkflowExecutor:
         self._agent = agent_component
         log.debug("WorkflowExecutor initialized")
 
-    async def execute_workflow(
-        self,
-        workflow_id: str,
-        inputs: Dict[str, Any],
-        session_id: str
-    ) -> Dict[str, Any]:
+    async def execute_workflow(self, workflow_id: str, inputs: Dict[str, Any], session_id: str) -> Dict[str, Any]:
         """
         Execute a workflow by ID with given inputs.
 
@@ -65,7 +61,7 @@ class WorkflowExecutor:
             inputs=inputs,
             session_id=session_id,
             execution_id=execution_id,
-            variables=inputs.copy()
+            variables=inputs.copy(),
         )
 
         log.info(f"Executing workflow {workflow_id} with execution_id {execution_id}")
@@ -83,25 +79,20 @@ class WorkflowExecutor:
             results.append(result)
 
             # Store output in context for dependent actions
-            if action.get('output'):
-                context.variables[action['output']] = result.get('output')
+            if action.get("output"):
+                context.variables[action["output"]] = result.get("output")
 
         log.info(f"Workflow {workflow_id} execution completed")
 
         return {
-            'execution_id': execution_id,
-            'workflow_id': workflow_id,
-            'status': 'completed',
-            'results': results,
-            'final_outputs': context.variables
+            "execution_id": execution_id,
+            "workflow_id": workflow_id,
+            "status": "completed",
+            "results": results,
+            "final_outputs": context.variables,
         }
 
-    async def execute_entrypoint(
-        self,
-        entrypoint_name: str,
-        inputs: Dict[str, Any],
-        session_id: str
-    ) -> Dict[str, Any]:
+    async def execute_entrypoint(self, entrypoint_name: str, inputs: Dict[str, Any], session_id: str) -> Dict[str, Any]:
         """
         Execute workflow via entrypoint name.
 
@@ -154,11 +145,7 @@ class WorkflowExecutor:
         result = self._neo4j.run(query, {"workflow_id": workflow_id})
         return result if result else []
 
-    async def _execute_action(
-        self,
-        action: Dict[str, Any],
-        context: WorkflowExecutionContext
-    ) -> Dict[str, Any]:
+    async def _execute_action(self, action: Dict[str, Any], context: WorkflowExecutionContext) -> Dict[str, Any]:
         """
         Execute a single action via unified event bus.
 
@@ -170,63 +157,48 @@ class WorkflowExecutor:
             Dict with action execution results
         """
         # Parse inputs if stored as JSON string
-        if isinstance(action['inputs'], str):
+        if isinstance(action["inputs"], str):
             try:
-                action_inputs = json.loads(action['inputs'])
+                action_inputs = json.loads(action["inputs"])
             except json.JSONDecodeError:
                 log.warning(f"Could not parse action inputs as JSON: {action['inputs']}")
                 action_inputs = {}
         else:
-            action_inputs = action['inputs']
+            action_inputs = action["inputs"]
 
         # Resolve input variables from context
         resolved_inputs = self._resolve_inputs(action_inputs, context.variables)
 
         log.debug(
-            f"[WorkflowExecutor] Executing action: {action['tool']}.{action['action']} "
-            f"with inputs: {resolved_inputs}"
+            f"[WorkflowExecutor] Executing action: {action['tool']}.{action['action']} with inputs: {resolved_inputs}"
         )
 
         # Emit tool.call event (pipes can transform)
         # Note: emit is sync, wraps async event processing internally
-        tool_call_payload = emit("tool.call", {
-            "tool": action['tool'],
-            "args": resolved_inputs
-        })
+        tool_call_payload = emit("tool.call", {"tool": action["tool"], "args": resolved_inputs})
 
         # Execute via component request API (goes through event bus)
         try:
             result = await self._agent.request(
-                tool_call_payload.tool,
-                {
-                    "action": action['action'],
-                    "inputs": tool_call_payload.args
-                }
+                tool_call_payload.tool, {"action": action["action"], "inputs": tool_call_payload.args}
             )
         except Exception as e:
             log.error(f"[WorkflowExecutor] Error executing {action['tool']}.{action['action']}: {e}")
             result = f"Error: {e}"
 
         # Emit tool.observation event (hooks can observe)
-        obs_payload = emit("tool.observation", {
-            "tool": action['tool'],
-            "observation": str(result)
-        })
+        obs_payload = emit("tool.observation", {"tool": action["tool"], "observation": str(result)})
 
         return {
-            'action_id': action['id'],
-            'tool': action['tool'],
-            'action': action['action'],
-            'output': result,
-            'observation': obs_payload.observation,
-            'output_var': action.get('output')
+            "action_id": action["id"],
+            "tool": action["tool"],
+            "action": action["action"],
+            "output": result,
+            "observation": obs_payload.observation,
+            "output_var": action.get("output"),
         }
 
-    def _resolve_inputs(
-        self,
-        inputs: Dict[str, Any],
-        variables: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _resolve_inputs(self, inputs: Dict[str, Any], variables: Dict[str, Any]) -> Dict[str, Any]:
         """
         Resolve input variable references to actual values.
 
@@ -268,15 +240,11 @@ class WorkflowExecutor:
         result = self._neo4j.run(query, {"name": entrypoint_name})
 
         if result and len(result) > 0:
-            return result[0]['workflow_id']
+            return result[0]["workflow_id"]
 
         return None
 
-    async def _validate_entrypoint_inputs(
-        self,
-        entrypoint_name: str,
-        inputs: Dict[str, Any]
-    ) -> None:
+    async def _validate_entrypoint_inputs(self, entrypoint_name: str, inputs: Dict[str, Any]) -> None:
         """
         Validate inputs against entrypoint schema.
 
@@ -297,7 +265,7 @@ class WorkflowExecutor:
         if not result or len(result) == 0:
             return  # No schema to validate against
 
-        schema = result[0].get('schema')
+        schema = result[0].get("schema")
 
         if not schema:
             return
@@ -313,11 +281,9 @@ class WorkflowExecutor:
             schema_dict = schema
 
         # Validate required fields
-        required = schema_dict.get('required', [])
+        required = schema_dict.get("required", [])
         for field in required:
             if field not in inputs:
-                raise ValueError(
-                    f"Required input '{field}' missing for entrypoint '{entrypoint_name}'"
-                )
+                raise ValueError(f"Required input '{field}' missing for entrypoint '{entrypoint_name}'")
 
         log.debug(f"Inputs validated successfully for entrypoint '{entrypoint_name}'")

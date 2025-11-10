@@ -27,16 +27,11 @@ class TestAgentVariableResolution:
     @pytest.fixture
     def agent(self, mock_model, mock_task_master):
         """Create agent with mocked dependencies."""
-        with patch('woodwork.components.agents.llm.InternalFeatureRegistry') as mock_registry:
+        with patch("woodwork.components.agents.llm.InternalFeatureRegistry") as mock_registry:
             mock_registry.create_features.return_value = []
 
-            with patch('woodwork.components.agents.llm.get_prompt', return_value="Test prompt"):
-                agent = llm(
-                    model=mock_model,
-                    task_m=mock_task_master,
-                    name="test_agent",
-                    tools=[]
-                )
+            with patch("woodwork.components.agents.llm.get_prompt", return_value="Test prompt"):
+                agent = llm(model=mock_model, task_m=mock_task_master, name="test_agent", tools=[])
                 return agent
 
     def test_resolve_action_inputs_no_variables(self, agent):
@@ -56,14 +51,14 @@ class TestAgentVariableResolution:
         agent._workflow_variables = {
             "bob_messages": "Hello from Bob!",
             "result_data": {"status": "success"},
-            "count": 42
+            "count": 42,
         }
 
         inputs = {
             "messages": "bob_messages",  # Should be resolved
-            "data": "result_data",       # Should be resolved
-            "num": "count",              # Should be resolved
-            "literal": "just_a_string"   # Should stay literal
+            "data": "result_data",  # Should be resolved
+            "num": "count",  # Should be resolved
+            "literal": "just_a_string",  # Should stay literal
         }
 
         resolved = agent._resolve_action_inputs(inputs)
@@ -77,12 +72,7 @@ class TestAgentVariableResolution:
         """Test mix of variable references and literals."""
         agent._workflow_variables = {"var1": "resolved_value"}
 
-        inputs = {
-            "variable_ref": "var1",
-            "literal_string": "not_a_variable",
-            "number": 100,
-            "boolean": True
-        }
+        inputs = {"variable_ref": "var1", "literal_string": "not_a_variable", "number": 100, "boolean": True}
 
         resolved = agent._resolve_action_inputs(inputs)
 
@@ -126,12 +116,9 @@ class TestAgentVariableResolution:
         # Mock the request method
         agent.request = AsyncMock(return_value="tool_result")
 
-        action = Action.from_dict({
-            "tool": "test_tool",
-            "action": "test_action",
-            "inputs": {"key": "value"},
-            "output": "stored_result"
-        })
+        action = Action.from_dict(
+            {"tool": "test_tool", "action": "test_action", "inputs": {"key": "value"}, "output": "stored_result"}
+        )
 
         result = await agent._execute_tool_with_improved_api(action)
 
@@ -144,12 +131,14 @@ class TestAgentVariableResolution:
         agent._workflow_variables = {"previous_output": "resolved_value"}
         agent.request = AsyncMock(return_value="result")
 
-        action = Action.from_dict({
-            "tool": "test_tool",
-            "action": "test_action",
-            "inputs": {"data": "previous_output", "literal": "keep_me"},
-            "output": "new_result"
-        })
+        action = Action.from_dict(
+            {
+                "tool": "test_tool",
+                "action": "test_action",
+                "inputs": {"data": "previous_output", "literal": "keep_me"},
+                "output": "new_result",
+            }
+        )
 
         await agent._execute_tool_with_improved_api(action)
 
@@ -165,31 +154,18 @@ class TestAgentVariableResolution:
         agent.request = AsyncMock(side_effect=["result1", "result2", "result3"])
 
         # Action 1: Store in var1
-        action1 = Action.from_dict({
-            "tool": "tool1",
-            "action": "action1",
-            "inputs": {},
-            "output": "var1"
-        })
-        result1 = await agent._execute_tool_with_improved_api(action1)
+        action1 = Action.from_dict({"tool": "tool1", "action": "action1", "inputs": {}, "output": "var1"})
+        await agent._execute_tool_with_improved_api(action1)
 
         # Action 2: Use var1, store in var2
-        action2 = Action.from_dict({
-            "tool": "tool2",
-            "action": "action2",
-            "inputs": {"data": "var1"},
-            "output": "var2"
-        })
-        result2 = await agent._execute_tool_with_improved_api(action2)
+        action2 = Action.from_dict({"tool": "tool2", "action": "action2", "inputs": {"data": "var1"}, "output": "var2"})
+        await agent._execute_tool_with_improved_api(action2)
 
         # Action 3: Use var2, store in var3
-        action3 = Action.from_dict({
-            "tool": "tool3",
-            "action": "action3",
-            "inputs": {"input": "var2"},
-            "output": "var3"
-        })
-        result3 = await agent._execute_tool_with_improved_api(action3)
+        action3 = Action.from_dict(
+            {"tool": "tool3", "action": "action3", "inputs": {"input": "var2"}, "output": "var3"}
+        )
+        await agent._execute_tool_with_improved_api(action3)
 
         # Verify chain
         assert agent._workflow_variables["var1"] == "result1"
@@ -211,12 +187,7 @@ class TestAgentVariableResolution:
         dict_result = {"status": "success", "data": [1, 2, 3]}
         agent.request = AsyncMock(return_value=dict_result)
 
-        action = Action.from_dict({
-            "tool": "test_tool",
-            "action": "get_data",
-            "inputs": {},
-            "output": "api_response"
-        })
+        action = Action.from_dict({"tool": "test_tool", "action": "get_data", "inputs": {}, "output": "api_response"})
 
         result = await agent._execute_tool_with_improved_api(action)
 
@@ -233,21 +204,13 @@ class TestAgentVariableResolution:
         agent.request = AsyncMock(side_effect=[dict_result, "processed"])
 
         # Action 1: Returns dict, stores in var
-        action1 = Action.from_dict({
-            "tool": "tool1",
-            "action": "get_data",
-            "inputs": {},
-            "output": "data_var"
-        })
+        action1 = Action.from_dict({"tool": "tool1", "action": "get_data", "inputs": {}, "output": "data_var"})
         await agent._execute_tool_with_improved_api(action1)
 
         # Action 2: References the dict variable
-        action2 = Action.from_dict({
-            "tool": "tool2",
-            "action": "process",
-            "inputs": {"data": "data_var"},
-            "output": "result"
-        })
+        action2 = Action.from_dict(
+            {"tool": "tool2", "action": "process", "inputs": {"data": "data_var"}, "output": "result"}
+        )
         await agent._execute_tool_with_improved_api(action2)
 
         # Verify tool2 received the actual dict, not a string

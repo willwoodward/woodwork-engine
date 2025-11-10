@@ -41,9 +41,7 @@ def discover_and_register_tools(agent) -> List[ToolSchema]:
     event_bus = get_global_event_bus()
     schemas = event_bus.discover_tools_from_agent(agent)
 
-    log.info(
-        f"[ToolDiscovery] Registered {len(schemas)} tool schemas from agent '{agent.name}'"
-    )
+    log.info(f"[ToolDiscovery] Registered {len(schemas)} tool schemas from agent '{agent.name}'")
 
     return schemas
 
@@ -75,6 +73,4 @@ def register_tool_schema_from_decorator(tool_class) -> None:
         event_bus.register_tool_schema(schema)
         log.info(f"[ToolDiscovery] Registered schema for {schema.tool_name}")
     else:
-        log.warning(
-            f"[ToolDiscovery] Tool class {tool_class.__name__} has no __tool_schema__"
-        )
+        log.warning(f"[ToolDiscovery] Tool class {tool_class.__name__} has no __tool_schema__")

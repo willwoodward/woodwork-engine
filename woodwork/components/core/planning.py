@@ -113,12 +113,12 @@ class planning_tools(core):
                     # Format: [state] task
                     if line.startswith("[") and "] " in line:
                         s, t = line[1:].split("] ", 1)
-                        t = t.strip()          # Remove extra whitespace
+                        t = t.strip()  # Remove extra whitespace
                         s = s.strip()
                         current[t] = s
                     else:
                         current[line.strip()] = "pending"
-        
+
         if state is None:
             print("STATE NONE")
             state = "pending"
@@ -138,7 +138,7 @@ class planning_tools(core):
         with open(abs_path, "w", encoding="utf-8") as f:
             for todo, st in current.items():
                 f.write(f"[{st}] {todo}\n")
-        
+
         print("DEBUG written todos:")
         with open(abs_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -146,8 +146,6 @@ class planning_tools(core):
 
         # Return updated todos
         return f"Updated todo list to {[(todo.strip(), current[todo.strip()]) for todo in todos]}"
-
-
 
     @property
     def description(self):
@@ -482,9 +480,6 @@ ls: Lists all files in the agent filesystem.
                 inputs.get("replace_all", False),
             )
         elif action == "write_todos":
-            return self.write_todos(
-                todos=inputs.get("todos", []),
-                state=inputs.get("state")
-            )
+            return self.write_todos(todos=inputs.get("todos", []), state=inputs.get("state"))
         else:
             return f"Error: Unknown action '{action}'"

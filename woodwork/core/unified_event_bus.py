@@ -8,10 +8,13 @@ async event system that eliminates threading issues and provides real-time deliv
 import asyncio
 import logging
 import time
-from typing import Dict, List, Any, Callable, Optional, Set
+from typing import Dict, List, Any, Callable, Optional, TYPE_CHECKING
 from collections import defaultdict
 
 from woodwork.types.events import BasePayload, PayloadRegistry
+
+if TYPE_CHECKING:
+    from woodwork.types.tool_schema import ToolSchema
 
 log = logging.getLogger(__name__)
 
@@ -52,17 +55,17 @@ class UnifiedEventBus:
             "components_registered": 0,
             "routes_processed": 0,
             "hooks_executed": 0,
-            "tools_registered": 0
+            "tools_registered": 0,
         }
 
     def register_component(self, component: Any) -> None:
         """Register component for event delivery and routing"""
-        component_name = getattr(component, 'name', str(component))
+        component_name = getattr(component, "name", str(component))
         self._components[component_name] = component
         self._stats["components_registered"] += 1
 
         # Set router on components that have MessageBusIntegration
-        if hasattr(component, 'set_router') and callable(getattr(component, 'set_router')):
+        if hasattr(component, "set_router") and callable(getattr(component, "set_router")):
             try:
                 component.set_router(self)
                 log.debug("[UnifiedEventBus] Set router on component '%s'", component_name)
@@ -92,19 +95,18 @@ class UnifiedEventBus:
         self._infer_routing_patterns()
 
         total_routes = sum(len(targets) for targets in self._routing_table.values())
-        log.info("[UnifiedEventBus] Routing configured: %d components, %d routes",
-                 len(self._components), total_routes)
+        log.info("[UnifiedEventBus] Routing configured: %d components, %d routes", len(self._components), total_routes)
 
     def _extract_routing_targets(self, component: Any) -> List[str]:
         """Extract routing targets from component 'to' property"""
-        component_name = getattr(component, 'name', 'unknown')
+        component_name = getattr(component, "name", "unknown")
 
         # Check multiple possible properties where 'to' config might be stored
         to_config = None
         source_property = None
 
         # Check common properties where routing targets are stored
-        for prop in ['to', '_output', 'output_targets']:
+        for prop in ["to", "_output", "output_targets"]:
             if hasattr(component, prop):
                 value = getattr(component, prop)
                 if value is not None:
@@ -112,11 +114,19 @@ class UnifiedEventBus:
                     source_property = prop
                     break
 
-        log.debug("[UnifiedEventBus] Extracting routing for component '%s': to_config=%s (type=%s, from=%s)",
-                 component_name, to_config, type(to_config).__name__, source_property)
+        log.debug(
+            "[UnifiedEventBus] Extracting routing for component '%s': to_config=%s (type=%s, from=%s)",
+            component_name,
+            to_config,
+            type(to_config).__name__,
+            source_property,
+        )
 
         if not to_config:
-            log.debug("[UnifiedEventBus] No 'to' config for component '%s' (checked: to, _output, output_targets)", component_name)
+            log.debug(
+                "[UnifiedEventBus] No 'to' config for component '%s' (checked: to, _output, output_targets)",
+                component_name,
+            )
             return []
 
         if isinstance(to_config, str):
@@ -127,13 +137,13 @@ class UnifiedEventBus:
             targets = [str(target) for target in to_config]
             log.debug("[UnifiedEventBus] List targets for '%s': %s", component_name, targets)
             return targets
-        elif hasattr(to_config, 'name'):
+        elif hasattr(to_config, "name"):
             targets = [to_config.name]
             log.debug("[UnifiedEventBus] Object target for '%s': %s", component_name, targets)
             return targets
         else:
             target_str = str(to_config)
-            if target_str and not target_str.startswith('<'):
+            if target_str and not target_str.startswith("<"):
                 targets = [target_str]
                 log.debug("[UnifiedEventBus] String representation target for '%s': %s", component_name, targets)
                 return targets
@@ -148,19 +158,19 @@ class UnifiedEventBus:
         for name, component in self._components.items():
             # Get component type from class name
             class_name = component.__class__.__name__.lower()
-            if 'input' in class_name or 'api' in class_name:
-                component_types[name] = 'input'
-            elif 'llm' in class_name or 'agent' in class_name or 'openai' in class_name:
-                component_types[name] = 'agent'
-            elif 'output' in class_name or 'console' in class_name:
-                component_types[name] = 'output'
+            if "input" in class_name or "api" in class_name:
+                component_types[name] = "input"
+            elif "llm" in class_name or "agent" in class_name or "openai" in class_name:
+                component_types[name] = "agent"
+            elif "output" in class_name or "console" in class_name:
+                component_types[name] = "output"
             else:
-                component_types[name] = 'unknown'
+                component_types[name] = "unknown"
 
         # Find patterns
-        inputs = [name for name, type_ in component_types.items() if type_ == 'input']
-        agents = [name for name, type_ in component_types.items() if type_ == 'agent']
-        outputs = [name for name, type_ in component_types.items() if type_ == 'output']
+        inputs = [name for name, type_ in component_types.items() if type_ == "input"]
+        agents = [name for name, type_ in component_types.items() if type_ == "agent"]
+        outputs = [name for name, type_ in component_types.items() if type_ == "output"]
 
         # Infer input -> agent routing (only if no explicit routing configured)
         for input_comp in inputs:
@@ -179,8 +189,7 @@ class UnifiedEventBus:
                     self._routing_table[agent_comp] = outputs
                 else:
                     self._routing_table[agent_comp] = ["_console_output"]
-                log.debug("[UnifiedEventBus] Inferred routing: %s -> %s",
-                         agent_comp, self._routing_table[agent_comp])
+                log.debug("[UnifiedEventBus] Inferred routing: %s -> %s", agent_comp, self._routing_table[agent_comp])
 
     def register_hook(self, event_type: str, hook: Callable) -> None:
         """Register hook for event type (read-only, concurrent)"""
@@ -213,8 +222,7 @@ class UnifiedEventBus:
         else:
             typed_payload = payload
 
-        log.debug("[UnifiedEventBus] Emitting '%s' with payload type: %s",
-                 event_type, type(typed_payload).__name__)
+        log.debug("[UnifiedEventBus] Emitting '%s' with payload type: %s", event_type, type(typed_payload).__name__)
 
         # 1. Process hooks concurrently (read-only)
         await self._process_hooks(event_type, typed_payload)
@@ -329,15 +337,22 @@ class UnifiedEventBus:
         if not targets:
             return
 
-        log.debug("[UnifiedEventBus] Routing '%s' from '%s' to %d targets: %s",
-                 event_type, source_component, len(targets), targets)
+        log.debug(
+            "[UnifiedEventBus] Routing '%s' from '%s' to %d targets: %s",
+            event_type,
+            source_component,
+            len(targets),
+            targets,
+        )
 
         # Route to each target component
         for target_name in targets:
             await self._deliver_to_component(target_name, event_type, payload, source_component)
             self._stats["routes_processed"] += 1
 
-    async def _deliver_to_component(self, target_name: str, event_type: str, payload: BasePayload, source_component: str) -> Any:
+    async def _deliver_to_component(
+        self, target_name: str, event_type: str, payload: BasePayload, source_component: str
+    ) -> Any:
         """Deliver event directly to target component"""
         target_component = self._components.get(target_name)
 
@@ -351,11 +366,11 @@ class UnifiedEventBus:
 
                     envelope = MessageEnvelope(
                         message_id=f"msg-{uuid.uuid4().hex[:12]}",
-                        session_id=getattr(payload, 'session_id', 'default'),
+                        session_id=getattr(payload, "session_id", "default"),
                         event_type=event_type,
                         payload=payload,
                         sender_component=source_component,
-                        target_component=target_name
+                        target_component=target_name,
                     )
 
                     success = await self._message_bus.send_to_component(envelope)
@@ -375,12 +390,15 @@ class UnifiedEventBus:
         # Only deliver input.received and agent.response events to component input methods
         # Other events are processed by hooks/pipes but not delivered as input
         if event_type not in ["input.received", "agent.response"]:
-            log.debug("[UnifiedEventBus] Skipping delivery of '%s' to component '%s' (not an input event)",
-                     event_type, target_name)
+            log.debug(
+                "[UnifiedEventBus] Skipping delivery of '%s' to component '%s' (not an input event)",
+                event_type,
+                target_name,
+            )
             return None
 
         # Check if component has input method
-        if not hasattr(target_component, 'input'):
+        if not hasattr(target_component, "input"):
             log.debug("[UnifiedEventBus] Component '%s' has no input method", target_name)
             return None
 
@@ -390,16 +408,16 @@ class UnifiedEventBus:
             # Prepare input data based on event type
             if event_type == "input.received":
                 # For input.received events, extract input field
-                if hasattr(payload, 'input'):
+                if hasattr(payload, "input"):
                     input_data = payload.input
-                    inputs_dict = getattr(payload, 'inputs', {})
+                    inputs_dict = getattr(payload, "inputs", {})
                 else:
                     input_data = payload
                     inputs_dict = {}
             elif event_type == "agent.response":
                 # For agent.response events, extract response from data
-                if hasattr(payload, 'data') and isinstance(payload.data, dict):
-                    input_data = payload.data.get('response', str(payload))
+                if hasattr(payload, "data") and isinstance(payload.data, dict):
+                    input_data = payload.data.get("response", str(payload))
                 else:
                     input_data = str(payload)
                 inputs_dict = {}
@@ -410,7 +428,8 @@ class UnifiedEventBus:
             # Call component input method
             # Check if component expects inputs parameter
             import inspect
-            if hasattr(target_component.input, '__func__'):
+
+            if hasattr(target_component.input, "__func__"):
                 sig = inspect.signature(target_component.input.__func__)
             else:
                 sig = inspect.signature(target_component.input)
@@ -418,7 +437,7 @@ class UnifiedEventBus:
             params = list(sig.parameters.keys())
 
             # If component accepts inputs parameter, pass it
-            if 'inputs' in params:
+            if "inputs" in params:
                 if asyncio.iscoroutinefunction(target_component.input):
                     result = await target_component.input(input_data, inputs=inputs_dict)
                 else:
@@ -430,8 +449,11 @@ class UnifiedEventBus:
                 else:
                     result = target_component.input(input_data)
 
-            log.debug("[UnifiedEventBus] Component '%s' processed input, result: %s",
-                     target_name, str(result)[:100] if result else "None")
+            log.debug(
+                "[UnifiedEventBus] Component '%s' processed input, result: %s",
+                target_name,
+                str(result)[:100] if result else "None",
+            )
 
             # Auto-emit appropriate response event if component doesn't emit internally
             if result is not None:
@@ -443,18 +465,20 @@ class UnifiedEventBus:
             log.error("[UnifiedEventBus] Error delivering to component '%s': %s", target_name, e)
             return None
 
-    async def _auto_emit_response_event(self, component_name: str, component: Any, result: Any, input_event_type: str) -> None:
+    async def _auto_emit_response_event(
+        self, component_name: str, component: Any, result: Any, input_event_type: str
+    ) -> None:
         """Auto-emit appropriate response event based on component type and result."""
         try:
             # Determine component type
             component_class = component.__class__.__name__.lower()
 
             # Determine appropriate response event type
-            if 'llm' in component_class or 'openai' in component_class:
+            if "llm" in component_class or "openai" in component_class:
                 response_event_type = "agent.response"
-            elif 'agent' in component_class:
+            elif "agent" in component_class:
                 response_event_type = "agent.response"
-            elif 'tool' in component_class or 'api' in component_class:
+            elif "tool" in component_class or "api" in component_class:
                 response_event_type = "tool.observation"
             else:
                 response_event_type = "component.response"
@@ -465,15 +489,10 @@ class UnifiedEventBus:
             response_payload = GenericPayload(
                 component_id=component_name,
                 component_type=component_class,
-                data={
-                    'response': str(result),
-                    'source_component': component_name,
-                    'original_event': input_event_type
-                }
+                data={"response": str(result), "source_component": component_name, "original_event": input_event_type},
             )
 
-            log.debug("[UnifiedEventBus] Auto-emitting '%s' from component '%s'",
-                     response_event_type, component_name)
+            log.debug("[UnifiedEventBus] Auto-emitting '%s' from component '%s'", response_event_type, component_name)
 
             # Emit the response event
             await self.emit_from_component(component_name, response_event_type, response_payload)
@@ -490,8 +509,8 @@ class UnifiedEventBus:
         if context and isinstance(data, dict):
             component_id, component_type = context
             data = data.copy()
-            data.setdefault('component_id', component_id)
-            data.setdefault('component_type', component_type)
+            data.setdefault("component_id", component_id)
+            data.setdefault("component_type", component_type)
 
         # Create typed payload
         return PayloadRegistry.create_payload(event_type, data)
@@ -505,7 +524,7 @@ class UnifiedEventBus:
             "total_routes": sum(len(targets) for targets in self._routing_table.values()),
             "hook_subscriptions": sum(len(hooks) for hooks in self._hooks.values()),
             "pipe_subscriptions": sum(len(pipes) for pipes in self._pipes.values()),
-            "event_subscriptions": sum(len(events) for events in self._events.values())
+            "event_subscriptions": sum(len(events) for events in self._events.values()),
         }
 
     def get_routing_info(self, component_name: str) -> Dict[str, Any]:
@@ -514,7 +533,7 @@ class UnifiedEventBus:
             "component_name": component_name,
             "targets": self._routing_table.get(component_name, []),
             "is_registered": component_name in self._components,
-            "target_count": len(self._routing_table.get(component_name, []))
+            "target_count": len(self._routing_table.get(component_name, [])),
         }
 
     def get_routing_stats(self) -> Dict[str, Any]:
@@ -523,7 +542,7 @@ class UnifiedEventBus:
             "total_components": len(self._components),
             "routed_components": len(self._routing_table),
             "total_routes": sum(len(targets) for targets in self._routing_table.values()),
-            "unrouted_components": len(self._components) - len(self._routing_table)
+            "unrouted_components": len(self._components) - len(self._routing_table),
         }
 
     def validate_routing_configuration(self) -> Dict[str, Any]:
@@ -540,25 +559,25 @@ class UnifiedEventBus:
         for component_name, targets in self._routing_table.items():
             for target in targets:
                 # Built-in targets are allowed
-                if target.startswith('_'):
+                if target.startswith("_"):
                     continue
                 # Check if target exists
                 if target not in self._components:
                     warnings.append(f"Component '{component_name}' routes to non-existent target '{target}'")
 
-        return {
-            "valid": len(issues) == 0,
-            "issues": issues,
-            "warnings": warnings
-        }
+        return {"valid": len(issues) == 0, "issues": issues, "warnings": warnings}
 
     # Message Bus Integration compatibility methods
-    async def send_to_component_with_response(self, name: str, source_component_name: str, data: dict) -> tuple[bool, str]:
+    async def send_to_component_with_response(
+        self, name: str, source_component_name: str, data: dict
+    ) -> tuple[bool, str]:
         """Send message to component and return (success, request_id) for response tracking"""
         import uuid
 
         request_id = str(uuid.uuid4())
-        log.debug("[UnifiedEventBus] Sending request to '%s' from '%s' with id '%s'", name, source_component_name, request_id)
+        log.debug(
+            "[UnifiedEventBus] Sending request to '%s' from '%s' with id '%s'", name, source_component_name, request_id
+        )
 
         if name not in self._components:
             log.warning("[UnifiedEventBus] Component '%s' not found for request", name)
@@ -570,7 +589,7 @@ class UnifiedEventBus:
 
             # Call component's input method with data
             result = None
-            if hasattr(target_component, 'input'):
+            if hasattr(target_component, "input"):
                 # Handle different input method signatures
                 if isinstance(data, dict) and "action" in data and "inputs" in data:
                     # Tool format: input(action, inputs)
@@ -590,14 +609,17 @@ class UnifiedEventBus:
             # Send response back to source component
             if source_component_name in self._components:
                 source_component = self._components[source_component_name]
-                if hasattr(source_component, '_received_responses'):
+                if hasattr(source_component, "_received_responses"):
                     source_component._received_responses[request_id] = {
                         "result": result,
                         "source_component": name,
-                        "received_at": time.time()
+                        "received_at": time.time(),
                     }
-                    log.debug("[UnifiedEventBus] Stored response for request_id '%s' in component '%s'",
-                             request_id, source_component_name)
+                    log.debug(
+                        "[UnifiedEventBus] Stored response for request_id '%s' in component '%s'",
+                        request_id,
+                        source_component_name,
+                    )
 
             return True, request_id
 
@@ -642,10 +664,9 @@ class UnifiedEventBus:
         Returns:
             List of discovered tool schemas
         """
-        from woodwork.types.tool_schema import ToolSchema
 
         if not hasattr(agent, "_tools"):
-            log.debug("[UnifiedEventBus] Agent '%s' has no _tools attribute", getattr(agent, 'name', 'unknown'))
+            log.debug("[UnifiedEventBus] Agent '%s' has no _tools attribute", getattr(agent, "name", "unknown"))
             return []
 
         schemas = []
@@ -655,7 +676,7 @@ class UnifiedEventBus:
                 self.register_tool_schema(schema)
                 schemas.append(schema)
 
-        agent_name = getattr(agent, 'name', 'unknown')
+        agent_name = getattr(agent, "name", "unknown")
         log.info("[UnifiedEventBus] Discovered %d tool schemas from agent '%s'", len(schemas), agent_name)
         return schemas
 
@@ -703,7 +724,7 @@ class UnifiedEventBus:
             description=description if description else f"Tool: {tool.name}",
             category=self._infer_tool_category(tool),
             parameters=[],  # TODO: Parse from description or require decorator
-            output_type="string"
+            output_type="string",
         )
 
     def _infer_tool_category(self, tool: Any) -> str:

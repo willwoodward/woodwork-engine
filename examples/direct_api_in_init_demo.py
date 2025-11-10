@@ -11,6 +11,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
+
 class IntelligentAgent(base_llm):
     """Agent that uses direct API in __init__ to set up components and hooks/pipes."""
 
@@ -37,7 +38,7 @@ class IntelligentAgent(base_llm):
                     uri="bolt://localhost:7687",
                     user="neo4j",
                     password="agentpassword",
-                    name=f"{self.name}_knowledge"
+                    name=f"{self.name}_knowledge",
                 )
                 log.info(f"Agent '{self.name}' created knowledge graph at startup")
             except Exception as e:
@@ -51,7 +52,7 @@ class IntelligentAgent(base_llm):
                     component_id="memory_cache",
                     host="localhost",
                     port=6379,
-                    db=1  # Use DB 1 for agent memory
+                    db=1,  # Use DB 1 for agent memory
                 )
                 log.info(f"Agent '{self.name}' created memory cache at startup")
             except Exception as e:
@@ -65,7 +66,7 @@ class IntelligentAgent(base_llm):
                     component_id="analytics_tracker",
                     host="localhost",
                     port=9200,
-                    index=f"{self.name}_analytics"
+                    index=f"{self.name}_analytics",
                 )
                 log.info(f"Agent '{self.name}' created analytics tracker at startup")
             except Exception as e:
@@ -76,13 +77,12 @@ class IntelligentAgent(base_llm):
 
         # Hook to capture and store all thoughts in knowledge graph
         def store_thought_in_knowledge(payload):
-            if hasattr(self, 'knowledge_db') and hasattr(payload, 'thought'):
+            if hasattr(self, "knowledge_db") and hasattr(payload, "thought"):
                 try:
-                    self.knowledge_db.create_node("Thought", {
-                        "text": payload.thought,
-                        "agent": self.name,
-                        "timestamp": payload.get('timestamp', 'unknown')
-                    })
+                    self.knowledge_db.create_node(
+                        "Thought",
+                        {"text": payload.thought, "agent": self.name, "timestamp": payload.get("timestamp", "unknown")},
+                    )
                     log.debug(f"Stored thought in knowledge graph: {payload.thought[:50]}...")
                 except Exception as e:
                     log.debug(f"Failed to store thought: {e}")
@@ -91,7 +91,7 @@ class IntelligentAgent(base_llm):
 
         # Hook to cache successful actions in Redis
         def cache_successful_action(payload):
-            if hasattr(self, 'memory_cache') and hasattr(payload, 'action'):
+            if hasattr(self, "memory_cache") and hasattr(payload, "action"):
                 try:
                     action_key = f"action:{hash(str(payload.action))}"
                     self.memory_cache.setex(action_key, 3600, str(payload.action))  # Cache for 1 hour
@@ -103,15 +103,17 @@ class IntelligentAgent(base_llm):
 
         # Hook to track analytics
         def track_agent_analytics(payload):
-            if hasattr(self, 'analytics'):
+            if hasattr(self, "analytics"):
                 try:
-                    self.analytics.index({
-                        "event": "step_complete",
-                        "agent": self.name,
-                        "step": payload.get('step', 0),
-                        "session": payload.get('session_id', 'unknown'),
-                        "timestamp": payload.get('timestamp', 'unknown')
-                    })
+                    self.analytics.index(
+                        {
+                            "event": "step_complete",
+                            "agent": self.name,
+                            "step": payload.get("step", 0),
+                            "session": payload.get("session_id", "unknown"),
+                            "timestamp": payload.get("timestamp", "unknown"),
+                        }
+                    )
                     log.debug(f"Tracked analytics for step {payload.get('step', 0)}")
                 except Exception as e:
                     log.debug(f"Failed to track analytics: {e}")
@@ -123,7 +125,7 @@ class IntelligentAgent(base_llm):
 
         # Pipe to enhance input with knowledge from graph
         def enhance_with_knowledge(payload):
-            if hasattr(self, 'knowledge_db') and hasattr(payload, 'input'):
+            if hasattr(self, "knowledge_db") and hasattr(payload, "input"):
                 try:
                     # Search for relevant knowledge
                     relevant = self.knowledge_db.similarity_search(payload.input, limit=3)
@@ -143,14 +145,14 @@ class IntelligentAgent(base_llm):
 
         # Pipe to check cache for similar inputs
         def check_action_cache(payload):
-            if hasattr(self, 'memory_cache') and hasattr(payload, 'input'):
+            if hasattr(self, "memory_cache") and hasattr(payload, "input"):
                 try:
                     # Check if we've seen similar input before
                     input_hash = hash(payload.input.lower().strip())
                     cached_action = self.memory_cache.get(f"input:{input_hash}")
 
                     if cached_action:
-                        log.debug(f"Found cached action for similar input")
+                        log.debug("Found cached action for similar input")
                         # Could add cache hit indicator to payload
                         enhanced_payload = payload._replace(
                             input=f"{payload.input}\n\n[Cache Hint]: Similar to previous successful action"
@@ -181,7 +183,7 @@ class SmartTool(component):
         self.call_count = 0
 
         def track_tool_usage(payload):
-            if hasattr(payload, 'tool') and payload.tool == self.name:
+            if hasattr(payload, "tool") and payload.tool == self.name:
                 self.call_count += 1
                 log.info(f"Tool '{self.name}' has been called {self.call_count} times")
 
@@ -189,7 +191,7 @@ class SmartTool(component):
 
         # Add context to tool observations
         def add_tool_context(payload):
-            if hasattr(payload, 'tool') and payload.tool == self.name:
+            if hasattr(payload, "tool") and payload.tool == self.name:
                 enhanced_obs = f"[{self.name}] {payload.observation}"
                 return payload._replace(observation=enhanced_obs)
             return payload
@@ -198,6 +200,7 @@ class SmartTool(component):
 
 
 # Usage Examples:
+
 
 def example_agent_with_startup_components():
     """Example of agent that sets up everything at startup."""
@@ -210,8 +213,11 @@ def example_agent_with_startup_components():
 
     # Mock task master and tools
     class MockTaskMaster:
-        def start_workflow(self, query): pass
-        def end_workflow(self): pass
+        def start_workflow(self, query):
+            pass
+
+        def end_workflow(self):
+            pass
 
     # Create agent - all components and hooks/pipes set up automatically!
     agent = IntelligentAgent(
@@ -221,17 +227,17 @@ def example_agent_with_startup_components():
         name="smart_agent",
         component="llm",
         type="agent",
-        enable_knowledge=True,   # Creates Neo4j + knowledge hooks/pipes
-        enable_cache=True,       # Creates Redis + caching hooks/pipes
-        enable_analytics=True    # Creates Elasticsearch + analytics hooks
+        enable_knowledge=True,  # Creates Neo4j + knowledge hooks/pipes
+        enable_cache=True,  # Creates Redis + caching hooks/pipes
+        enable_analytics=True,  # Creates Elasticsearch + analytics hooks
     )
 
     print("✅ Agent created with startup components:")
     print(f"  - Knowledge DB: {hasattr(agent, 'knowledge_db')}")
     print(f"  - Memory Cache: {hasattr(agent, 'memory_cache')}")
     print(f"  - Analytics: {hasattr(agent, 'analytics')}")
-    print(f"  - Hooks registered automatically at startup")
-    print(f"  - Pipes registered automatically at startup")
+    print("  - Hooks registered automatically at startup")
+    print("  - Pipes registered automatically at startup")
 
     return agent
 
@@ -240,16 +246,12 @@ def example_tool_with_startup_monitoring():
     """Example of tool that sets up monitoring at startup."""
 
     # Create tool - monitoring set up automatically!
-    tool = SmartTool(
-        name="data_analyzer",
-        component="tool",
-        type="analysis"
-    )
+    tool = SmartTool(name="data_analyzer", component="tool", type="analysis")
 
     print("✅ Tool created with startup monitoring:")
-    print(f"  - Call tracking: Ready")
-    print(f"  - Context enhancement: Ready")
-    print(f"  - Hooks registered automatically at startup")
+    print("  - Call tracking: Ready")
+    print("  - Context enhancement: Ready")
+    print("  - Hooks registered automatically at startup")
 
     return tool
 

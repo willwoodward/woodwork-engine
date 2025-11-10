@@ -4,7 +4,6 @@ from woodwork.utils.errors.errors import ForbiddenVariableNameError
 
 import pytest
 import os
-from dotenv import load_dotenv
 
 
 # activate_virtual_environment()
@@ -431,14 +430,14 @@ def test_environment_variables_mixed_with_other_types():
 
         auth = config_dict["authentication"]
         assert auth["api_key"] == "secret_key_123"  # Environment variable
-        assert auth["enabled"] is True              # Boolean
-        assert auth["timeout"] == 30               # Integer (as dependency)
+        assert auth["enabled"] is True  # Boolean
+        assert auth["timeout"] == 30  # Integer (as dependency)
         assert auth["methods"] == ["GET", "POST"]  # Array
 
         server = config_dict["server"]
-        assert server["port"] == "8080"            # Environment variable (string)
-        assert server["host"] == "localhost"       # String literal
-        assert server["debug"] is False            # Boolean
+        assert server["port"] == "8080"  # Environment variable (string)
+        assert server["host"] == "localhost"  # String literal
+        assert server["debug"] is False  # Boolean
 
     finally:
         # Clean up test environment variables
@@ -495,8 +494,8 @@ def test_environment_variables_real_world_mcp_config():
 
         env_config = mcp_config["env"]
         assert env_config["GITHUB_TOKEN"] == "ghp_real_token_123"  # From env var
-        assert env_config["API_VERSION"] == "2022-11-28"          # String literal
-        assert env_config["RATE_LIMIT"] == 5000                   # Integer (as dependency)
+        assert env_config["API_VERSION"] == "2022-11-28"  # String literal
+        assert env_config["RATE_LIMIT"] == 5000  # Integer (as dependency)
 
     finally:
         del os.environ["TEST_GITHUB_TOKEN"]

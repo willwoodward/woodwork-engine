@@ -29,11 +29,7 @@ class MockAgent:
 def test_tool_parameter_serialization():
     """Test ToolParameter serialization."""
     param = ToolParameter(
-        name="file_path",
-        type="string",
-        description="Path to file",
-        required=True,
-        default="/tmp/file.txt"
+        name="file_path", type="string", description="Path to file", required=True, default="/tmp/file.txt"
     )
 
     data = param.to_dict()
@@ -51,12 +47,7 @@ def test_tool_parameter_serialization():
 
 def test_tool_parameter_enum():
     """Test ToolParameter with enum values."""
-    param = ToolParameter(
-        name="format",
-        type="enum",
-        description="File format",
-        enum=["csv", "json", "xml"]
-    )
+    param = ToolParameter(name="format", type="enum", description="File format", enum=["csv", "json", "xml"])
 
     data = param.to_dict()
     assert data["enum"] == ["csv", "json", "xml"]
@@ -69,15 +60,8 @@ def test_tool_schema_serialization():
         display_name="File Reader",
         description="Read files from filesystem",
         category="file",
-        parameters=[
-            ToolParameter(
-                name="path",
-                type="string",
-                description="File path",
-                required=True
-            )
-        ],
-        output_type="string"
+        parameters=[ToolParameter(name="path", type="string", description="File path", required=True)],
+        output_type="string",
     )
 
     data = schema.to_dict()
@@ -102,7 +86,7 @@ def test_event_bus_register_tool_schema():
         description="Test",
         category="general",
         parameters=[],
-        output_type="string"
+        output_type="string",
     )
 
     event_bus.register_tool_schema(schema)
@@ -176,10 +160,8 @@ def test_event_bus_tool_with_decorator_schema():
         display_name="Custom Tool",
         description="Custom description",
         category="custom",
-        parameters=[
-            ToolParameter(name="param1", type="string", description="Test")
-        ],
-        output_type="object"
+        parameters=[ToolParameter(name="param1", type="string", description="Test")],
+        output_type="object",
     )
     class CustomTool:
         def __init__(self):
@@ -201,18 +183,8 @@ def test_event_bus_tool_stats():
     """Test tool registration statistics."""
     event_bus = UnifiedEventBus()
 
-    schema1 = ToolSchema(
-        tool_name="tool1",
-        display_name="Tool 1",
-        description="Test",
-        category="general"
-    )
-    schema2 = ToolSchema(
-        tool_name="tool2",
-        display_name="Tool 2",
-        description="Test",
-        category="general"
-    )
+    schema1 = ToolSchema(tool_name="tool1", display_name="Tool 1", description="Test", category="general")
+    schema2 = ToolSchema(tool_name="tool2", display_name="Tool 2", description="Test", category="general")
 
     event_bus.register_tool_schema(schema1)
     event_bus.register_tool_schema(schema2)
@@ -224,10 +196,7 @@ def test_event_bus_tool_stats():
 def test_tool_schema_empty_parameters():
     """Test tool schema with no parameters."""
     schema = ToolSchema(
-        tool_name="simple_tool",
-        display_name="Simple Tool",
-        description="No parameters",
-        category="general"
+        tool_name="simple_tool", display_name="Simple Tool", description="No parameters", category="general"
     )
 
     data = schema.to_dict()
@@ -237,12 +206,7 @@ def test_tool_schema_empty_parameters():
 
 def test_tool_parameter_optional():
     """Test optional tool parameters."""
-    param = ToolParameter(
-        name="optional_param",
-        type="string",
-        description="Optional parameter",
-        required=False
-    )
+    param = ToolParameter(name="optional_param", type="string", description="Optional parameter", required=False)
 
     data = param.to_dict()
     assert data["required"] is False

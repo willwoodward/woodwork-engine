@@ -20,9 +20,10 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
         """Ensure graph cache feature is registered before each test."""
         from woodwork.components.internal_features.graph_cache import GraphCacheFeature
         from woodwork.components.internal_features.base import InternalFeatureRegistry
+
         InternalFeatureRegistry.register("graph_cache", GraphCacheFeature)
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     async def test_internal_components_register_with_async_runtime(self, mock_neo4j_factory):
         """Test that internal components are properly registered with AsyncRuntime."""
         # Setup mocks
@@ -82,11 +83,11 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
         manager._components["test_component"] = mock_component
 
         # Verify async lifecycle methods exist
-        assert hasattr(mock_component, 'start')
+        assert hasattr(mock_component, "start")
         assert asyncio.iscoroutinefunction(mock_component.start)
-        assert hasattr(mock_component, 'close')
+        assert hasattr(mock_component, "close")
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     async def test_unified_event_bus_integration(self, mock_neo4j_factory):
         """Test that internal features integrate with UnifiedEventBus for hooks/pipes."""
         # Setup mocks
@@ -117,8 +118,8 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
 
         # Verify hooks and pipes are registered with UnifiedEventBus
         # (This is what we need to implement - currently they use old EventManager)
-        assert hasattr(feature, 'get_hooks')
-        assert hasattr(feature, 'get_pipes')
+        assert hasattr(feature, "get_hooks")
+        assert hasattr(feature, "get_pipes")
 
         hooks = feature.get_hooks()
         pipes = feature.get_pipes()
@@ -156,7 +157,7 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
 
         # Simulate AsyncRuntime calling start on all components
         for component in internal_components:
-            if hasattr(component, 'start') and asyncio.iscoroutinefunction(component.start):
+            if hasattr(component, "start") and asyncio.iscoroutinefunction(component.start):
                 await component.start()
 
         # Verify internal component was started
@@ -171,12 +172,14 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
 
         class TestFeature(InternalFeature):
             def get_required_components(self):
-                return [{
-                    "component_type": "test_component",
-                    "component_id": "test_internal",
-                    "config": {"setting": "value"},
-                    "optional": False
-                }]
+                return [
+                    {
+                        "component_type": "test_component",
+                        "component_id": "test_internal",
+                        "config": {"setting": "value"},
+                        "optional": False,
+                    }
+                ]
 
             def _setup_feature(self, component, config, component_manager):
                 # Should be this simple to add components
@@ -186,8 +189,8 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
                 component._test_feature = test_component
 
             def teardown(self, component, component_manager):
-                if hasattr(component, '_test_feature'):
-                    delattr(component, '_test_feature')
+                if hasattr(component, "_test_feature"):
+                    delattr(component, "_test_feature")
 
             def get_hooks(self):
                 return [("test.event", self._test_hook)]
@@ -206,6 +209,7 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
 
         # Step 3: Mock the component factory for test
         manager = InternalComponentManager()
+
         def mock_test_component(**config):
             mock_comp = Mock()
             mock_comp.config = config
@@ -213,10 +217,12 @@ class TestAsyncRuntimeInternalFeaturesIntegration:
 
         # Temporarily patch the component creation
         original_create = manager._create_component
+
         def patched_create(component_type, config):
             if component_type == "test_component":
                 return mock_test_component(**config)
             return original_create(component_type, config)
+
         manager._create_component = patched_create
 
         # Step 4: Use in config (should be one line)

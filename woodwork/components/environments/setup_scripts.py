@@ -4,7 +4,6 @@ Provides common setup patterns and script management.
 """
 
 import logging
-import json
 from typing import List, Dict, Union, Callable
 
 log = logging.getLogger(__name__)
@@ -12,12 +11,11 @@ log = logging.getLogger(__name__)
 
 class SetupScriptManager:
     """Manages and executes setup scripts for environments."""
-    
+
     def __init__(self, environment):
         self.environment = environment
-        
-    def create_python_setup(self, requirements_file: str = "requirements.txt", 
-                          python_version: str = "3.9") -> str:
+
+    def create_python_setup(self, requirements_file: str = "requirements.txt", python_version: str = "3.9") -> str:
         """Generate a Python environment setup script."""
         return f"""#!/bin/bash
 # Python development environment setup
@@ -86,8 +84,7 @@ chmod +x /usr/local/bin/docker-compose
 echo "Docker setup complete!"
 """
 
-    def create_git_setup(self, user_name: str = "Woodwork Agent", 
-                        user_email: str = "agent@woodwork.dev") -> str:
+    def create_git_setup(self, user_name: str = "Woodwork Agent", user_email: str = "agent@woodwork.dev") -> str:
         """Generate Git configuration setup script."""
         return f"""#!/bin/bash
 # Git setup
@@ -153,35 +150,32 @@ echo "MongoDB setup complete!"
             f'echo "Running {description}..."',
             "",
         ]
-        
+
         for command in commands:
             script_lines.append(command)
-        
-        script_lines.extend([
-            "",
-            f'echo "{description} complete!"'
-        ])
-        
+
+        script_lines.extend(["", f'echo "{description} complete!"'])
+
         return "\\n".join(script_lines)
 
     def save_and_execute_script(self, script_content: str, script_name: str) -> str:
         """Save a script to the environment and execute it."""
         script_path = f"/workspace/setup_scripts/{script_name}"
-        
+
         # Create scripts directory
         self.environment.execute_command("mkdir -p /workspace/setup_scripts")
-        
+
         # Write script
         write_result = self.environment.write_file(f"setup_scripts/{script_name}", script_content)
         if "Error" in write_result:
             return f"Failed to write script: {write_result}"
-        
+
         # Make executable
         self.environment.execute_command(f"chmod +x {script_path}")
-        
+
         # Execute script
         result = self.environment.execute_command(f"bash {script_path}")
-        
+
         log.info(f"Executed setup script {script_name}: {result}")
         return result
 
@@ -189,7 +183,7 @@ echo "MongoDB setup complete!"
 def get_common_setups() -> Dict[str, Callable]:
     """Return a dictionary of common setup script generators."""
     manager = SetupScriptManager(None)  # Will be set when used
-    
+
     return {
         "python": manager.create_python_setup,
         "node": manager.create_node_setup,
@@ -207,7 +201,7 @@ def parse_setup_config(setup_config: Union[str, List, Dict]) -> List[Dict]:
     if isinstance(setup_config, str):
         # Single script path or command
         return [{"type": "command", "command": setup_config}]
-    
+
     elif isinstance(setup_config, list):
         # List of scripts/commands
         parsed = []
@@ -217,10 +211,10 @@ def parse_setup_config(setup_config: Union[str, List, Dict]) -> List[Dict]:
             elif isinstance(item, dict):
                 parsed.append(item)
         return parsed
-    
+
     elif isinstance(setup_config, dict):
         # Single script configuration
         return [setup_config]
-    
+
     else:
         return []

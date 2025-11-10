@@ -9,7 +9,7 @@ This tests the complete flow:
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 import json
 
 
@@ -38,7 +38,7 @@ class TestWorkflowEndToEnd:
                 neo4j._workflows[workflow_id] = {
                     "id": workflow_id,
                     "status": params.get("status", "in_progress"),
-                    "source": "auto"
+                    "source": "auto",
                 }
 
                 # Also create prompt
@@ -47,7 +47,7 @@ class TestWorkflowEndToEnd:
                     neo4j._prompts[prompt_id] = {
                         "id": prompt_id,
                         "text": params.get("input_text", ""),
-                        "workflow_id": workflow_id
+                        "workflow_id": workflow_id,
                     }
                 return [{"workflow_id": workflow_id}]
 
@@ -61,16 +61,13 @@ class TestWorkflowEndToEnd:
                     "inputs": params.get("inputs_json"),
                     "output": params.get("output_var"),
                     "sequence": params.get("sequence"),
-                    "workflow_id": params.get("workflow_id")
+                    "workflow_id": params.get("workflow_id"),
                 }
                 return [{"action_id": action_id}]
 
             # Handle relationship creation
             elif ("CREATE" in query or "MERGE" in query) and ("-[:" in query):
-                neo4j._relationships.append({
-                    "query": query,
-                    "params": params
-                })
+                neo4j._relationships.append({"query": query, "params": params})
                 return []
 
             # Handle workflow completion
@@ -83,10 +80,7 @@ class TestWorkflowEndToEnd:
             # Handle action retrieval for execution
             elif "MATCH (w:Workflow {id:" in query and "RETURN a.id as id" in query:
                 workflow_id = params.get("workflow_id")
-                actions = [
-                    action for action in neo4j._actions.values()
-                    if action.get("workflow_id") == workflow_id
-                ]
+                actions = [action for action in neo4j._actions.values() if action.get("workflow_id") == workflow_id]
                 # Sort by sequence
                 actions.sort(key=lambda x: x.get("sequence", 0))
                 return actions
@@ -125,7 +119,7 @@ class TestWorkflowEndToEnd:
             inputs={},
             session_id="test_session",
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         workflows_feature._check_similar_workflows_pipe(input_payload)
@@ -140,13 +134,11 @@ class TestWorkflowEndToEnd:
                 "tool": f"tool_{i}",
                 "action": f"action_{i}",
                 "inputs": {"input": f"value_{i}"},
-                "output": f"output_{i}"
+                "output": f"output_{i}",
             }
 
             action_payload = AgentActionPayload(
-                action=json.dumps(action_data),
-                component_id="test_agent",
-                component_type="agent"
+                action=json.dumps(action_data), component_id="test_agent", component_type="agent"
             )
 
             workflows_feature._sync_action_hook(action_payload)
@@ -167,38 +159,33 @@ class TestWorkflowEndToEnd:
 
         # Start workflow
         input_payload = InputReceivedPayload(
-            input="Process data",
-            inputs={},
-            session_id="test",
-            component_id="test_agent",
-            component_type="agent"
+            input="Process data", inputs={}, session_id="test", component_id="test_agent", component_type="agent"
         )
 
         workflows_feature._check_similar_workflows_pipe(input_payload)
 
         # Action 1: Read file
         action1 = AgentActionPayload(
-            action=json.dumps({
-                "tool": "file_tool",
-                "action": "read",
-                "inputs": {"path": "data.txt"},
-                "output": "file_contents"
-            }),
+            action=json.dumps(
+                {"tool": "file_tool", "action": "read", "inputs": {"path": "data.txt"}, "output": "file_contents"}
+            ),
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
         workflows_feature._sync_action_hook(action1)
 
         # Action 2: Process (depends on action 1)
         action2 = AgentActionPayload(
-            action=json.dumps({
-                "tool": "process_tool",
-                "action": "process",
-                "inputs": {"data": "file_contents"},  # Uses output from action1
-                "output": "result"
-            }),
+            action=json.dumps(
+                {
+                    "tool": "process_tool",
+                    "action": "process",
+                    "inputs": {"data": "file_contents"},  # Uses output from action1
+                    "output": "result",
+                }
+            ),
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
         workflows_feature._sync_action_hook(action2)
 
@@ -214,11 +201,7 @@ class TestWorkflowEndToEnd:
 
         # Start workflow
         input_payload = InputReceivedPayload(
-            input="Test task",
-            inputs={},
-            session_id="test",
-            component_id="test_agent",
-            component_type="agent"
+            input="Test task", inputs={}, session_id="test", component_id="test_agent", component_type="agent"
         )
 
         workflows_feature._check_similar_workflows_pipe(input_payload)
@@ -226,10 +209,7 @@ class TestWorkflowEndToEnd:
 
         # Complete workflow
         complete_payload = AgentStepCompletePayload(
-            step=5,
-            session_id="test",
-            component_id="test_agent",
-            component_type="agent"
+            step=5, session_id="test", component_id="test_agent", component_type="agent"
         )
 
         workflows_feature._complete_workflow_hook(complete_payload)
@@ -254,7 +234,7 @@ class TestWorkflowEndToEnd:
             "inputs": '{"path": "test.txt"}',
             "output": "file_data",
             "sequence": 0,
-            "workflow_id": workflow_id
+            "workflow_id": workflow_id,
         }
 
         mock_neo4j_component._actions["a2"] = {
@@ -264,7 +244,7 @@ class TestWorkflowEndToEnd:
             "inputs": '{"text": "file_data"}',  # Variable reference
             "output": "result",
             "sequence": 1,
-            "workflow_id": workflow_id
+            "workflow_id": workflow_id,
         }
 
         # Mock task master with tools
@@ -274,36 +254,25 @@ class TestWorkflowEndToEnd:
         text_tool = Mock()
         text_tool.execute = AsyncMock(return_value="Processed: File content from test.txt")
 
-        task_master.get_tool = Mock(side_effect=lambda name: {
-            "file_tool": file_tool,
-            "text_tool": text_tool
-        }.get(name))
+        task_master.get_tool = Mock(side_effect=lambda name: {"file_tool": file_tool, "text_tool": text_tool}.get(name))
 
         # Execute workflow
         executor = WorkflowExecutor(mock_neo4j_component, task_master)
-        result = await executor.execute_workflow(
-            workflow_id=workflow_id,
-            inputs={},
-            session_id="test"
-        )
+        result = await executor.execute_workflow(workflow_id=workflow_id, inputs={}, session_id="test")
 
         # Verify execution
-        assert result['status'] == 'completed'
-        assert len(result['results']) == 2
-        assert 'file_data' in result['final_outputs']
-        assert 'result' in result['final_outputs']
+        assert result["status"] == "completed"
+        assert len(result["results"]) == 2
+        assert "file_data" in result["final_outputs"]
+        assert "result" in result["final_outputs"]
 
         # Verify variable substitution worked
         text_tool_call = text_tool.execute.call_args
-        assert text_tool_call[1]['text'] == "File content from test.txt"  # Resolved!
+        assert text_tool_call[1]["text"] == "File content from test.txt"  # Resolved!
 
     def test_full_workflow_lifecycle(self, workflows_feature, mock_neo4j_component):
         """Test complete lifecycle: capture -> complete -> verify storage."""
-        from woodwork.types.events import (
-            InputReceivedPayload,
-            AgentActionPayload,
-            AgentStepCompletePayload
-        )
+        from woodwork.types.events import InputReceivedPayload, AgentActionPayload, AgentStepCompletePayload
 
         # 1. Start workflow
         input_payload = InputReceivedPayload(
@@ -311,7 +280,7 @@ class TestWorkflowEndToEnd:
             inputs={},
             session_id="test",
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
         workflows_feature._check_similar_workflows_pipe(input_payload)
         workflow_id = workflows_feature._current_workflow_id
@@ -320,23 +289,18 @@ class TestWorkflowEndToEnd:
         actions_data = [
             {"tool": "file_tool", "action": "read", "inputs": {"path": "data.csv"}, "output": "csv_data"},
             {"tool": "analysis_tool", "action": "analyze", "inputs": {"data": "csv_data"}, "output": "analysis"},
-            {"tool": "report_tool", "action": "generate", "inputs": {"analysis": "analysis"}, "output": "report"}
+            {"tool": "report_tool", "action": "generate", "inputs": {"analysis": "analysis"}, "output": "report"},
         ]
 
         for action_data in actions_data:
             payload = AgentActionPayload(
-                action=json.dumps(action_data),
-                component_id="test_agent",
-                component_type="agent"
+                action=json.dumps(action_data), component_id="test_agent", component_type="agent"
             )
             workflows_feature._sync_action_hook(payload)
 
         # 3. Complete workflow
         complete_payload = AgentStepCompletePayload(
-            step=len(actions_data),
-            session_id="test",
-            component_id="test_agent",
-            component_type="agent"
+            step=len(actions_data), session_id="test", component_id="test_agent", component_type="agent"
         )
         workflows_feature._complete_workflow_hook(complete_payload)
 

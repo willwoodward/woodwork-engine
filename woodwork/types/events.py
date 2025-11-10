@@ -1,8 +1,8 @@
 """
 Event payload type system for Woodwork engine.
 
-This module provides typed, validated event payloads designed for JSON 
-serialization/deserialization over HTTP. Payloads include component 
+This module provides typed, validated event payloads designed for JSON
+serialization/deserialization over HTTP. Payloads include component
 attribution for namespacing without event name prefixing.
 """
 
@@ -10,7 +10,6 @@ import time
 import json
 from typing import Any, Dict, Optional, Type, Union, List
 from dataclasses import dataclass, field, asdict, fields, MISSING
-from datetime import datetime
 import logging
 
 log = logging.getLogger(__name__)
@@ -19,14 +18,15 @@ log = logging.getLogger(__name__)
 @dataclass
 class BasePayload:
     """Base class for all event payloads with JSON serialization support"""
+
     timestamp: float = field(default_factory=time.time)
     component_id: Optional[str] = None
     component_type: Optional[str] = None
-    
+
     def to_json(self) -> str:
         """Serialize payload to JSON string"""
         return json.dumps(asdict(self), default=str)
-    
+
     @classmethod
     def from_json(cls, json_str: str) -> "BasePayload":
         """Create payload from JSON string"""
@@ -36,34 +36,34 @@ class BasePayload:
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             log.error(f"Failed to parse JSON for {cls.__name__}: {e}")
             raise ValueError(f"Invalid JSON for {cls.__name__}: {e}")
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "BasePayload":
         """Create payload from dictionary (for HTTP JSON payloads)"""
         # Extract fields that match the dataclass
         field_names = {f.name for f in fields(cls)}
         filtered_data = {k: v for k, v in data.items() if k in field_names}
-        
+
         # Set timestamp if not provided
-        if 'timestamp' not in filtered_data:
-            filtered_data['timestamp'] = time.time()
-            
+        if "timestamp" not in filtered_data:
+            filtered_data["timestamp"] = time.time()
+
         try:
             return cls(**filtered_data)
         except TypeError as e:
             log.error(f"Failed to create {cls.__name__} from dict: {e}")
             raise ValueError(f"Invalid data for {cls.__name__}: {e}")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return asdict(self)
-    
+
     def validate(self) -> List[str]:
         """Validate payload and return list of error messages"""
         errors = []
         # Override in subclasses for specific validation
         return errors
-    
+
     def is_valid(self) -> bool:
         """Check if payload is valid"""
         return len(self.validate()) == 0
@@ -72,45 +72,47 @@ class BasePayload:
 @dataclass
 class GenericPayload(BasePayload):
     """Generic payload that accepts any additional data"""
+
     data: Dict[str, Any] = field(default_factory=dict)
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "GenericPayload":
         """Create GenericPayload, storing unknown fields in data"""
         # Extract known base fields
         base_data = {}
         extra_data = {}
-        
+
         base_field_names = {f.name for f in fields(BasePayload)}
-        
+
         for k, v in data.items():
-            if k in base_field_names or k == 'data':
+            if k in base_field_names or k == "data":
                 base_data[k] = v
             else:
                 extra_data[k] = v
-        
+
         # Set timestamp if not provided
-        if 'timestamp' not in base_data:
-            base_data['timestamp'] = time.time()
-            
+        if "timestamp" not in base_data:
+            base_data["timestamp"] = time.time()
+
         # Merge extra_data into existing data field if present
-        existing_data = base_data.get('data', {})
+        existing_data = base_data.get("data", {})
         if isinstance(existing_data, dict):
             existing_data.update(extra_data)
-            base_data['data'] = existing_data
+            base_data["data"] = existing_data
         else:
-            base_data['data'] = extra_data
-            
+            base_data["data"] = extra_data
+
         return cls(**base_data)
 
 
-@dataclass  
+@dataclass
 class InputReceivedPayload(BasePayload):
     """Payload for input.received events"""
+
     input: str = ""
     inputs: Dict[str, Any] = field(default_factory=dict)
     session_id: Optional[str] = None
-    
+
     def validate(self) -> List[str]:
         """Validate input payload"""
         errors = []
@@ -124,8 +126,9 @@ class InputReceivedPayload(BasePayload):
 @dataclass
 class AgentThoughtPayload(BasePayload):
     """Payload for agent.thought events"""
+
     thought: str = ""
-    
+
     def validate(self) -> List[str]:
         """Validate thought payload"""
         errors = []
@@ -137,8 +140,9 @@ class AgentThoughtPayload(BasePayload):
 @dataclass
 class AgentActionPayload(BasePayload):
     """Payload for agent.action events"""
+
     action: Dict[str, Any] = field(default_factory=dict)
-    
+
     def validate(self) -> List[str]:
         """Validate action payload"""
         errors = []
@@ -152,9 +156,10 @@ class AgentActionPayload(BasePayload):
 @dataclass
 class ToolCallPayload(BasePayload):
     """Payload for tool.call events"""
+
     tool: str = ""
     args: Dict[str, Any] = field(default_factory=dict)
-    
+
     def validate(self) -> List[str]:
         """Validate tool call payload"""
         errors = []
@@ -168,9 +173,10 @@ class ToolCallPayload(BasePayload):
 @dataclass
 class ToolObservationPayload(BasePayload):
     """Payload for tool.observation events"""
+
     tool: str = ""
     observation: str = ""
-    
+
     def validate(self) -> List[str]:
         """Validate tool observation payload"""
         errors = []
@@ -184,9 +190,10 @@ class ToolObservationPayload(BasePayload):
 @dataclass
 class AgentStepCompletePayload(BasePayload):
     """Payload for agent.step_complete events"""
+
     step: int = 0
     session_id: Optional[str] = None
-    
+
     def validate(self) -> List[str]:
         """Validate step complete payload"""
         errors = []
@@ -198,6 +205,7 @@ class AgentStepCompletePayload(BasePayload):
 @dataclass
 class AgentErrorPayload(BasePayload):
     """Payload for agent.error events"""
+
     error: str = ""
     error_type: str = "Unknown"
     context: Dict[str, Any] = field(default_factory=dict)
@@ -214,17 +222,13 @@ class AgentErrorPayload(BasePayload):
     @classmethod
     def from_exception(cls, exc: Exception, context: Optional[Dict[str, Any]] = None, **kwargs) -> "AgentErrorPayload":
         """Create AgentErrorPayload from an exception"""
-        return cls(
-            error=str(exc),
-            error_type=exc.__class__.__name__,
-            context=context or {},
-            **kwargs
-        )
+        return cls(error=str(exc), error_type=exc.__class__.__name__, context=context or {}, **kwargs)
 
 
 @dataclass
 class UserInputRequestPayload(BasePayload):
     """Payload for user.input.request events - requests input from user"""
+
     question: str = ""
     request_id: str = ""
     session_id: Optional[str] = None
@@ -237,7 +241,9 @@ class UserInputRequestPayload(BasePayload):
             errors.append("question field cannot be empty")
         if not self.request_id or not self.request_id.strip():
             errors.append("request_id field cannot be empty")
-        if self.timeout_seconds is not None and (not isinstance(self.timeout_seconds, int) or self.timeout_seconds <= 0):
+        if self.timeout_seconds is not None and (
+            not isinstance(self.timeout_seconds, int) or self.timeout_seconds <= 0
+        ):
             errors.append("timeout_seconds must be a positive integer")
         return errors
 
@@ -245,6 +251,7 @@ class UserInputRequestPayload(BasePayload):
 @dataclass
 class UserInputResponsePayload(BasePayload):
     """Payload for user.input.response events - user's response to input request"""
+
     response: str = ""
     request_id: str = ""
     session_id: Optional[str] = None
@@ -260,7 +267,7 @@ class UserInputResponsePayload(BasePayload):
 
 class PayloadRegistry:
     """Registry mapping event names to payload types with JSON validation"""
-    
+
     _registry: Dict[str, Type[BasePayload]] = {
         "input.received": InputReceivedPayload,
         "agent.thought": AgentThoughtPayload,
@@ -272,31 +279,31 @@ class PayloadRegistry:
         "user.input.request": UserInputRequestPayload,
         "user.input.response": UserInputResponsePayload,
     }
-    
+
     @classmethod
     def get_payload_type(cls, event: str) -> Type[BasePayload]:
         """Get the payload type for an event, defaulting to GenericPayload"""
         return cls._registry.get(event, GenericPayload)
-    
+
     @classmethod
     def register(cls, event: str, payload_type: Type[BasePayload]):
         """Register a custom payload type for an event"""
         if not issubclass(payload_type, BasePayload):
-            raise ValueError(f"Payload type must inherit from BasePayload")
+            raise ValueError("Payload type must inherit from BasePayload")
         cls._registry[event] = payload_type
         log.debug(f"Registered payload type {payload_type.__name__} for event '{event}'")
-    
+
     @classmethod
     def create_payload(cls, event: str, data: Union[Dict[str, Any], BasePayload, str]) -> BasePayload:
         """Create a typed payload from various input formats with validation"""
         if isinstance(data, BasePayload):
             return data
-            
+
         if data is None:
             data = {}
-            
+
         payload_type = cls.get_payload_type(event)
-        
+
         try:
             if isinstance(data, str):
                 # Assume it's JSON
@@ -306,21 +313,23 @@ class PayloadRegistry:
             else:
                 log.warning(f"Unexpected data type for event '{event}': {type(data)}")
                 return GenericPayload.from_dict({"data": data})
-                
+
             # Validate the created payload
             validation_errors = payload.validate()
             if validation_errors:
                 log.warning(f"Validation errors for event '{event}': {validation_errors}")
                 # Return payload anyway but log the errors
-                
+
             return payload
-            
+
         except Exception as e:
-            log.warning(f"Failed to create {payload_type.__name__} for event '{event}': {e}. Falling back to GenericPayload")
+            log.warning(
+                f"Failed to create {payload_type.__name__} for event '{event}': {e}. Falling back to GenericPayload"
+            )
             # Fallback to GenericPayload for compatibility
             fallback_data = data if isinstance(data, dict) else {"raw_data": data}
             return GenericPayload.from_dict(fallback_data)
-    
+
     @classmethod
     def validate_event_data(cls, event: str, data: Union[Dict[str, Any], str]) -> List[str]:
         """Validate event data without creating payload"""
@@ -333,21 +342,17 @@ class PayloadRegistry:
             return payload.validate()
         except Exception as e:
             return [f"Failed to parse data: {e}"]
-    
+
     @classmethod
     def get_event_schema(cls, event: str) -> Dict[str, Any]:
         """Get JSON schema information for an event type"""
         payload_type = cls.get_payload_type(event)
-        schema = {
-            "event": event,
-            "payload_type": payload_type.__name__,
-            "fields": {}
-        }
-        
+        schema = {"event": event, "payload_type": payload_type.__name__, "fields": {}}
+
         for field_info in fields(payload_type):
             schema["fields"][field_info.name] = {
                 "type": str(field_info.type),
-                "required": field_info.default == MISSING and field_info.default_factory == MISSING
+                "required": field_info.default == MISSING and field_info.default_factory == MISSING,
             }
-            
+
         return schema

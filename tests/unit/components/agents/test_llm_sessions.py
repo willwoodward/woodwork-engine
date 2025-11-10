@@ -1,7 +1,7 @@
 """
 Test agent session support for persistent context.
 """
-import pytest
+
 from woodwork.core.session import ConversationSession
 
 

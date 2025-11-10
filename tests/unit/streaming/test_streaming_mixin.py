@@ -1,7 +1,6 @@
 """Tests for StreamingMixin component."""
 
-import pytest
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 from woodwork.components.streaming_mixin import StreamingMixin
 
 
@@ -46,7 +45,7 @@ class TestStreamingMixin:
         class CustomComponent(StreamingMixin):
             def __init__(self, **kwargs):
                 self.name = "custom"
-                self.config = kwargs.get('config', {})
+                self.config = kwargs.get("config", {})
                 super().__init__(**kwargs)
 
             def _can_stream_input(self):
@@ -101,7 +100,7 @@ class TestStreamingMixin:
         class MixedComponent(StreamingMixin, BaseComponent):
             def __init__(self, **kwargs):
                 self.name = "mixed"
-                self.config = kwargs.get('config', {})
+                self.config = kwargs.get("config", {})
                 super().__init__(**kwargs)
 
         # Should work with multiple inheritance
@@ -140,9 +139,6 @@ class TestStreamingMixinIntegration:
             def __init__(self, **kwargs):
                 super().__init__(**kwargs)
 
-        component = KwargsComponent(
-            config={"streaming": True},
-            name="kwargs_test"
-        )
+        component = KwargsComponent(config={"streaming": True}, name="kwargs_test")
         assert component.streaming_enabled
         assert component.component_name == "kwargs_test"

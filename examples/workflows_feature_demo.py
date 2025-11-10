@@ -63,7 +63,7 @@ def demo_workflows_feature():
         inputs={},
         session_id="demo_session",
         component_id="demo_agent",
-        component_type="agent"
+        component_type="agent",
     )
 
     result = feature._check_similar_workflows_pipe(input_payload)
@@ -73,17 +73,10 @@ def demo_workflows_feature():
     print("\n3️⃣ Testing action sync hook (building workflow incrementally)...")
 
     # First action: Create file
-    action_1 = {
-        "tool": "file_tool",
-        "action": "create",
-        "inputs": {"filename": "demo.py"},
-        "output": "file_created"
-    }
+    action_1 = {"tool": "file_tool", "action": "create", "inputs": {"filename": "demo.py"}, "output": "file_created"}
 
     action_payload_1 = AgentActionPayload(
-        action=json.dumps(action_1),
-        component_id="demo_agent",
-        component_type="agent"
+        action=json.dumps(action_1), component_id="demo_agent", component_type="agent"
     )
 
     feature._sync_action_hook(action_payload_1)
@@ -94,13 +87,11 @@ def demo_workflows_feature():
         "tool": "text_tool",
         "action": "write",
         "inputs": {"file": "file_created", "content": "def hello(): pass"},
-        "output": "function_added"
+        "output": "function_added",
     }
 
     action_payload_2 = AgentActionPayload(
-        action=json.dumps(action_2),
-        component_id="demo_agent",
-        component_type="agent"
+        action=json.dumps(action_2), component_id="demo_agent", component_type="agent"
     )
 
     feature._sync_action_hook(action_payload_2)
@@ -109,10 +100,7 @@ def demo_workflows_feature():
 
     print("\n4️⃣ Testing workflow completion hook...")
     completion_payload = AgentStepCompletePayload(
-        step=5,
-        session_id="demo_session",
-        component_id="demo_agent",
-        component_type="agent"
+        step=5, session_id="demo_session", component_id="demo_agent", component_type="agent"
     )
 
     feature._complete_workflow_hook(completion_payload)
@@ -123,11 +111,7 @@ def demo_workflows_feature():
 
     # Mock similar workflow found
     mock_neo4j.similarity_search.return_value = [
-        {
-            "nodeID": "prompt-123",
-            "score": 0.9,
-            "text": "Create a Python file and add functions"
-        }
+        {"nodeID": "prompt-123", "score": 0.9, "text": "Create a Python file and add functions"}
     ]
 
     # Mock workflow context query
@@ -136,8 +120,8 @@ def demo_workflows_feature():
             "prompt": "Create a Python file and add functions",
             "workflow": [
                 {"tool": "file_tool", "action": "create", "output": "file_created"},
-                {"tool": "text_tool", "action": "write", "output": "function_added"}
-            ]
+                {"tool": "text_tool", "action": "write", "output": "function_added"},
+            ],
         }
     ]
 
@@ -146,7 +130,7 @@ def demo_workflows_feature():
         inputs={},
         session_id="demo_session_2",
         component_id="demo_agent",
-        component_type="agent"
+        component_type="agent",
     )
 
     result_2 = feature._check_similar_workflows_pipe(input_payload_2)
@@ -230,5 +214,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Demo error: {e}")
         import traceback
+
         traceback.print_exc()
         print("\n✅ Core implementation is correct - would work in real environment!")

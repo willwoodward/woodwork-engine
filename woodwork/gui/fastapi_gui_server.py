@@ -59,8 +59,8 @@ class FastAPIGUIServer:
         self.api_connections: Dict[str, Dict] = {}  # API input connections
         self.frontend_connections: Dict[str, WebSocket] = {}  # Frontend WebSocket connections
         self.pending_requests: Dict[str, Dict] = {}  # Cross-session inbox
-        self.request_routing: Dict[str, Dict] = {}   # Request routing info
-        self.user_sessions: Dict[str, Dict] = {}     # User sessions
+        self.request_routing: Dict[str, Dict] = {}  # Request routing info
+        self.user_sessions: Dict[str, Dict] = {}  # User sessions
         self.pending_api_requests: Dict[str, asyncio.Future] = {}  # Pending API input requests
 
         self._setup_routes()
@@ -68,11 +68,12 @@ class FastAPIGUIServer:
     def _sanitize_for_json(self, data: Any) -> Any:
         """Sanitize data for JSON serialization by removing non-serializable objects."""
         if isinstance(data, dict):
-            return {k: self._sanitize_for_json(v) for k, v in data.items()
-                   if not str(type(v)).startswith("<class '_thread")}
+            return {
+                k: self._sanitize_for_json(v) for k, v in data.items() if not str(type(v)).startswith("<class '_thread")
+            }
         elif isinstance(data, list):
             return [self._sanitize_for_json(item) for item in data]
-        elif hasattr(data, '__dict__'):
+        elif hasattr(data, "__dict__"):
             try:
                 return self._sanitize_for_json(vars(data))
             except TypeError:
@@ -81,6 +82,7 @@ class FastAPIGUIServer:
             # Try to determine if it's JSON serializable
             try:
                 import json
+
                 json.dumps(data)
                 return data
             except (TypeError, ValueError):
@@ -94,30 +96,23 @@ class FastAPIGUIServer:
             status: Optional[str] = None,
             category: Optional[str] = None,
             search: Optional[str] = None,
-            limit: Optional[int] = 50
+            limit: Optional[int] = 50,
         ):
             """Get workflows from Neo4j database with optional filters."""
             try:
                 workflows = await self._get_stored_workflows(
-                    status=status,
-                    category=category,
-                    search=search,
-                    limit=limit
+                    status=status, category=category, search=search, limit=limit
                 )
                 return {
                     "workflows": workflows,
                     "total": len(workflows),
-                    "categories": list(set(w.get("category", "general") for w in workflows))
+                    "categories": list(set(w.get("category", "general") for w in workflows)),
                 }
             except Exception as e:
                 logger.error(f"Error getting workflows: {e}")
                 # Fallback to discover from API inputs
                 workflows = await self._discover_workflows()
-                return {
-                    "workflows": workflows,
-                    "total": len(workflows),
-                    "categories": []
-                }
+                return {"workflows": workflows, "total": len(workflows), "categories": []}
 
         @self.app.get("/api/workflows/get")
         async def get_stored_workflows():
@@ -133,9 +128,17 @@ class FastAPIGUIServer:
                         "id": "mock-workflow-1",
                         "name": "Example Data Processing",
                         "steps": [
-                            {"name": "Load Data", "tool": "file_reader", "description": "Read CSV files from input directory"},
-                            {"name": "Clean Data", "tool": "data_cleaner", "description": "Remove duplicates and handle missing values"}
-                        ]
+                            {
+                                "name": "Load Data",
+                                "tool": "file_reader",
+                                "description": "Read CSV files from input directory",
+                            },
+                            {
+                                "name": "Clean Data",
+                                "tool": "data_cleaner",
+                                "description": "Remove duplicates and handle missing values",
+                            },
+                        ],
                     }
                 ]
 
@@ -162,23 +165,20 @@ class FastAPIGUIServer:
                 # Sanitize agents data to prevent JSON serialization errors
                 sanitized_agents = self._sanitize_for_json(agents)
                 sanitized_connections = self._sanitize_for_json(
-                    [{"id": k, **{key: val for key, val in v.items() if key != "websocket"}}
-                     for k, v in self.api_connections.items()]
+                    [
+                        {"id": k, **{key: val for key, val in v.items() if key != "websocket"}}
+                        for k, v in self.api_connections.items()
+                    ]
                 )
 
                 return {
                     "agents": sanitized_agents,
                     "capabilities": list(set().union(*(a.get("capabilities", []) for a in sanitized_agents))),
-                    "apiInputs": sanitized_connections
+                    "apiInputs": sanitized_connections,
                 }
             except Exception as e:
                 logger.error(f"Error getting agents: {e}")
-                return {
-                    "agents": [],
-                    "capabilities": [],
-                    "apiInputs": [],
-                    "error": str(e)
-                }
+                return {"agents": [], "capabilities": [], "apiInputs": [], "error": str(e)}
 
         @self.app.post("/api/workflows/trigger")
         async def trigger_workflow(request: WorkflowTriggerRequest):
@@ -189,10 +189,7 @@ class FastAPIGUIServer:
         @self.app.get("/api/inbox/requests")
         async def get_inbox_requests():
             """Get all pending human input requests."""
-            return {
-                "requests": list(self.pending_requests.values()),
-                "total": len(self.pending_requests)
-            }
+            return {"requests": list(self.pending_requests.values()), "total": len(self.pending_requests)}
 
         @self.app.post("/api/inbox/respond")
         async def respond_to_inbox_request(response: HumanInputResponse):
@@ -216,10 +213,10 @@ class FastAPIGUIServer:
                 # This is a response to an ask_user request, handle via inbox response
                 response = HumanInputResponse(
                     request_id=request.request_id,
-                    action='responded',
+                    action="responded",
                     data=message_content,
-                    user_id='current_user',  # TODO: Get from auth context
-                    responded_at=datetime.now().isoformat()
+                    user_id="current_user",  # TODO: Get from auth context
+                    responded_at=datetime.now().isoformat(),
                 )
                 await self._handle_human_input_response(response)
                 return {"status": "success", "session_id": session_id, "message": "Response sent to agent"}
@@ -238,7 +235,7 @@ class FastAPIGUIServer:
             return {
                 "status": "connected" if self.api_connections else "disconnected",
                 "api_inputs": len(self.api_connections),
-                "response": "FastAPI GUI server ready for input"
+                "response": "FastAPI GUI server ready for input",
             }
 
         @self.app.websocket("/ws")
@@ -273,10 +270,7 @@ class FastAPIGUIServer:
             try:
                 # Query workflows from API input using request-response pattern
                 request_id = str(uuid.uuid4())
-                message = {
-                    "type": "get_workflows",
-                    "request_id": request_id
-                }
+                message = {"type": "get_workflows", "request_id": request_id}
 
                 # Create a future for this request
                 future = asyncio.Future()
@@ -290,11 +284,7 @@ class FastAPIGUIServer:
 
                     if "workflows" in data:
                         for workflow in data["workflows"]:
-                            workflows.append({
-                                **workflow,
-                                "api_input_id": api_id,
-                                "source": api_id
-                            })
+                            workflows.append({**workflow, "api_input_id": api_id, "source": api_id})
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout waiting for workflows from {api_id}")
                 finally:
@@ -315,7 +305,7 @@ class FastAPIGUIServer:
                     "status": "active",
                     "requiredCapabilities": ["general"],
                     "api_input_id": "local",
-                    "source": "local"
+                    "source": "local",
                 }
             ]
 
@@ -332,10 +322,7 @@ class FastAPIGUIServer:
             try:
                 # Query agents from API input using request-response pattern
                 request_id = str(uuid.uuid4())
-                message = {
-                    "type": "get_agents",
-                    "request_id": request_id
-                }
+                message = {"type": "get_agents", "request_id": request_id}
 
                 # Create a future for this request
                 future = asyncio.Future()
@@ -351,10 +338,7 @@ class FastAPIGUIServer:
                         for agent in data["agents"]:
                             # Sanitize agent data before adding
                             sanitized_agent = self._sanitize_for_json(agent)
-                            sanitized_agent.update({
-                                "api_input_id": api_id,
-                                "source": api_id
-                            })
+                            sanitized_agent.update({"api_input_id": api_id, "source": api_id})
                             agents.append(sanitized_agent)
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout waiting for agents from {api_id}")
@@ -374,7 +358,7 @@ class FastAPIGUIServer:
                     "capabilities": ["general"],
                     "status": "online",
                     "api_input_id": "local",
-                    "source": "local"
+                    "source": "local",
                 }
             ]
 
@@ -385,17 +369,14 @@ class FastAPIGUIServer:
         status: Optional[str] = None,
         category: Optional[str] = None,
         search: Optional[str] = None,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[Dict]:
         """Get stored workflows from Neo4j database with optional filters."""
         try:
             # Use raw Neo4j driver to avoid creating new Docker containers
             from neo4j import GraphDatabase
 
-            driver = GraphDatabase.driver(
-                "bolt://localhost:7687",
-                auth=("neo4j", "testpassword")
-            )
+            driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
             # Build query with optional filters
             where_clauses = []
@@ -445,30 +426,36 @@ class FastAPIGUIServer:
                         "status": record.get("status", "unknown"),
                         "source": record.get("source", "auto"),
                         "description": f"Workflow with {record.get('action_count', 0)} actions",
-                        "actions": []
+                        "actions": [],
                     }
 
                     # Convert action types to actions format with proper sequence
                     action_types = record.get("action_types", [])
                     # Sort by sequence to maintain order
-                    sorted_actions = sorted(action_types, key=lambda x: x.get('sequence', 0))
+                    sorted_actions = sorted(action_types, key=lambda x: x.get("sequence", 0))
 
                     for action in sorted_actions[:20]:  # Limit to 20 actions for display
-                        workflow["actions"].append({
-                            "sequence": action.get('sequence', 0),
-                            "tool": action.get('tool', 'unknown'),
-                            "action": action.get('action', 'unknown'),
-                            "inputs": {},
-                            "output": ""
-                        })
+                        workflow["actions"].append(
+                            {
+                                "sequence": action.get("sequence", 0),
+                                "tool": action.get("tool", "unknown"),
+                                "action": action.get("action", "unknown"),
+                                "inputs": {},
+                                "output": "",
+                            }
+                        )
 
                     # Add created/completed timestamps - convert DateTime objects
                     if record.get("created_at"):
                         created_at = record.get("created_at")
-                        workflow["created_at"] = created_at.iso_format() if hasattr(created_at, 'iso_format') else str(created_at)
+                        workflow["created_at"] = (
+                            created_at.iso_format() if hasattr(created_at, "iso_format") else str(created_at)
+                        )
                     if record.get("completed_at"):
                         completed_at = record.get("completed_at")
-                        workflow["completed_at"] = completed_at.iso_format() if hasattr(completed_at, 'iso_format') else str(completed_at)
+                        workflow["completed_at"] = (
+                            completed_at.iso_format() if hasattr(completed_at, "iso_format") else str(completed_at)
+                        )
 
                     workflows.append(workflow)
 
@@ -487,10 +474,7 @@ class FastAPIGUIServer:
             # Use raw Neo4j driver to avoid creating new Docker containers
             from neo4j import GraphDatabase
 
-            driver = GraphDatabase.driver(
-                "bolt://localhost:7687",
-                auth=("neo4j", "testpassword")
-            )
+            driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
             # Query to get complete workflow with action chain and dependencies
             query = """
@@ -551,30 +535,36 @@ class FastAPIGUIServer:
                             "completed_at": record.get("completed_at"),
                             "final_step": record.get("final_step"),
                             "prompt": record.get("prompt"),
-                            "prompt_id": record.get("prompt_id")
+                            "prompt_id": record.get("prompt_id"),
                         }
 
                     if record.get("action_id"):
-                        actions.append({
-                            "id": record.get("action_id"),
-                            "name": record.get("action_name", "unknown"),
-                            "tool": record.get("tool", "unknown"),
-                            "inputs": record.get("inputs", "{}"),
-                            "output": record.get("output", "unknown"),
-                            "sequence": record.get("sequence", 0),
-                            "dependencies": record.get("dependencies", []),
-                            "description": f"{record.get('action_name', 'unknown')} using {record.get('tool', 'unknown')}"
-                        })
+                        actions.append(
+                            {
+                                "id": record.get("action_id"),
+                                "name": record.get("action_name", "unknown"),
+                                "tool": record.get("tool", "unknown"),
+                                "inputs": record.get("inputs", "{}"),
+                                "output": record.get("output", "unknown"),
+                                "sequence": record.get("sequence", 0),
+                                "dependencies": record.get("dependencies", []),
+                                "description": f"{record.get('action_name', 'unknown')} using {record.get('tool', 'unknown')}",
+                            }
+                        )
 
                 # Convert to frontend format
                 if workflow_data:
                     # Convert DateTime objects to strings
                     created_at = workflow_data.get("created_at")
                     if created_at:
-                        workflow_data["created_at"] = created_at.iso_format() if hasattr(created_at, 'iso_format') else str(created_at)
+                        workflow_data["created_at"] = (
+                            created_at.iso_format() if hasattr(created_at, "iso_format") else str(created_at)
+                        )
                     completed_at = workflow_data.get("completed_at")
                     if completed_at:
-                        workflow_data["completed_at"] = completed_at.iso_format() if hasattr(completed_at, 'iso_format') else str(completed_at)
+                        workflow_data["completed_at"] = (
+                            completed_at.iso_format() if hasattr(completed_at, "iso_format") else str(completed_at)
+                        )
 
                     workflow_detail = {
                         "id": workflow_data["id"],
@@ -586,17 +576,22 @@ class FastAPIGUIServer:
                             "completed_at": workflow_data["completed_at"],
                             "final_step": workflow_data["final_step"],
                             "prompt": workflow_data["prompt"],
-                            "total_actions": len(actions)
+                            "total_actions": len(actions),
                         },
                         "graph": {
                             "nodes": [
-                                {"id": workflow_data["prompt_id"], "type": "prompt", "label": workflow_data["name"][:50]}
-                            ] + [
+                                {
+                                    "id": workflow_data["prompt_id"],
+                                    "type": "prompt",
+                                    "label": workflow_data["name"][:50],
+                                }
+                            ]
+                            + [
                                 {"id": action["id"], "type": "action", "label": f"{action['tool']}: {action['name']}"}
                                 for action in actions
                             ],
-                            "edges": self._build_workflow_edges(workflow_data["prompt_id"], actions)
-                        }
+                            "edges": self._build_workflow_edges(workflow_data["prompt_id"], actions),
+                        },
                     }
 
                     driver.close()
@@ -621,33 +616,39 @@ class FastAPIGUIServer:
 
         # Add edge from prompt to first action
         if sorted_actions:
-            edges.append({
-                "id": f"{prompt_id}->{sorted_actions[0]['id']}",
-                "source": prompt_id,
-                "target": sorted_actions[0]["id"],
-                "type": "starts"
-            })
+            edges.append(
+                {
+                    "id": f"{prompt_id}->{sorted_actions[0]['id']}",
+                    "source": prompt_id,
+                    "target": sorted_actions[0]["id"],
+                    "type": "starts",
+                }
+            )
 
         # Add sequential edges
         for i in range(len(sorted_actions) - 1):
             current = sorted_actions[i]
             next_action = sorted_actions[i + 1]
-            edges.append({
-                "id": f"{current['id']}->{next_action['id']}",
-                "source": current["id"],
-                "target": next_action["id"],
-                "type": "next"
-            })
+            edges.append(
+                {
+                    "id": f"{current['id']}->{next_action['id']}",
+                    "source": current["id"],
+                    "target": next_action["id"],
+                    "type": "next",
+                }
+            )
 
         # Add dependency edges
         for action in actions:
             for dep in action.get("dependencies", []):
-                edges.append({
-                    "id": f"{action['id']}-depends-{dep['id']}",
-                    "source": action["id"],
-                    "target": dep["id"],
-                    "type": "depends_on"
-                })
+                edges.append(
+                    {
+                        "id": f"{action['id']}-depends-{dep['id']}",
+                        "source": action["id"],
+                        "target": dep["id"],
+                        "type": "depends_on",
+                    }
+                )
 
         return edges
 
@@ -676,8 +677,8 @@ class FastAPIGUIServer:
                     "inputs": request.inputs,
                     "sessionId": request.sessionId or f"gui_session_{uuid.uuid4().hex[:8]}",
                     "priority": request.priority,
-                    "targetAgent": request.targetAgent
-                }
+                    "targetAgent": request.targetAgent,
+                },
             }
 
             connection = self.api_connections[target_api_input]
@@ -687,7 +688,7 @@ class FastAPIGUIServer:
             return {
                 "executionId": execution_id,
                 "status": "running",
-                "targetAgent": request.targetAgent or "default_agent"
+                "targetAgent": request.targetAgent or "default_agent",
             }
 
         except Exception as e:
@@ -706,13 +707,9 @@ class FastAPIGUIServer:
 
         try:
             # Handle ask_user requests specially
-            if original_request.get('type') == 'ask_user' and response.action == 'responded':
+            if original_request.get("type") == "ask_user" and response.action == "responded":
                 # Send user input response back to the agent
-                message = {
-                    "type": "user_input",
-                    "input": response.data or "",
-                    "request_id": request_id
-                }
+                message = {"type": "user_input", "input": response.data or "", "request_id": request_id}
 
                 api_input_id = routing_info["api_input_id"]
                 if api_input_id in self.api_connections and self.api_connections[api_input_id]["status"] == "connected":
@@ -730,9 +727,9 @@ class FastAPIGUIServer:
                             "action": response.action,
                             "data": response.data,
                             "user_id": response.user_id,
-                            "responded_at": response.responded_at
-                        }
-                    }
+                            "responded_at": response.responded_at,
+                        },
+                    },
                 }
 
                 api_input_id = routing_info["api_input_id"]
@@ -744,13 +741,12 @@ class FastAPIGUIServer:
             self.request_routing.pop(request_id, None)
 
             # Notify all frontend clients
-            await self._broadcast_to_frontend({
-                "type": "inbox_update",
-                "payload": {
-                    "completed_request": request_id,
-                    "total_pending": len(self.pending_requests)
+            await self._broadcast_to_frontend(
+                {
+                    "type": "inbox_update",
+                    "payload": {"completed_request": request_id, "total_pending": len(self.pending_requests)},
                 }
-            })
+            )
 
             logger.info(f"Routed human input response for {request_id}")
 
@@ -768,13 +764,15 @@ class FastAPIGUIServer:
 
         try:
             # Send initial connection info
-            await websocket.send_json({
-                "type": "connection_established",
-                "payload": {
-                    "connected_api_inputs": list(self.api_connections.keys()),
-                    "pending_requests": len(self.pending_requests)
+            await websocket.send_json(
+                {
+                    "type": "connection_established",
+                    "payload": {
+                        "connected_api_inputs": list(self.api_connections.keys()),
+                        "pending_requests": len(self.pending_requests),
+                    },
                 }
-            })
+            )
 
             # Handle incoming messages
             while True:
@@ -818,46 +816,45 @@ class FastAPIGUIServer:
         elif message_type == "register":
             # Handle frontend registration
             try:
-                logger.debug(f"Step 1: Accessing payload...")
+                logger.debug("Step 1: Accessing payload...")
                 payload = message.get("payload", {})
                 logger.debug(f"Step 1 success: payload = {payload}")
 
-                logger.debug(f"Step 2: Getting client_type...")
+                logger.debug("Step 2: Getting client_type...")
                 client_type = payload.get("client_type", "unknown") if isinstance(payload, dict) else "unknown"
                 logger.debug(f"Step 2 success: client_type = {client_type}")
 
                 logger.info(f"Frontend client registered: {client_type}")
 
-                logger.debug(f"Step 3: Checking self attributes...")
+                logger.debug("Step 3: Checking self attributes...")
                 logger.debug(f"api_connections type: {type(self.api_connections)}")
                 logger.debug(f"pending_requests type: {type(self.pending_requests)}")
 
-                logger.debug(f"Step 4: Building response...")
+                logger.debug("Step 4: Building response...")
                 try:
-                    connected_inputs = list(self.api_connections.keys()) if isinstance(self.api_connections, dict) else []
-                    pending_count = len(self.pending_requests) if hasattr(self.pending_requests, '__len__') else 0
+                    connected_inputs = (
+                        list(self.api_connections.keys()) if isinstance(self.api_connections, dict) else []
+                    )
+                    pending_count = len(self.pending_requests) if hasattr(self.pending_requests, "__len__") else 0
                     logger.debug(f"Step 4 success: inputs={len(connected_inputs)}, pending={pending_count}")
                 except Exception as inner_e:
                     logger.error(f"Error in step 4: {inner_e}")
                     connected_inputs = []
                     pending_count = 0
 
-                logger.debug(f"Step 5: Creating response data...")
+                logger.debug("Step 5: Creating response data...")
                 response_data = {
                     "type": "connection_established",
-                    "payload": {
-                        "connected_api_inputs": connected_inputs,
-                        "pending_requests": pending_count
-                    },
-                    "timestamp": datetime.now().isoformat()
+                    "payload": {"connected_api_inputs": connected_inputs, "pending_requests": pending_count},
+                    "timestamp": datetime.now().isoformat(),
                 }
                 logger.debug(f"Step 5 success: {response_data}")
 
-                logger.debug(f"Step 6: Sending response...")
+                logger.debug("Step 6: Sending response...")
                 json_str = json.dumps(response_data)
                 logger.debug(f"Step 6a: JSON string created: {len(json_str)} chars")
                 await websocket.send_text(json_str)
-                logger.debug(f"Step 6 success: Response sent")
+                logger.debug("Step 6 success: Response sent")
             except Exception as e:
                 logger.error(f"Error in register handler: {e}")
                 logger.error(f"Message type: {type(message)}, content: {repr(message)}")
@@ -879,7 +876,7 @@ class FastAPIGUIServer:
                         "type": "user_input",
                         "request_id": str(uuid.uuid4()),
                         "session_id": session_id,
-                        "payload": agent_message
+                        "payload": agent_message,
                     }
                     await connection["websocket"].send(json.dumps(message))
                     break
@@ -897,11 +894,7 @@ class FastAPIGUIServer:
         for api_id, connection in self.api_connections.items():
             if connection["status"] == "connected":
                 try:
-                    message_payload = {
-                        "type": "user_input",
-                        "input": message,
-                        "session_id": session_id
-                    }
+                    message_payload = {"type": "user_input", "input": message, "session_id": session_id}
                     await connection["websocket"].send(json.dumps(message_payload))
                     logger.info(f"Routed user message to {api_id} for session {session_id}: {message}")
                     logger.debug(f"Full message payload sent: {json.dumps(message_payload, indent=2)}")
@@ -938,7 +931,7 @@ class FastAPIGUIServer:
                 "websocket": websocket,
                 "host": host,
                 "port": port,
-                "status": "connected"
+                "status": "connected",
             }
 
             # Start listening for events from this API input
@@ -983,17 +976,27 @@ class FastAPIGUIServer:
             await self._handle_human_input_request(api_input_id, event["payload"])
 
         elif event_type in [
-            "agent.thought", "agent.action", "agent.response", "agent.step_complete", "agent.error",
-            "tool.call", "tool.observation", "input.received", "workflow.started", "workflow.completed",
-            "user.input.request"
+            "agent.thought",
+            "agent.action",
+            "agent.response",
+            "agent.step_complete",
+            "agent.error",
+            "tool.call",
+            "tool.observation",
+            "input.received",
+            "workflow.started",
+            "workflow.completed",
+            "user.input.request",
         ]:
             # Forward agent events to frontend with enhanced structure
-            await self._broadcast_to_frontend({
-                "type": event_type,
-                "payload": event.get("payload", {}),
-                "timestamp": event.get("timestamp") or datetime.now().isoformat(),
-                "api_input_id": api_input_id
-            })
+            await self._broadcast_to_frontend(
+                {
+                    "type": event_type,
+                    "payload": event.get("payload", {}),
+                    "timestamp": event.get("timestamp") or datetime.now().isoformat(),
+                    "api_input_id": api_input_id,
+                }
+            )
 
         else:
             logger.debug(f"Received event from {api_input_id}: {event_type}")
@@ -1010,17 +1013,16 @@ class FastAPIGUIServer:
             self.request_routing[request_id] = {
                 "session_id": payload.get("session_id"),
                 "api_input_id": api_input_id,
-                "agent_name": payload.get("agent_name", "unknown")
+                "agent_name": payload.get("agent_name", "unknown"),
             }
 
             # Broadcast to frontend
-            await self._broadcast_to_frontend({
-                "type": "inbox_update",
-                "payload": {
-                    "new_request": payload,
-                    "total_pending": len(self.pending_requests)
+            await self._broadcast_to_frontend(
+                {
+                    "type": "inbox_update",
+                    "payload": {"new_request": payload, "total_pending": len(self.pending_requests)},
                 }
-            })
+            )
 
             logger.info(f"New human input request: {request_id} from {api_input_id}")
 
@@ -1028,7 +1030,7 @@ class FastAPIGUIServer:
         """Load configuration and connect to API inputs."""
         try:
             if Path(config_path).exists():
-                with open(config_path, 'r') as f:
+                with open(config_path, "r") as f:
                     config = yaml.safe_load(f)
 
                 for api_input in config.get("api_inputs", []):
@@ -1057,12 +1059,7 @@ class FastAPIGUIServer:
         await self.load_config_and_connect()
 
         # Start the server
-        config = uvicorn.Config(
-            app=self.app,
-            host=host,
-            port=port,
-            log_level="info"
-        )
+        config = uvicorn.Config(app=self.app, host=host, port=port, log_level="info")
 
         server = uvicorn.Server(config)
         logger.info(f"Starting FastAPI GUI server on {host}:{port}")

@@ -9,7 +9,6 @@ from mcp.client.sse import sse_client
 from mcp import ClientSession
 import asyncio
 from urllib.parse import urlparse
-import os
 import logging
 
 log = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ class mcp_server(mcp, Startable):
         image_url: str = None,
         api_key: str = None,
         remote_url: str = None,
-        **config
+        **config,
     ):
         """
         :param transport: "stdio" for local Docker server, "sse" for remote HTTP/SSE server
@@ -51,6 +50,7 @@ class mcp_server(mcp, Startable):
 
         if queue:
             from woodwork.types import Update
+
             queue.put(Update(progress=10, component_name=self.name))
 
         asyncio.run(self.connect())
@@ -71,9 +71,7 @@ class mcp_server(mcp, Startable):
                 container_name=self.name,
                 dockerfile=None,
                 container_args={
-                    "environment": {
-                        "GITHUB_PERSONAL_ACCESS_TOKEN": self.api_key
-                    },
+                    "environment": {"GITHUB_PERSONAL_ACCESS_TOKEN": self.api_key},
                     "network_mode": "host",
                     "stdin_open": True,
                 },
@@ -83,7 +81,10 @@ class mcp_server(mcp, Startable):
             params = StdioServerParameters(
                 command="docker",
                 args=[
-                    "exec", "-i", self.name, "github-mcp-server",
+                    "exec",
+                    "-i",
+                    self.name,
+                    "github-mcp-server",
                 ],
             )
             # Store the context manager to keep connection alive

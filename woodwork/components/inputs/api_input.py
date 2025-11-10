@@ -5,7 +5,6 @@ This is the refactored API input component that uses the unified event system
 for real-time event delivery without cross-thread queues or delays.
 """
 
-import asyncio
 import logging
 import json
 import time
@@ -28,6 +27,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class WebSocketSession:
     """Represents a websocket session with its own context."""
+
     websocket: WebSocket
     session_id: str
     subscribed_components: List[str]
@@ -92,7 +92,7 @@ class api_input(inputs):
                 "tool.observation",
                 "agent.step_complete",
                 "agent.error",
-                "user.input.request"
+                "user.input.request",
             ]
 
             # Register async hooks for real-time delivery
@@ -108,28 +108,27 @@ class api_input(inputs):
         """Handle events from unified event bus and forward to WebSocket sessions in real-time."""
         try:
             # Extract event type
-            event_type = getattr(payload, '__class__', type(payload)).__name__
-            if hasattr(payload, 'to_dict'):
+            event_type = getattr(payload, "__class__", type(payload)).__name__
+            if hasattr(payload, "to_dict"):
                 payload_dict = payload.to_dict()
             else:
-                payload_dict = payload if isinstance(payload, dict) else {'data': payload}
+                payload_dict = payload if isinstance(payload, dict) else {"data": payload}
 
             # Map payload class name to event type
             mapped_event_type = self._map_payload_class_to_event_type(event_type)
 
             event_data = {
-                'event_type': mapped_event_type,
-                'payload': payload_dict,
-                'sender_component': getattr(payload, 'component_id', 'unknown'),
-                'session_id': getattr(payload, 'session_id', 'default'),
-                'created_at': time.time()
+                "event_type": mapped_event_type,
+                "payload": payload_dict,
+                "sender_component": getattr(payload, "component_id", "unknown"),
+                "session_id": getattr(payload, "session_id", "default"),
+                "created_at": time.time(),
             }
 
-            log.debug("[api_input] Real-time event: %s from %s",
-                     mapped_event_type, event_data['sender_component'])
+            log.debug("[api_input] Real-time event: %s from %s", mapped_event_type, event_data["sender_component"])
 
             # Special handling for user input requests - create inbox entry
-            if mapped_event_type == 'user.input.request':
+            if mapped_event_type == "user.input.request":
                 await self._create_inbox_entry_for_user_request(payload_dict)
 
             # Forward directly to WebSocket sessions (no queues, no delays)
@@ -143,27 +142,26 @@ class api_input(inputs):
         try:
             # Create a human input request for the inbox
             inbox_payload = {
-                'request_id': payload_dict.get('request_id'),
-                'type': 'ask_user',
-                'title': f"User Input: {payload_dict.get('question', 'Input Required')[:50]}...",
-                'description': payload_dict.get('question', 'Agent is requesting user input'),
-                'context': f"Request from {payload_dict.get('component_id', 'unknown')}",
-                'priority': 'medium',  # Could be configurable
-                'agent_name': payload_dict.get('component_id', 'unknown'),
-                'session_id': payload_dict.get('session_id', 'default'),
-                'api_input_id': self.name,
-                'workflow_name': None,  # Could extract from payload if available
-                'created_at': time.time(),
-                'metadata': {
-                    'question': payload_dict.get('question'),
-                    'timeout_seconds': payload_dict.get('timeout_seconds', 60)
-                }
+                "request_id": payload_dict.get("request_id"),
+                "type": "ask_user",
+                "title": f"User Input: {payload_dict.get('question', 'Input Required')[:50]}...",
+                "description": payload_dict.get("question", "Agent is requesting user input"),
+                "context": f"Request from {payload_dict.get('component_id', 'unknown')}",
+                "priority": "medium",  # Could be configurable
+                "agent_name": payload_dict.get("component_id", "unknown"),
+                "session_id": payload_dict.get("session_id", "default"),
+                "api_input_id": self.name,
+                "workflow_name": None,  # Could extract from payload if available
+                "created_at": time.time(),
+                "metadata": {
+                    "question": payload_dict.get("question"),
+                    "timeout_seconds": payload_dict.get("timeout_seconds", 60),
+                },
             }
 
             # Emit as human.input.required for inbox system
             await self.event_bus.emit_from_component(self.name, "human.input.required", inbox_payload)
-            log.debug("[api_input] Created inbox entry for user input request: %s",
-                     payload_dict.get('request_id'))
+            log.debug("[api_input] Created inbox entry for user input request: %s", payload_dict.get("request_id"))
 
         except Exception as e:
             log.error("[api_input] Error creating inbox entry for user request: %s", e)
@@ -175,11 +173,11 @@ class api_input(inputs):
 
         # Convert to websocket-friendly format
         ws_message = {
-            "event": event_data['event_type'],
-            "payload": event_data['payload'],
-            "sender": event_data['sender_component'],
-            "session_id": event_data['session_id'],
-            "timestamp": event_data['created_at'],
+            "event": event_data["event_type"],
+            "payload": event_data["payload"],
+            "sender": event_data["sender_component"],
+            "session_id": event_data["session_id"],
+            "timestamp": event_data["created_at"],
         }
 
         # Send to all subscribed sessions
@@ -188,12 +186,11 @@ class api_input(inputs):
                 # Check if this session cares about this message
                 if (
                     "*" in session.subscribed_components  # Subscribed to all
-                    or event_data['sender_component'] in session.subscribed_components
-                    or event_data['session_id'] == session.session_id
+                    or event_data["sender_component"] in session.subscribed_components
+                    or event_data["session_id"] == session.session_id
                 ):
                     await session.websocket.send_json(ws_message)
-                    log.debug("[api_input] Sent real-time event %s to session %s",
-                             event_data['event_type'], session_id)
+                    log.debug("[api_input] Sent real-time event %s to session %s", event_data["event_type"], session_id)
 
             except Exception as e:
                 log.error("[api_input] Error sending to WebSocket session %s: %s", session_id, e)
@@ -204,17 +201,17 @@ class api_input(inputs):
     def _map_payload_class_to_event_type(self, class_name: str) -> str:
         """Map payload class names to event types."""
         mapping = {
-            'AgentThoughtPayload': 'agent.thought',
-            'AgentResponsePayload': 'agent.response',
-            'ToolObservationPayload': 'tool.observation',
-            'AgentStepCompletePayload': 'agent.step_complete',
-            'AgentActionPayload': 'agent.action',
-            'ToolCallPayload': 'tool.call',
-            'AgentErrorPayload': 'agent.error',
-            'InputReceivedPayload': 'input.received',
-            'UserInputRequestPayload': 'user.input.request',
-            'UserInputResponsePayload': 'user.input.response',
-            'GenericPayload': 'generic'
+            "AgentThoughtPayload": "agent.thought",
+            "AgentResponsePayload": "agent.response",
+            "ToolObservationPayload": "tool.observation",
+            "AgentStepCompletePayload": "agent.step_complete",
+            "AgentActionPayload": "agent.action",
+            "ToolCallPayload": "tool.call",
+            "AgentErrorPayload": "agent.error",
+            "InputReceivedPayload": "input.received",
+            "UserInputRequestPayload": "user.input.request",
+            "UserInputResponsePayload": "user.input.response",
+            "GenericPayload": "generic",
         }
         return mapping.get(class_name, class_name.lower())
 
@@ -226,12 +223,13 @@ class api_input(inputs):
             if request_id:
                 # This is a response to a user input request
                 from woodwork.types.events import UserInputResponsePayload
+
                 payload = UserInputResponsePayload(
                     response=user_input,
                     request_id=request_id,
                     session_id="api_session",
                     component_id=self.name,
-                    component_type="inputs"
+                    component_type="inputs",
                 )
                 await self.event_bus.emit_from_component(self.name, "user.input.response", payload)
                 log.debug("[api_input] User input response processed for request %s", request_id)
@@ -242,7 +240,7 @@ class api_input(inputs):
                     inputs={},
                     session_id="api_session",
                     component_id=self.name,
-                    component_type="inputs"
+                    component_type="inputs",
                 )
                 await self.event_bus.emit_from_component(self.name, "input.received", payload)
                 log.debug("[api_input] Input processed and routed")
@@ -263,7 +261,7 @@ class api_input(inputs):
                 app=self.app,
                 host="0.0.0.0",
                 port=self.port,
-                log_level="warning"  # Only show warnings and errors, not startup/shutdown info
+                log_level="warning",  # Only show warnings and errors, not startup/shutdown info
             )
 
             server = uvicorn.Server(config)
@@ -300,7 +298,7 @@ class api_input(inputs):
             websocket=websocket,
             session_id=session_id,
             subscribed_components=["*"],  # Subscribe to all by default
-            created_at=time.time()
+            created_at=time.time(),
         )
 
         self._websocket_sessions[session_id] = session
@@ -309,6 +307,7 @@ class api_input(inputs):
 
     def _setup_app_and_routes(self):
         """Setup FastAPI application and routes."""
+
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             """Application lifespan manager."""
@@ -321,11 +320,12 @@ class api_input(inputs):
             title="Woodwork API Input",
             description="API input component for Woodwork engine",
             version="1.0.0",
-            lifespan=lifespan
+            lifespan=lifespan,
         )
 
         # Add CORS middleware for browser compatibility
         from fastapi.middleware.cors import CORSMiddleware
+
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -342,6 +342,7 @@ class api_input(inputs):
 
     def _setup_websocket_routes(self):
         """Setup WebSocket routes for real-time communication."""
+
         @self.app.websocket("/input")
         async def websocket_endpoint(websocket: WebSocket):
             session_id = None
@@ -353,13 +354,12 @@ class api_input(inputs):
                 session_id = await self.setup_websocket_subscription(websocket)
 
                 # Send welcome message (compatibility with old API)
-                await websocket.send_json({
-                    "event": "session.connected",
-                    "payload": {
-                        "session_id": session_id,
-                        "subscribed_components": ["*"]
+                await websocket.send_json(
+                    {
+                        "event": "session.connected",
+                        "payload": {"session_id": session_id, "subscribed_components": ["*"]},
                     }
-                })
+                )
                 log.info("[api_input] Welcome message sent to session %s", session_id)
 
                 # Keep connection alive and handle incoming messages
@@ -375,7 +375,7 @@ class api_input(inputs):
                     try:
                         message = json.loads(data)
                         log.debug("[api_input] Parsed message: %s", message)
-                    except json.JSONDecodeError as e:
+                    except json.JSONDecodeError:
                         log.debug("[api_input] Invalid JSON, treating as plain text: %r", data)
                         # Treat as plain text input (compatibility with old API)
                         message = {"input": data}
@@ -423,6 +423,7 @@ class api_input(inputs):
 
     def _setup_rest_routes(self):
         """Setup REST API routes."""
+
         @self.app.post("/input")
         async def submit_input(request: Request):
             """Submit input via REST API."""
@@ -432,10 +433,7 @@ class api_input(inputs):
                 request_id = data.get("request_id")
 
                 if not user_input:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": "Input is required"}
-                    )
+                    return JSONResponse(status_code=400, content={"error": "Input is required"})
 
                 # Process input
                 await self.handle_input(user_input, request_id)
@@ -444,35 +442,36 @@ class api_input(inputs):
 
             except Exception as e:
                 log.error("[api_input] REST input error: %s", e)
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.get("/health")
         async def health_check():
             """Health check endpoint."""
-            return JSONResponse(content={
-                "status": "healthy",
-                "component": self.name,
-                "websocket_sessions": len(self._websocket_sessions),
-                "event_bus_stats": self.event_bus.get_stats()
-            })
+            return JSONResponse(
+                content={
+                    "status": "healthy",
+                    "component": self.name,
+                    "websocket_sessions": len(self._websocket_sessions),
+                    "event_bus_stats": self.event_bus.get_stats(),
+                }
+            )
 
         @self.app.get("/")
         async def root():
             """Root endpoint with component information."""
-            return JSONResponse(content={
-                "component": "api_input",
-                "description": "Woodwork API input component with unified event system",
-                "endpoints": {
-                    "websocket": "/input",
-                    "rest_input": "/input",
-                    "health": "/health",
-                    "workflows": "/api/workflows",
-                    "agents": "/api/agents"
+            return JSONResponse(
+                content={
+                    "component": "api_input",
+                    "description": "Woodwork API input component with unified event system",
+                    "endpoints": {
+                        "websocket": "/input",
+                        "rest_input": "/input",
+                        "health": "/health",
+                        "workflows": "/api/workflows",
+                        "agents": "/api/agents",
+                    },
                 }
-            })
+            )
 
     def _setup_workflow_routes(self):
         """Setup workflow entrypoint routes dynamically."""
@@ -492,8 +491,8 @@ class api_input(inputs):
             """Execute workflow via entrypoint."""
             try:
                 body = await request.json()
-                inputs = body.get('inputs', {})
-                session_id = body.get('session_id', str(uuid.uuid4()))
+                inputs = body.get("inputs", {})
+                session_id = body.get("session_id", str(uuid.uuid4()))
 
                 log.info(f"[api_input] Workflow entrypoint '{entrypoint_name}' triggered with inputs: {inputs}")
 
@@ -502,38 +501,25 @@ class api_input(inputs):
 
                 if not executor:
                     return JSONResponse(
-                        status_code=500,
-                        content={
-                            'status': 'error',
-                            'error': 'Workflow executor not available'
-                        }
+                        status_code=500, content={"status": "error", "error": "Workflow executor not available"}
                     )
 
                 # Execute workflow
-                result = await executor.execute_entrypoint(
-                    entrypoint_name, inputs, session_id
-                )
+                result = await executor.execute_entrypoint(entrypoint_name, inputs, session_id)
 
-                return JSONResponse(content={
-                    'status': 'success',
-                    'entrypoint': entrypoint_name,
-                    'result': result
-                })
+                return JSONResponse(content={"status": "success", "entrypoint": entrypoint_name, "result": result})
 
             except Exception as e:
                 log.error(f"[api_input] Workflow entrypoint execution failed: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={'status': 'error', 'error': str(e)}
-                )
+                return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
         log.info(f"[api_input] Registered workflow entrypoint: {route_path} → {entrypoint_name}")
 
     def _get_workflow_executor(self):
         """Get workflow executor from task master."""
-        if hasattr(self, 'task_m') and self.task_m:
+        if hasattr(self, "task_m") and self.task_m:
             # Access workflow executor through task master
-            return getattr(self.task_m, '_workflow_executor', None)
+            return getattr(self.task_m, "_workflow_executor", None)
         return None
 
     def _setup_workflow_query_routes(self):
@@ -543,18 +529,12 @@ class api_input(inputs):
         async def get_tools():
             """Get available tools with schemas from unified event bus."""
             try:
-                schemas = [
-                    schema.to_dict()
-                    for schema in self.event_bus.get_all_tool_schemas()
-                ]
+                schemas = [schema.to_dict() for schema in self.event_bus.get_all_tool_schemas()]
                 log.info(f"[api_input] Returning {len(schemas)} tool schemas")
                 return JSONResponse(content={"tools": schemas})
             except Exception as e:
                 log.error(f"[api_input] Error getting tool schemas: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"tools": [], "error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"tools": [], "error": str(e)})
 
         @self.app.get("/api/workflows/{workflow_id}")
         async def get_workflow_detail(workflow_id: str):
@@ -562,10 +542,7 @@ class api_input(inputs):
             try:
                 from neo4j import GraphDatabase
 
-                driver = GraphDatabase.driver(
-                    "bolt://localhost:7687",
-                    auth=("neo4j", "testpassword")
-                )
+                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
                 with driver.session() as session:
                     # Get workflow with all actions
@@ -579,19 +556,13 @@ class api_input(inputs):
 
                     if not record:
                         driver.close()
-                        return JSONResponse(
-                            status_code=404,
-                            content={"error": "Workflow not found"}
-                        )
+                        return JSONResponse(status_code=404, content={"error": "Workflow not found"})
 
                     workflow_node = record["w"]
                     actions = record["actions"]
 
                     # Sort actions by sequence and build response
-                    sorted_actions = sorted(
-                        [a for a in actions if a is not None],
-                        key=lambda x: x.get("sequence", 0)
-                    )
+                    sorted_actions = sorted([a for a in actions if a is not None], key=lambda x: x.get("sequence", 0))
 
                     # Build workflow detail response matching frontend expectations
                     workflow_detail = {
@@ -602,41 +573,42 @@ class api_input(inputs):
                                 "id": action.get("id", f"action-{i}"),
                                 "name": action.get("action", ""),
                                 "tool": action.get("tool", ""),
-                                "inputs": action.get("inputs", "{}") if isinstance(action.get("inputs"), str) else json.dumps(action.get("inputs", {})),
+                                "inputs": action.get("inputs", "{}")
+                                if isinstance(action.get("inputs"), str)
+                                else json.dumps(action.get("inputs", {})),
                                 "output": action.get("output", ""),
                                 "sequence": action.get("sequence", i),
                                 "dependencies": [],
-                                "description": f"{action.get('tool', '')} - {action.get('action', '')}"
+                                "description": f"{action.get('tool', '')} - {action.get('action', '')}",
                             }
                             for i, action in enumerate(sorted_actions)
                         ],
                         "metadata": {
                             "status": workflow_node.get("status", "draft"),
-                            "created_at": workflow_node.get("created_at").iso_format() if workflow_node.get("created_at") else None,
-                            "completed_at": workflow_node.get("completed_at").iso_format() if workflow_node.get("completed_at") else None,
+                            "created_at": workflow_node.get("created_at").iso_format()
+                            if workflow_node.get("created_at")
+                            else None,
+                            "completed_at": workflow_node.get("completed_at").iso_format()
+                            if workflow_node.get("completed_at")
+                            else None,
                             "final_step": len(sorted_actions),
                             "prompt": workflow_node.get("name", "Unnamed Workflow"),
-                            "total_actions": len(sorted_actions)
+                            "total_actions": len(sorted_actions),
                         },
                         "graph": {
                             "nodes": [
                                 {
                                     "id": f"step-{i}",
                                     "type": "action",
-                                    "label": f"{action.get('tool', '')}: {action.get('action', '')}"
+                                    "label": f"{action.get('tool', '')}: {action.get('action', '')}",
                                 }
                                 for i, action in enumerate(sorted_actions)
                             ],
                             "edges": [
-                                {
-                                    "id": f"edge-{i}",
-                                    "source": f"step-{i}",
-                                    "target": f"step-{i+1}",
-                                    "type": "next"
-                                }
+                                {"id": f"edge-{i}", "source": f"step-{i}", "target": f"step-{i + 1}", "type": "next"}
                                 for i in range(len(sorted_actions) - 1)
-                            ]
-                        }
+                            ],
+                        },
                     }
 
                 driver.close()
@@ -644,27 +616,16 @@ class api_input(inputs):
 
             except Exception as e:
                 log.error(f"[api_input] Error getting workflow detail: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.get("/api/workflows")
-        async def get_workflows(
-            status: str = None,
-            category: str = None,
-            search: str = None,
-            limit: int = 50
-        ):
+        async def get_workflows(status: str = None, category: str = None, search: str = None, limit: int = 50):
             """Get workflows from Neo4j database with optional filters."""
             try:
                 # Use Neo4j driver directly (not the woodwork component which tries to create a new container)
                 from neo4j import GraphDatabase
 
-                driver = GraphDatabase.driver(
-                    "bolt://localhost:7687",
-                    auth=("neo4j", "testpassword")
-                )
+                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
                 # Build query with optional filters
                 where_clauses = []
@@ -712,66 +673,61 @@ class api_input(inputs):
                             "status": record.get("status", "unknown"),
                             "source": record.get("source", "auto"),
                             "description": f"Workflow with {record.get('action_count', 0)} actions",
-                            "actions": []
+                            "actions": [],
                         }
 
                         # Convert action types to actions format with proper sequence
                         action_types = record.get("action_types", [])
-                        sorted_actions = sorted(action_types, key=lambda x: x.get('sequence', 0))
+                        sorted_actions = sorted(action_types, key=lambda x: x.get("sequence", 0))
 
                         for action in sorted_actions[:20]:
-                            workflow["actions"].append({
-                                "sequence": action.get('sequence', 0),
-                                "tool": action.get('tool', 'unknown'),
-                                "action": action.get('action', 'unknown'),
-                                "inputs": {},
-                                "output": ""
-                            })
+                            workflow["actions"].append(
+                                {
+                                    "sequence": action.get("sequence", 0),
+                                    "tool": action.get("tool", "unknown"),
+                                    "action": action.get("action", "unknown"),
+                                    "inputs": {},
+                                    "output": "",
+                                }
+                            )
 
                         # Convert Neo4j DateTime objects to ISO strings
                         if record.get("created_at"):
                             created_at = record.get("created_at")
-                            workflow["created_at"] = created_at.iso_format() if hasattr(created_at, 'iso_format') else str(created_at)
+                            workflow["created_at"] = (
+                                created_at.iso_format() if hasattr(created_at, "iso_format") else str(created_at)
+                            )
                         if record.get("completed_at"):
                             completed_at = record.get("completed_at")
-                            workflow["completed_at"] = completed_at.iso_format() if hasattr(completed_at, 'iso_format') else str(completed_at)
+                            workflow["completed_at"] = (
+                                completed_at.iso_format() if hasattr(completed_at, "iso_format") else str(completed_at)
+                            )
 
                         workflows.append(workflow)
 
                 driver.close()
                 log.info(f"[api_input] Retrieved {len(workflows)} workflows from Neo4j")
 
-                return JSONResponse(content={
-                    "workflows": workflows,
-                    "total": len(workflows),
-                    "categories": []
-                })
+                return JSONResponse(content={"workflows": workflows, "total": len(workflows), "categories": []})
 
             except Exception as e:
                 log.error(f"[api_input] Error getting workflows: {e}")
                 return JSONResponse(
-                    status_code=500,
-                    content={
-                        "workflows": [],
-                        "total": 0,
-                        "categories": [],
-                        "error": str(e)
-                    }
+                    status_code=500, content={"workflows": [], "total": 0, "categories": [], "error": str(e)}
                 )
 
         @self.app.get("/api/agents")
         async def get_agents():
             """Get available agents (returns this component's agent info)."""
             # For now, return basic agent info - could be extended to query multiple agents
-            return JSONResponse(content={
-                "agents": [{
-                    "id": "default",
-                    "name": "Orchestrator Agent",
-                    "status": "online",
-                    "capabilities": ["general"]
-                }],
-                "total": 1
-            })
+            return JSONResponse(
+                content={
+                    "agents": [
+                        {"id": "default", "name": "Orchestrator Agent", "status": "online", "capabilities": ["general"]}
+                    ],
+                    "total": 1,
+                }
+            )
 
         @self.app.post("/api/workflows")
         async def create_workflow(request: Request):
@@ -785,10 +741,7 @@ class api_input(inputs):
                 workflow_id = str(uuid.uuid4())
 
                 # Store in Neo4j
-                driver = GraphDatabase.driver(
-                    "bolt://localhost:7687",
-                    auth=("neo4j", "testpassword")
-                )
+                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
                 with driver.session() as session:
                     # Create Workflow node
@@ -818,30 +771,26 @@ class api_input(inputs):
                         })
                         CREATE (w)-[:CONTAINS]->(a)
                         """
-                        session.run(action_query, {
-                            "workflow_id": workflow_id,
-                            "tool": action.tool,
-                            "action": action.action,
-                            "inputs": json.dumps(action.inputs),
-                            "output": action.output,
-                            "sequence": idx
-                        })
+                        session.run(
+                            action_query,
+                            {
+                                "workflow_id": workflow_id,
+                                "tool": action.tool,
+                                "action": action.action,
+                                "inputs": json.dumps(action.inputs),
+                                "output": action.output,
+                                "sequence": idx,
+                            },
+                        )
 
                 driver.close()
                 log.info(f"[api_input] Created workflow {workflow_id}: {workflow.name}")
 
-                return JSONResponse(content={
-                    "id": workflow_id,
-                    "name": workflow.name,
-                    "status": "success"
-                })
+                return JSONResponse(content={"id": workflow_id, "name": workflow.name, "status": "success"})
 
             except Exception as e:
                 log.error(f"[api_input] Error creating workflow: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.put("/api/workflows/{workflow_id}")
         async def update_workflow(workflow_id: str, request: Request):
@@ -851,25 +800,20 @@ class api_input(inputs):
 
                 data = await request.json()
 
-                driver = GraphDatabase.driver(
-                    "bolt://localhost:7687",
-                    auth=("neo4j", "testpassword")
-                )
+                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
                 with driver.session() as session:
                     # Update workflow metadata
                     if "name" in data:
                         session.run(
-                            "MATCH (w:Workflow {id: $id}) SET w.name = $name",
-                            {"id": workflow_id, "name": data["name"]}
+                            "MATCH (w:Workflow {id: $id}) SET w.name = $name", {"id": workflow_id, "name": data["name"]}
                         )
 
                     # Update actions if provided
                     if "actions" in data:
                         # Delete old actions
                         session.run(
-                            "MATCH (w:Workflow {id: $id})-[:CONTAINS]->(a:Action) DETACH DELETE a",
-                            {"id": workflow_id}
+                            "MATCH (w:Workflow {id: $id})-[:CONTAINS]->(a:Action) DETACH DELETE a", {"id": workflow_id}
                         )
 
                         # Create new actions
@@ -886,14 +830,17 @@ class api_input(inputs):
                             })
                             CREATE (w)-[:CONTAINS]->(a)
                             """
-                            session.run(action_query, {
-                                "workflow_id": workflow_id,
-                                "tool": action.get("tool", ""),
-                                "action": action.get("action", ""),
-                                "inputs": json.dumps(action.get("inputs", {})),
-                                "output": action.get("output", ""),
-                                "sequence": action.get("sequence", idx)
-                            })
+                            session.run(
+                                action_query,
+                                {
+                                    "workflow_id": workflow_id,
+                                    "tool": action.get("tool", ""),
+                                    "action": action.get("action", ""),
+                                    "inputs": json.dumps(action.get("inputs", {})),
+                                    "output": action.get("output", ""),
+                                    "sequence": action.get("sequence", idx),
+                                },
+                            )
 
                 driver.close()
                 log.info(f"[api_input] Updated workflow {workflow_id}")
@@ -902,10 +849,7 @@ class api_input(inputs):
 
             except Exception as e:
                 log.error(f"[api_input] Error updating workflow: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.delete("/api/workflows/{workflow_id}")
         async def delete_workflow(workflow_id: str):
@@ -913,16 +857,10 @@ class api_input(inputs):
             try:
                 from neo4j import GraphDatabase
 
-                driver = GraphDatabase.driver(
-                    "bolt://localhost:7687",
-                    auth=("neo4j", "testpassword")
-                )
+                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
                 with driver.session() as session:
-                    session.run(
-                        "MATCH (w:Workflow {id: $id}) DETACH DELETE w",
-                        {"id": workflow_id}
-                    )
+                    session.run("MATCH (w:Workflow {id: $id}) DETACH DELETE w", {"id": workflow_id})
 
                 driver.close()
                 log.info(f"[api_input] Deleted workflow {workflow_id}")
@@ -931,10 +869,7 @@ class api_input(inputs):
 
             except Exception as e:
                 log.error(f"[api_input] Error deleting workflow: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.post("/api/workflows/{workflow_id}/entrypoint")
         async def create_entrypoint(workflow_id: str, request: Request):
@@ -945,10 +880,7 @@ class api_input(inputs):
                 data = await request.json()
                 entrypoint_name = data["name"]
 
-                driver = GraphDatabase.driver(
-                    "bolt://localhost:7687",
-                    auth=("neo4j", "testpassword")
-                )
+                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
 
                 with driver.session() as session:
                     query = """
@@ -960,12 +892,15 @@ class api_input(inputs):
                     CREATE (e)-[:EXECUTES]->(w)
                     RETURN e
                     """
-                    session.run(query, {
-                        "workflow_id": workflow_id,
-                        "name": entrypoint_name,
-                        "description": data.get("description", ""),
-                        "schema": json.dumps(data.get("inputSchema", {}))
-                    })
+                    session.run(
+                        query,
+                        {
+                            "workflow_id": workflow_id,
+                            "name": entrypoint_name,
+                            "description": data.get("description", ""),
+                            "schema": json.dumps(data.get("inputSchema", {})),
+                        },
+                    )
 
                 driver.close()
                 log.info(f"[api_input] Created entrypoint {entrypoint_name} for workflow {workflow_id}")
@@ -974,10 +909,7 @@ class api_input(inputs):
 
             except Exception as e:
                 log.error(f"[api_input] Error creating entrypoint: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.post("/api/workflows/{workflow_id}/execute")
         async def execute_workflow(workflow_id: str, request: Request):
@@ -987,45 +919,33 @@ class api_input(inputs):
                 executor = self._get_workflow_executor()
 
                 if not executor:
-                    return JSONResponse(
-                        status_code=500,
-                        content={"error": "Workflow executor not available"}
-                    )
+                    return JSONResponse(status_code=500, content={"error": "Workflow executor not available"})
 
                 result = await executor.execute_workflow(
                     workflow_id=workflow_id,
                     inputs=data.get("inputs", {}),
-                    session_id=data.get("sessionId", str(uuid.uuid4()))
+                    session_id=data.get("sessionId", str(uuid.uuid4())),
                 )
 
                 return JSONResponse(content=result)
 
             except Exception as e:
                 log.error(f"[api_input] Error executing workflow: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.post("/api/workflows/match")
         async def match_workflow(request: Request):
             """Match a task to an existing workflow using similarity search."""
             try:
                 body = await request.json()
-                task_title = body.get('task_title', '')
+                body.get("task_title", "")
 
                 # For now, return no match - this would use Neo4j similarity search
                 # TODO: Implement vector similarity search in Neo4j
-                return JSONResponse(content={
-                    "canUseWorkflow": False,
-                    "message": "No matching workflow found"
-                })
+                return JSONResponse(content={"canUseWorkflow": False, "message": "No matching workflow found"})
             except Exception as e:
                 log.error(f"[api_input] Error matching workflow: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.get("/api/event-pipeline")
         async def get_event_pipeline():
@@ -1040,39 +960,39 @@ class api_input(inputs):
                 pipes_data = {}
 
                 # Access internal _hooks and _pipes dictionaries
-                if hasattr(event_bus, '_hooks'):
+                if hasattr(event_bus, "_hooks"):
                     for event_name, listeners in event_bus._hooks.items():
                         hooks_data[event_name] = [
                             {
-                                "function": getattr(listener, '__name__', str(listener)),
-                                "module": getattr(listener, '__module__', 'unknown'),
+                                "function": getattr(listener, "__name__", str(listener)),
+                                "module": getattr(listener, "__module__", "unknown"),
                             }
                             for listener in listeners
                         ]
 
-                if hasattr(event_bus, '_pipes'):
+                if hasattr(event_bus, "_pipes"):
                     for event_name, listeners in event_bus._pipes.items():
                         pipes_data[event_name] = [
                             {
-                                "function": getattr(listener, '__name__', str(listener)),
-                                "module": getattr(listener, '__module__', 'unknown'),
+                                "function": getattr(listener, "__name__", str(listener)),
+                                "module": getattr(listener, "__module__", "unknown"),
                             }
                             for listener in listeners
                         ]
 
-                return JSONResponse(content={
-                    "hooks": hooks_data,
-                    "pipes": pipes_data,
-                    "event_types": list(set(list(hooks_data.keys()) + list(pipes_data.keys())))
-                })
+                return JSONResponse(
+                    content={
+                        "hooks": hooks_data,
+                        "pipes": pipes_data,
+                        "event_types": list(set(list(hooks_data.keys()) + list(pipes_data.keys()))),
+                    }
+                )
             except Exception as e:
                 log.error(f"[api_input] Error getting event pipeline: {e}")
                 import traceback
+
                 log.error(traceback.format_exc())
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": str(e)}
-                )
+                return JSONResponse(status_code=500, content={"error": str(e)})
 
     def get_stats(self) -> Dict[str, Any]:
         """Get component statistics."""
@@ -1080,7 +1000,7 @@ class api_input(inputs):
             "component_name": self.name,
             "websocket_sessions": len(self._websocket_sessions),
             "port": self.port,
-            "event_bus_stats": self.event_bus.get_stats()
+            "event_bus_stats": self.event_bus.get_stats(),
         }
 
     async def close(self):

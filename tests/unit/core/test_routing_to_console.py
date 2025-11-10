@@ -3,9 +3,9 @@
 import pytest
 import asyncio
 from unittest.mock import Mock
-from woodwork.core.unified_event_bus import UnifiedEventBus, get_global_event_bus
+from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.message_bus.integration import GlobalMessageBusManager, get_global_message_bus
+from woodwork.core.message_bus.integration import GlobalMessageBusManager
 from woodwork.types.events import GenericPayload
 
 
@@ -19,11 +19,7 @@ class TestRoutingToConsole:
         manager = GlobalMessageBusManager()
 
         # Create mock components
-        component_configs = {
-            "coding_ag": {
-                "object": Mock(name="coding_ag", to=["_console_output"])
-            }
-        }
+        component_configs = {"coding_ag": {"object": Mock(name="coding_ag", to=["_console_output"])}}
 
         # Initialize (this should set message bus on unified event bus)
         await manager.initialize(component_configs)
@@ -35,21 +31,16 @@ class TestRoutingToConsole:
         print(f"\n[TEST] event_bus._message_bus: {event_bus._message_bus}")
         print(f"[TEST] type: {type(event_bus._message_bus)}")
 
-        assert event_bus._message_bus is not None, \
-            "Message bus should be set on unified event bus"
+        assert event_bus._message_bus is not None, "Message bus should be set on unified event bus"
 
         # Check routing table
         print(f"[TEST] Routing table: {event_bus._routing_table}")
 
         # Try emitting an event
-        payload = GenericPayload(
-            component_id="coding_ag",
-            component_type="agent",
-            data={"response": "Test response"}
-        )
+        payload = GenericPayload(component_id="coding_ag", component_type="agent", data={"response": "Test response"})
 
         # Check if console handler is registered
-        if hasattr(manager.message_bus, 'component_handlers'):
+        if hasattr(manager.message_bus, "component_handlers"):
             print(f"[TEST] Registered component handlers: {list(manager.message_bus.component_handlers.keys())}")
 
         await event_bus.emit_from_component("coding_ag", "agent.response", payload)
@@ -80,11 +71,7 @@ class TestRoutingToConsole:
         from woodwork.core.message_bus.interface import MessageEnvelope
         import uuid
 
-        payload = GenericPayload(
-            component_id="coding_ag",
-            component_type="agent",
-            data={"response": "Test response"}
-        )
+        payload = GenericPayload(component_id="coding_ag", component_type="agent", data={"response": "Test response"})
 
         envelope = MessageEnvelope(
             message_id=f"msg-{uuid.uuid4().hex[:12]}",
@@ -92,19 +79,19 @@ class TestRoutingToConsole:
             event_type="agent.response",
             payload=payload,
             sender_component="coding_ag",
-            target_component="_console_output"
+            target_component="_console_output",
         )
 
-        print(f"\n[TEST] Sending envelope to _console_output")
+        print("\n[TEST] Sending envelope to _console_output")
         success = await message_bus.send_to_component(envelope)
         print(f"[TEST] send_to_component returned: {success}")
 
         # Wait for handler
         try:
             await asyncio.wait_for(handler_called.wait(), timeout=1.0)
-            print(f"[TEST] Handler was called successfully")
+            print("[TEST] Handler was called successfully")
         except asyncio.TimeoutError:
-            print(f"[TEST] Handler was NOT called!")
+            print("[TEST] Handler was NOT called!")
 
         await message_bus.stop()
 
@@ -126,7 +113,7 @@ class TestRoutingToConsole:
 
         # Register console handler
         async def console_handler(envelope):
-            print(f"[TEST] Console handler called!")
+            print("[TEST] Console handler called!")
 
         message_bus.register_component_handler("_console_output", console_handler)
 
@@ -143,15 +130,11 @@ class TestRoutingToConsole:
         print(f"[TEST] Message bus set: {event_bus._message_bus is not None}")
 
         # Emit event
-        payload = GenericPayload(
-            component_id="coding_ag",
-            component_type="agent",
-            data={"response": "Test response"}
-        )
+        payload = GenericPayload(component_id="coding_ag", component_type="agent", data={"response": "Test response"})
 
-        print(f"\n[TEST] About to emit agent.response from coding_ag...")
+        print("\n[TEST] About to emit agent.response from coding_ag...")
         await event_bus.emit_from_component("coding_ag", "agent.response", payload)
-        print(f"[TEST] Emit complete")
+        print("[TEST] Emit complete")
 
         await asyncio.sleep(0.1)
         await message_bus.stop()

@@ -1,6 +1,6 @@
 """Unit tests for coding environment find_files and search_in_files functionality."""
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+
+from unittest.mock import Mock, patch
 
 
 class TestSearchInFilesPatternParsing:
@@ -11,7 +11,7 @@ class TestSearchInFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -40,7 +40,7 @@ class TestSearchInFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -54,7 +54,7 @@ class TestSearchInFilesPatternParsing:
             container.exec_run = Mock(return_value=exec_result)
 
             # Call search_in_files with simple recursive pattern
-            result = env.search_in_files("llm", file_glob="**/*.py")
+            env.search_in_files("llm", file_glob="**/*.py")
 
             # Verify the command searches everywhere
             container.exec_run.assert_called_once()
@@ -66,7 +66,7 @@ class TestSearchInFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -80,7 +80,7 @@ class TestSearchInFilesPatternParsing:
             container.exec_run = Mock(return_value=exec_result)
 
             # Call search_in_files with non-recursive directory pattern
-            result = env.search_in_files("llm", file_glob="tests/*.py")
+            env.search_in_files("llm", file_glob="tests/*.py")
 
             # Verify maxdepth 1 is used
             container.exec_run.assert_called_once()
@@ -92,7 +92,7 @@ class TestSearchInFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -106,7 +106,7 @@ class TestSearchInFilesPatternParsing:
             container.exec_run = Mock(return_value=exec_result)
 
             # Call search_in_files with context lines
-            result = env.search_in_files("test", file_glob="*.py", context_lines=2)
+            env.search_in_files("test", file_glob="*.py", context_lines=2)
 
             # Verify context flag is included
             container.exec_run.assert_called_once()
@@ -118,7 +118,7 @@ class TestSearchInFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -146,7 +146,7 @@ class TestFindFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -173,7 +173,7 @@ class TestFindFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -183,7 +183,9 @@ class TestFindFilesPatternParsing:
             # Mock the exec_run to return test data
             exec_result = Mock()
             exec_result.exit_code = 0
-            exec_result.output = b"/workspace/woodwork/components/llms/llm.py\n/workspace/woodwork/components/llms/openai.py"
+            exec_result.output = (
+                b"/workspace/woodwork/components/llms/llm.py\n/workspace/woodwork/components/llms/openai.py"
+            )
             container.exec_run = Mock(return_value=exec_result)
 
             # Call find_files with directory + glob pattern
@@ -200,7 +202,7 @@ class TestFindFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -210,7 +212,9 @@ class TestFindFilesPatternParsing:
             # Mock the exec_run to return test data
             exec_result = Mock()
             exec_result.exit_code = 0
-            exec_result.output = b"/workspace/woodwork/components/llms/llm.py\n/workspace/woodwork/components/llms/openai.py"
+            exec_result.output = (
+                b"/workspace/woodwork/components/llms/llm.py\n/workspace/woodwork/components/llms/openai.py"
+            )
             container.exec_run = Mock(return_value=exec_result)
 
             # Call find_files with directory + specific extension
@@ -227,7 +231,7 @@ class TestFindFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
@@ -255,7 +259,7 @@ class TestFindFilesPatternParsing:
         from woodwork.components.environments.coding import coding
 
         # Mock Docker to avoid actual initialization
-        with patch('woodwork.components.environments.coding.Docker'):
+        with patch("woodwork.components.environments.coding.Docker"):
             env = coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container

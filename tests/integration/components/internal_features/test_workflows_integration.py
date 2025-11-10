@@ -11,7 +11,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.workflows]
 class TestWorkflowsIntegration:
     """Integration tests for workflows feature with LLM agents."""
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_workflows_feature_with_llm_agent(self, mock_neo4j_factory):
         """Test workflows feature integration with LLM agent."""
         # Setup mock Neo4j
@@ -26,6 +26,7 @@ class TestWorkflowsIntegration:
             def __init__(self, name):
                 self.name = name
                 from woodwork.components.internal_features.base import InternalComponentManager
+
                 self._internal_component_manager = InternalComponentManager()
 
                 # Mock model with API key
@@ -37,6 +38,7 @@ class TestWorkflowsIntegration:
 
         # Create workflows feature
         from woodwork.components.internal_features.workflows import WorkflowsFeature
+
         feature = WorkflowsFeature()
 
         # Setup feature
@@ -44,8 +46,8 @@ class TestWorkflowsIntegration:
         feature._setup_feature(agent, config, agent._internal_component_manager)
 
         # Verify feature was set up correctly
-        assert hasattr(agent, '_workflows_db')
-        assert hasattr(agent, '_workflows_mode')
+        assert hasattr(agent, "_workflows_db")
+        assert hasattr(agent, "_workflows_mode")
         assert agent._workflows_db is mock_neo4j_instance
         assert agent._workflows_mode is True
 
@@ -85,7 +87,7 @@ class TestWorkflowsIntegration:
 
         print("✅ Workflows feature hooks and pipes properly registered!")
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_workflows_feature_end_to_end_simulation(self, mock_neo4j_factory):
         """Test complete workflow simulation from input to completion."""
         # Setup mock Neo4j
@@ -118,7 +120,7 @@ class TestWorkflowsIntegration:
             inputs={},
             session_id="test_session",
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         result_payload = feature._check_similar_workflows_pipe(input_payload)
@@ -129,7 +131,7 @@ class TestWorkflowsIntegration:
         action_payload_1 = AgentActionPayload(
             action='{"tool": "file_tool", "action": "create", "inputs": {"filename": "test.txt"}, "output": "file_created"}',
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         feature._sync_action_hook(action_payload_1)
@@ -139,7 +141,7 @@ class TestWorkflowsIntegration:
         action_payload_2 = AgentActionPayload(
             action='{"tool": "text_tool", "action": "write", "inputs": {"file": "file_created", "content": "Hello World"}, "output": "content_written"}',
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         feature._sync_action_hook(action_payload_2)
@@ -147,9 +149,7 @@ class TestWorkflowsIntegration:
 
         # 4. Test workflow completion hook
         completion_payload = AgentStepCompletePayload(
-            result="File created and content written successfully",
-            component_id="test_agent",
-            component_type="agent"
+            result="File created and content written successfully", component_id="test_agent", component_type="agent"
         )
 
         feature._complete_workflow_hook(completion_payload)
@@ -183,12 +183,14 @@ class TestWorkflowsIntegration:
         assert len(features_1) == 1
 
         # Test with custom Neo4j settings (should still work)
-        features_2 = InternalFeatureRegistry.create_features({
-            "workflows": True,
-            "workflows_uri": "bolt://custom:7687",
-            "workflows_user": "custom_user",
-            "workflows_password": "custom_pass"
-        })
+        features_2 = InternalFeatureRegistry.create_features(
+            {
+                "workflows": True,
+                "workflows_uri": "bolt://custom:7687",
+                "workflows_user": "custom_user",
+                "workflows_password": "custom_pass",
+            }
+        )
         assert len(features_2) == 1
 
         # Test disabled
@@ -202,20 +204,16 @@ class TestWorkflowsIntegration:
 
         print("✅ Workflows feature configuration variations working!")
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_workflows_feature_with_existing_workflow_context(self, mock_neo4j_factory):
         """Test workflows feature when similar workflows exist."""
         # Setup mock Neo4j with existing workflow
         mock_neo4j_instance = Mock()
         mock_neo4j_instance.init_vector_index = Mock()
         mock_neo4j_instance.run = Mock()
-        mock_neo4j_instance.similarity_search = Mock(return_value=[
-            {
-                "nodeID": "existing-prompt-123",
-                "score": 0.92,
-                "text": "Create a file and add content"
-            }
-        ])
+        mock_neo4j_instance.similarity_search = Mock(
+            return_value=[{"nodeID": "existing-prompt-123", "score": 0.92, "text": "Create a file and add content"}]
+        )
 
         # Mock workflow context query result
         def mock_run_side_effect(query, params=None):
@@ -225,8 +223,8 @@ class TestWorkflowsIntegration:
                         "prompt": "Create a file and add content",
                         "workflow": [
                             {"tool": "file_tool", "action": "create", "output": "file_created"},
-                            {"tool": "text_tool", "action": "write", "output": "content_added"}
-                        ]
+                            {"tool": "text_tool", "action": "write", "output": "content_added"},
+                        ],
                     }
                 ]
             return []
@@ -255,7 +253,7 @@ class TestWorkflowsIntegration:
             inputs={},
             session_id="test_session",
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         result_payload = feature._check_similar_workflows_pipe(input_payload)
@@ -284,19 +282,19 @@ class TestWorkflowsIntegration:
         # Setup and then teardown
         component_manager = InternalComponentManager()
 
-        with patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j'):
+        with patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j"):
             feature._setup_feature(agent, {}, component_manager)
 
             # Verify setup
-            assert hasattr(agent, '_workflows_db')
-            assert hasattr(agent, '_workflows_mode')
+            assert hasattr(agent, "_workflows_db")
+            assert hasattr(agent, "_workflows_mode")
 
             # Teardown
             feature.teardown(agent, component_manager)
 
             # Verify cleanup
-            assert not hasattr(agent, '_workflows_db')
-            assert not hasattr(agent, '_workflows_mode')
+            assert not hasattr(agent, "_workflows_db")
+            assert not hasattr(agent, "_workflows_mode")
             assert feature._neo4j_component is None
 
         print("✅ Workflows feature teardown integration working!")

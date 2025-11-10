@@ -14,7 +14,7 @@ pytestmark = [pytest.mark.slow, pytest.mark.integration]
 class TestDirectAPIVsFeatures:
     """Compare Direct API vs Feature System approaches."""
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_direct_api_approach(self, mock_neo4j_factory):
         """Test the direct API approach for creating components and hooks/pipes."""
         # Setup mocks
@@ -28,6 +28,7 @@ class TestDirectAPIVsFeatures:
             def __init__(self, name):
                 self.name = name
                 from woodwork.components.internal_features.base import InternalComponentManager
+
                 self._internal_component_manager = InternalComponentManager()
 
                 # Mock model with API key
@@ -37,12 +38,17 @@ class TestDirectAPIVsFeatures:
             def create_component(self, component_type: str, component_id: str = None, **config):
                 """Direct API implementation."""
                 if component_id is None:
-                    existing_count = len([k for k in self._internal_component_manager._components.keys()
-                                        if k.startswith(f"{self.name}_{component_type}")])
+                    existing_count = len(
+                        [
+                            k
+                            for k in self._internal_component_manager._components.keys()
+                            if k.startswith(f"{self.name}_{component_type}")
+                        ]
+                    )
                     component_id = f"{self.name}_{component_type}_{existing_count}"
 
-                if 'api_key' not in config and hasattr(self, 'model') and hasattr(self.model, '_api_key'):
-                    config['api_key'] = self.model._api_key
+                if "api_key" not in config and hasattr(self, "model") and hasattr(self.model, "_api_key"):
+                    config["api_key"] = self.model._api_key
 
                 component = self._internal_component_manager.get_or_create_component(
                     component_id, component_type, config
@@ -55,12 +61,14 @@ class TestDirectAPIVsFeatures:
             def add_hook(self, event_name: str, hook_function, description: str = None):
                 """Direct hook addition."""
                 from woodwork.core.unified_event_bus import get_global_event_bus
+
                 event_bus = get_global_event_bus()
                 event_bus.register_hook(event_name, hook_function)
 
             def add_pipe(self, event_name: str, pipe_function, description: str = None):
                 """Direct pipe addition."""
                 from woodwork.core.unified_event_bus import get_global_event_bus
+
                 event_bus = get_global_event_bus()
                 event_bus.register_pipe(event_name, pipe_function)
 
@@ -68,15 +76,10 @@ class TestDirectAPIVsFeatures:
         agent = MockAgent("direct_agent")
 
         # Step 1: Create Neo4j component directly
-        neo4j = agent.create_component(
-            "neo4j",
-            uri="bolt://localhost:7687",
-            user="neo4j",
-            password="testpassword"
-        )
+        neo4j = agent.create_component("neo4j", uri="bolt://localhost:7687", user="neo4j", password="testpassword")
 
         # Verify component was created
-        assert hasattr(agent, '_neo4j')
+        assert hasattr(agent, "_neo4j")
         assert agent._neo4j is mock_neo4j_instance
         assert mock_neo4j_factory.called
 
@@ -102,15 +105,15 @@ class TestDirectAPIVsFeatures:
 
         # Test hooks work
         from woodwork.types.events import AgentThoughtPayload
+
         thought_payload = AgentThoughtPayload(
-            thought="Test thought",
-            component_id="direct_agent",
-            component_type="agent"
+            thought="Test thought", component_id="direct_agent", component_type="agent"
         )
 
         # Hooks are registered with event bus
         from woodwork.core.unified_event_bus import get_global_event_bus
-        event_bus = get_global_event_bus()
+
+        get_global_event_bus()
 
         # Manually call hooks to test (in real system, event bus would call them)
         capture_thoughts(thought_payload)
@@ -118,7 +121,7 @@ class TestDirectAPIVsFeatures:
 
         print("✅ Direct API approach working - created component and registered hooks/pipes")
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_feature_system_approach(self, mock_neo4j_factory):
         """Test the feature system approach - much simpler!"""
         # Setup mocks
@@ -146,14 +149,15 @@ class TestDirectAPIVsFeatures:
 
         # Setup feature (this creates Neo4j + registers hooks/pipes automatically)
         from woodwork.components.internal_features.base import InternalComponentManager
+
         component_manager = InternalComponentManager()
         feature = features[0]
 
         feature.setup(mock_agent, config, component_manager)
 
         # Verify everything was created automatically
-        assert hasattr(mock_agent, '_knowledge_graph')
-        assert hasattr(mock_agent, '_knowledge_mode')
+        assert hasattr(mock_agent, "_knowledge_graph")
+        assert hasattr(mock_agent, "_knowledge_mode")
         assert mock_agent._knowledge_graph is mock_neo4j_instance
 
         # Verify hooks and pipes were registered
@@ -191,12 +195,14 @@ class TestDirectAPIVsFeatures:
             def add_hook(self, event_name: str, hook_function, description: str = None):
                 """Components can add hooks to themselves."""
                 from woodwork.core.unified_event_bus import get_global_event_bus
+
                 event_bus = get_global_event_bus()
                 event_bus.register_hook(event_name, hook_function)
 
             def add_pipe(self, event_name: str, pipe_function, description: str = None):
                 """Components can add pipes to themselves."""
                 from woodwork.core.unified_event_bus import get_global_event_bus
+
                 event_bus = get_global_event_bus()
                 event_bus.register_pipe(event_name, pipe_function)
 
@@ -215,8 +221,8 @@ class TestDirectAPIVsFeatures:
         from woodwork.components.component import component
 
         # Check methods exist
-        assert hasattr(component, 'add_hook')
-        assert hasattr(component, 'add_pipe')
+        assert hasattr(component, "add_hook")
+        assert hasattr(component, "add_pipe")
 
         # Mock component instance
         mock_comp = Mock(spec=component)
@@ -239,9 +245,9 @@ class TestDirectAPIVsFeatures:
     def test_comparison_summary(self):
         """Summary comparison of both approaches."""
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("🔧 DIRECT API APPROACH:")
-        print("="*80)
+        print("=" * 80)
 
         print("""
         # Create components dynamically
@@ -275,9 +281,9 @@ class TestDirectAPIVsFeatures:
         print("  • Easy to forget hooks/pipes")
         print("  • Harder to standardize patterns")
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("🏗️ FEATURE SYSTEM APPROACH:")
-        print("="*80)
+        print("=" * 80)
 
         print("""
         # Just one line in config
@@ -299,14 +305,14 @@ class TestDirectAPIVsFeatures:
         print("  • Need to pre-define features")
         print("  • Less granular control")
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("🎯 RECOMMENDATION:")
-        print("="*80)
+        print("=" * 80)
         print("✅ Use Feature System for common patterns (knowledge graphs, caching)")
         print("✅ Use Direct API for one-off customizations or dynamic scenarios")
         print("✅ Use Both Together - they complement each other perfectly!")
         print("✅ Any component can add hooks/pipes to itself")
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("🎉 BOTH APPROACHES WORK PERFECTLY!")
-        print("="*80)
+        print("=" * 80)

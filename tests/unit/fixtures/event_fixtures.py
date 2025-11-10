@@ -15,12 +15,14 @@ class MockPayload(BasePayload):
     def to_json(self) -> str:
         """Convert to JSON string."""
         import json
+
         return json.dumps(self.data)
 
     @classmethod
-    def from_json(cls, json_str: str) -> 'MockPayload':
+    def from_json(cls, json_str: str) -> "MockPayload":
         """Create from JSON string."""
         import json
+
         data = json.loads(json_str)
         return cls(data)
 
@@ -62,7 +64,7 @@ def create_test_event_data() -> Dict[str, Any]:
         "tool.call": {"tool_name": "github_api", "arguments": {"repo": "test"}},
         "tool.observation": {"result": "GitHub API call successful"},
         "input.received": {"input": "Please help me with this task", "session_id": "test"},
-        "agent.step_complete": {"step_number": 1, "status": "completed"}
+        "agent.step_complete": {"step_number": 1, "status": "completed"},
     }
 
 
@@ -71,7 +73,7 @@ def create_mock_hooks() -> Dict[str, callable]:
     return {
         "debug_hook": Mock(return_value=None),
         "logging_hook": Mock(return_value=None),
-        "metrics_hook": Mock(return_value=None)
+        "metrics_hook": Mock(return_value=None),
     }
 
 
@@ -80,5 +82,5 @@ def create_mock_pipes() -> Dict[str, callable]:
     return {
         "input_transformer": Mock(side_effect=lambda x: x),
         "output_formatter": Mock(side_effect=lambda x: x),
-        "error_handler": Mock(side_effect=lambda x: x)
+        "error_handler": Mock(side_effect=lambda x: x),
     }
