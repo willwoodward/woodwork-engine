@@ -157,6 +157,44 @@ It also helps the user understand the progress of the task and overall progress 
 
 The functions can be called inside the inputs dictionary, with the key corresponding to the argument name and the value corresponding to the value passed as argument for that parameter.
 
+## IMPORTANT: Research Before Planning
+
+**Before using this tool, you MUST gather context about the task first:**
+
+1. **Explore and understand** - Use available tools to research the task:
+   - For bug fixes: Read the issue/ticket to understand what's broken
+   - For features: Explore existing code patterns and architecture
+   - For analysis: Locate and examine data sources
+   - For general tasks: Identify constraints, requirements, and resources
+
+2. **Assess complexity AFTER research** - Only create a plan once you understand what you're dealing with:
+   - Simple (1-2 steps): Skip this tool, just execute
+   - Moderate (3-5 steps): Use this tool for lightweight planning
+   - Complex (6+ steps): Use this tool for detailed planning
+
+3. **Do NOT plan blindly** - If someone says "solve issue #218", your FIRST action must be to read/fetch issue #218, NOT to create a plan.
+
+**Examples of Research-First Approach:**
+- "Solve GitHub issue #218" → First: fetch issue details. Then: assess complexity and plan if needed.
+- "Add OAuth to the API" → First: explore existing auth code. Then: plan the integration.
+- "Analyze sales data" → First: locate and examine data files. Then: plan analysis steps.
+
+## Adaptive Planning: You Can Add Tasks Anytime
+
+**This tool is not just for initial planning - use it adaptively throughout execution:**
+
+- **Start simple**: You can begin without todos if a task seems straightforward
+- **Add tasks mid-execution**: If you discover unexpected complexity or a difficult sub-task, create or add todos immediately
+- **After research reveals more**: Initial research might reveal the task is bigger than expected - add todos to capture everything
+- **When priorities shift**: User feedback or new information may require adding new tasks
+
+**Examples:**
+- You start fixing a bug without planning, but discover it requires changes in 5 different files → Add todos for each file
+- Initial research shows the task touches authentication, database, and API layers → Create todos to track all three areas
+- During execution, tests fail unexpectedly → Add a new todo: "Debug and fix failing tests"
+
+The key: **Use todos whenever tracking would help you stay organized and not miss steps.**
+
 ## Function Signature and State Parameter
 
 write_todos(todos, state=None)
@@ -173,27 +211,58 @@ write_todos(todos, state=None)
 - Remove tasks that are no longer relevant from the list entirely.
 
 ## When to Use This Tool
-Use this tool proactively in these scenarios:
 
-1. Complex multi-step tasks - When a task requires 3 or more distinct steps or actions
-2. Non-trivial and complex tasks - Tasks that require careful planning or multiple operations
-3. User explicitly requests todo list - When the user directly asks you to use the todo list
-4. User provides multiple tasks - When users provide a list of things to be done (numbered or comma-separated)
-5. After receiving new instructions - Immediately capture user requirements as todos
-6. When you start working on a task - Mark it as in_progress BEFORE beginning work. Only one todo should be in_progress at a time
-7. After completing a task - Mark it as completed and add any new follow-up tasks discovered during implementation
+Use this tool adaptively based on task complexity. You can use it at the start OR during execution:
 
-## When NOT to Use This Tool
+**Always Use For:**
+1. **Complex multi-step tasks** - Tasks requiring 6+ distinct steps with dependencies
+2. **User explicit request** - When the user directly asks for a todo list or plan
+3. **Multiple distinct deliverables** - When users provide a list of separate things to be done (numbered or comma-separated)
+4. **Mid-execution discovery** - When a seemingly simple task reveals unexpected complexity
 
-Skip using this tool when:
-1. There is only a single, straightforward task
-2. The task is trivial and tracking it provides no organizational benefit
-3. The task can be completed in less than 3 trivial steps
-4. The task is purely conversational or informational
+**Consider Using For (Moderate Complexity):**
+1. **Multi-step tasks (3-5 steps)** - Tasks with some uncertainty or multiple operations
+2. **Refactoring or debugging** - When you need to track changes across multiple locations
+3. **Progress visibility** - When user would benefit from seeing step-by-step progress
+4. **After research reveals scope** - When initial exploration shows more work than expected
 
-NOTE: Do not use this tool if there is only one trivial task to do. In this case, just do the task directly.
+**Do NOT Use For:**
+1. **Simple tasks (1-2 steps)** - Straightforward, clear tasks with obvious approach
+2. **Before research** - Never plan before understanding the task context
+3. **Trivial operations** - Quick lookups, calculations, or single-action tasks
+4. **Conversational requests** - Informational or explanatory requests
+
+**Key Rule: Research → Assess → Plan (if needed) → Execute → Re-plan if complexity emerges**
+
+Examples:
+- ✅ "I need to migrate our auth system from JWT to OAuth2" → Complex, use write_todos after research
+- ✅ "Help me with these 5 tasks: A, B, C, D, E" → Multiple tasks, use write_todos
+- ⚠️ "Add a login form to the homepage" → Moderate, consider write_todos after exploring codebase
+- ❌ "What's 2+2?" → Trivial, don't use write_todos
+- ❌ "Fix issue #42" → Don't plan yet! First read issue #42, then decide
 
 ## Examples of When to Use the Todo List
+
+<example>
+User: Fix the login validation bug
+Assistant: Let me first understand what the bug is.
+*Reads bug report and examines the validation code*
+Assistant: I see - the email regex is incorrect. This should be a simple fix.
+*Fixes the regex in validators.py*
+*Runs tests and discovers 15 test failures across multiple files*
+Assistant: The fix revealed that the email validation is used in many places. Let me create a todo list to track fixing all the affected tests.
+*Creates todo list:*
+1. [in_progress] Fix email validation tests in test_auth.py
+2. [pending] Fix email validation tests in test_user_profile.py
+3. [pending] Fix email validation tests in test_registration.py
+4. [pending] Update documentation for email validation
+5. [pending] Verify all tests pass
+*Begins fixing tests systematically*
+
+<reasoning>
+The assistant started without planning because it seemed like a simple bug fix. However, upon discovering the scope (15 test failures), it adaptively created a todo list mid-execution to track all the work. This demonstrates adaptive planning.
+</reasoning>
+</example>
 
 <example>
 User: I want to add a dark mode toggle to the application settings. Make sure you run the tests and build when you're done!

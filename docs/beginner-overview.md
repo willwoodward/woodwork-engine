@@ -1,6 +1,6 @@
 ---
 title: Beginner Overview
-description: A short introduction to Woodwork Engine and its main components for new contributors.
+description: A short introduction to Woodwork Engine and its main components for new users.
 index: 1
 ---
 

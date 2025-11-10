@@ -79,12 +79,18 @@ class keyword_voice(inputs):
         def callback_wrapper(indata, frames, time_info, status):
             self._rec.AcceptWaveform(bytes(indata))
             partial_result = json.loads(self._rec.PartialResult())
-            log.debug(partial_result)
-            if self._keyword in partial_result.get("partial", "").lower():
-                print("Hotword detected!")
+
+            # Show what's being recognized
+            recognized_text = partial_result.get("partial", "")
+            if recognized_text:
+                print(f"\rRecognizing: {recognized_text}", end="", flush=True)
+
+            if self._keyword in recognized_text.lower():
+                print("\n✓ Hotword detected!")
                 with self._listening_lock:
                     output = self._handle_voice_command()
                     self._rec = KaldiRecognizer(self._model, 16000)
+                    print("\nListening for keyword...")
                     return output
 
         # Initialize the audio stream (for some reason it sometimes doesn't work the first time)
@@ -146,10 +152,10 @@ class keyword_voice(inputs):
     def _transcribe_audio(self, filepath):
         client = openai.OpenAI(api_key=self._api_key)
 
-        log.debug("Transcribing with Whisper...")
+        print("Transcribing with Whisper...")
         with open(filepath, "rb") as f:
             transcript = client.audio.transcriptions.create(model="whisper-1", file=f)
-        log.debug(f"Transcribed: {transcript.text}")
+        print(f"You said: {transcript.text}")
         return transcript.text
 
     def _handle_voice_command(self):

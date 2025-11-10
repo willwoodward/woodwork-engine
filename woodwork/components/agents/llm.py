@@ -191,9 +191,20 @@ class llm(agent, Startable):
         if inputs is None:
             inputs = {}
 
-        # Reset workflow variables for new query and initialize with input variables
-        self._workflow_variables = inputs.copy()
-        log.debug(f"Initialized workflow variables with inputs: {list(inputs.keys())}")
+        # Check for session in inputs
+        session = inputs.pop("_session", None)
+
+        # Handle session-aware state management
+        if session:
+            # Use existing session state - don't reset
+            self._workflow_variables = session.workflow_variables.copy()
+            # Update with any new inputs (excluding _session)
+            self._workflow_variables.update(inputs)
+            log.debug(f"[Agent] Using session {session.id} with {len(session.conversation_history)} history items")
+        else:
+            # Reset workflow variables for new query (old behavior)
+            self._workflow_variables = inputs.copy()
+            log.debug(f"Initialized workflow variables with inputs: {list(inputs.keys())}")
 
         # Set component context for proper event attribution
         EventSource.set_current(getattr(self, 'name', 'unknown_agent'), 'agent')
@@ -261,11 +272,17 @@ class llm(agent, Startable):
 
         chain = prompt | self._llm
 
-        current_prompt = query
+        # Initialize current_prompt with session context if available
+        if session and session.current_prompt:
+            # Append new query to existing conversation context
+            current_prompt = session.current_prompt + f"\n\nUser: {query}"
+            log.debug(f"[Agent] Continuing session with accumulated context ({len(session.current_prompt)} chars)")
+        else:
+            current_prompt = query
 
         for iteration in range(1000):
             log.debug(f"\n--- Iteration {iteration + 1} ---")
-            
+
             current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
             print(f"tokens: {current_tokens}")
 
@@ -296,6 +313,14 @@ class llm(agent, Startable):
             if is_final:
                 log.debug("Final Answer found.")
                 self._task_m.end_workflow()
+
+                # Save state back to session if provided
+                if session:
+                    session.add_turn("assistant", thought)
+                    session.current_prompt = current_prompt
+                    session.workflow_variables = self._workflow_variables.copy()
+                    log.debug(f"[Agent] Saved state to session {session.id}")
+
                 return thought
             
             if action_dict is None:

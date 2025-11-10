@@ -1,35 +1,35 @@
 ---
 title: Quickstart
-description: A short, focused path to install and run Woodwork Engine in minutes.
-index: 2
+description: Get started with Woodwork Engine in minutes - from installation to your first running agent.
+index: 0
 ---
 
-# Quickstart — 2 minute path
+# Quickstart
 
-This guide gets you from install → runnable project quickly. Keep your `main.ww` small while you learn.
+This guide gets you from installation to a running agent in under 5 minutes.
 
-1. Install the package (stable release):
+## Installation
+
+Install Woodwork Engine via pip:
 
 ```bash
 pip install woodwork-engine
 ```
 
-2. Create a `.env` file in your project root (copy from `.env.example`) and set required keys (example for OpenAI):
+This gives you access to the `woodwork` CLI tool.
 
-```bash
-cp .env.example .env
-# then edit .env and add your key, e.g.:
-# OPENAI_API_KEY=sk-...
-```
+## Setup
 
-3. Create a minimal `main.ww` in your project root. Use an LLM component (simplest path):
+### 1. Create your configuration file
 
-```
-# main.ww
+Create a `main.ww` file in your project directory. This is where you declare your agent components:
+
+```ww
+# main.ww - A simple Q&A agent
 
 my_llm = llm openai {
-  model: "gpt-4"
-  api_key: "$OPENAI_API_KEY"
+  model: "gpt-4o-mini"
+  api_key: $OPENAI_API_KEY
 }
 
 input = input command_line {
@@ -37,29 +37,59 @@ input = input command_line {
 }
 ```
 
-Notes:
-- Property syntax in `.ww` uses colons (e.g., `model: "gpt-4"`).
-- Environment variables are referenced with `$VARNAME` in `.ww` files.
+**Notes:**
+- Properties use colon syntax: `model: "gpt-4o-mini"`
+- Environment variables are referenced with `$VARNAME`
 
-4. Install runtime dependencies referenced by your config (run this after creating `main.ww`):
+### 2. Set up environment variables
+
+Create a `.env` file in your project root with your API keys:
+
+```bash
+# .env
+OPENAI_API_KEY=sk-your-key-here
+```
+
+Make sure `.env` is in your `.gitignore` so API keys aren't committed.
+
+### 3. Install dependencies
+
+Install the dependencies your configuration needs:
 
 ```bash
 woodwork --init
 ```
 
-5. Start Woodwork:
+### 4. Run Woodwork
+
+Start your agent:
 
 ```bash
 woodwork
 ```
 
-You should be able to type into the command line and see responses from the configured LLM.
+You should now be able to type messages and get responses from your LLM!
 
-Quick tips:
-- Keep examples small: start with a single LLM and a command-line input.
-- For development, install editable/dev deps: `pip install -e .[dev]` and run `pytest` and `ruff format`.
-- If using a hosted LLM, ensure your `.env` is present and contains the API key referenced in your `.ww`.
+## Next Steps
 
-If something fails:
-- Confirm `.env` exists and variables match what you referenced in `main.ww`.
-- Check `examples/` for working configurations and copy the pattern.
+Now that you have a working agent, check out:
+
+- `docs/beginner-overview.md` - Understand the core concepts
+- `docs/explanation/philosophy.md` - Learn why Woodwork uses Infrastructure as Code
+- `docs/explanation/control-flow.md` - Master hooks and pipes for advanced control
+- `examples/` - Working examples you can copy and adapt
+
+## Troubleshooting
+
+**Agent won't start:**
+- Verify `.env` exists and contains the API keys referenced in `main.ww`
+- Run `woodwork --init` to ensure all dependencies are installed
+
+**Dependencies not installing:**
+- Check that your `main.ww` file is valid
+- Look at `examples/` for working configurations
+
+**For development:**
+- Install with dev dependencies: `pip install -e .[dev]`
+- Run tests with `pytest`
+- Format code with `ruff format`

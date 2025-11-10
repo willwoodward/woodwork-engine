@@ -6,10 +6,11 @@ Thought: [Explain what you're thinking or what needs to be done next. Be concise
 Action: {{"tool": tool_name, "action": function_or_endpoint, "inputs": {{input_variable: variable_name}}, "output": output_variable}}
 Observation: [This will be provided by the system after the action is executed. Do NOT fabricate or guess the observation.]
 
-If you need more information to proceed, ask the user a clarifying question:
+If you need more information from the user to proceed:
 Thought: [Identify what's missing and why you need it.]
-Action: {{"tool": "ask_user", "action": "ask", "inputs": {{"question": "your question here"}}, "output": "user_response"}}
-Observation: [The user's response]
+Final Answer: [Ask your question directly to the user]
+
+The user will respond in their next message, and you'll have full context from the conversation history.
 
 When the task is complete, respond with:
 Final Answer: [your conclusion or solution]

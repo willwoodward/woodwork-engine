@@ -372,9 +372,9 @@ class UnifiedEventBus:
                 log.warning("[UnifiedEventBus] Target component '%s' not found", target_name)
             return None
 
-        # Only deliver input.received events to component input methods
+        # Only deliver input.received and agent.response events to component input methods
         # Other events are processed by hooks/pipes but not delivered as input
-        if event_type != "input.received":
+        if event_type not in ["input.received", "agent.response"]:
             log.debug("[UnifiedEventBus] Skipping delivery of '%s' to component '%s' (not an input event)",
                      event_type, target_name)
             return None
@@ -387,17 +387,48 @@ class UnifiedEventBus:
         try:
             log.debug("[UnifiedEventBus] Delivering '%s' to component '%s'", event_type, target_name)
 
-            # Prepare input data for input.received events
-            if hasattr(payload, 'input'):
-                input_data = payload.input
+            # Prepare input data based on event type
+            if event_type == "input.received":
+                # For input.received events, extract input field
+                if hasattr(payload, 'input'):
+                    input_data = payload.input
+                    inputs_dict = getattr(payload, 'inputs', {})
+                else:
+                    input_data = payload
+                    inputs_dict = {}
+            elif event_type == "agent.response":
+                # For agent.response events, extract response from data
+                if hasattr(payload, 'data') and isinstance(payload.data, dict):
+                    input_data = payload.data.get('response', str(payload))
+                else:
+                    input_data = str(payload)
+                inputs_dict = {}
             else:
                 input_data = payload
+                inputs_dict = {}
 
             # Call component input method
-            if asyncio.iscoroutinefunction(target_component.input):
-                result = await target_component.input(input_data)
+            # Check if component expects inputs parameter
+            import inspect
+            if hasattr(target_component.input, '__func__'):
+                sig = inspect.signature(target_component.input.__func__)
             else:
-                result = target_component.input(input_data)
+                sig = inspect.signature(target_component.input)
+
+            params = list(sig.parameters.keys())
+
+            # If component accepts inputs parameter, pass it
+            if 'inputs' in params:
+                if asyncio.iscoroutinefunction(target_component.input):
+                    result = await target_component.input(input_data, inputs=inputs_dict)
+                else:
+                    result = target_component.input(input_data, inputs=inputs_dict)
+            else:
+                # Old behavior - just pass input_data
+                if asyncio.iscoroutinefunction(target_component.input):
+                    result = await target_component.input(input_data)
+                else:
+                    result = target_component.input(input_data)
 
             log.debug("[UnifiedEventBus] Component '%s' processed input, result: %s",
                      target_name, str(result)[:100] if result else "None")
