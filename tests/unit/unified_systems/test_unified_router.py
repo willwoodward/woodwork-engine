@@ -12,6 +12,7 @@ from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.types import InputReceivedPayload, AgentThoughtPayload
 
 
+@pytest.mark.slow
 class TestUnifiedEventBusRouting:
     """Test suite for UnifiedEventBus routing functionality."""
 

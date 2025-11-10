@@ -16,6 +16,7 @@ from woodwork.core.message_bus.integration import (
 )
 
 
+@pytest.mark.slow
 class TestStreamingMessageAPIDesign:
     """TDD tests that drive the streaming integration design."""
 
@@ -209,6 +210,7 @@ class TestStreamingMessageAPIDesign:
             await component.start_stream("stream_2", "client_2", {"prompt": "test2"})
 
 
+@pytest.mark.slow
 class TestStreamingMessageAPIIntegration:
     """TDD tests for the actual streaming integration implementation."""
 
@@ -344,6 +346,7 @@ class TestStreamingMessageAPIIntegration:
         assert chunks[-1].metadata.get("error") is True
 
 
+@pytest.mark.slow
 class TestStreamingRouterIntegration:
     """TDD tests for router streaming support."""
 

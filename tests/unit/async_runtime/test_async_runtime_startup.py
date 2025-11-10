@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pytest
 """
 Unit tests for AsyncRuntime startup_async_components functionality.
 
@@ -15,6 +16,9 @@ import logging
 from woodwork.core.async_runtime import AsyncRuntime
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
+@pytest.mark.slow
 class TestAsyncRuntimeStartupComponents:
     """Test AsyncRuntime startup_async_components method."""
 
@@ -257,6 +261,8 @@ class TestAsyncRuntimeStartupComponents:
         assert any("All async components started successfully" in msg for msg in log_messages)
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
 class TestAsyncRuntimeIntegrationWithStartup:
     """Test AsyncRuntime integration with startup sequence."""
 
@@ -337,6 +343,8 @@ class TestAsyncRuntimeIntegrationWithStartup:
         runtime._cleanup.assert_called_once()
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
 class TestAsyncRuntimeComponentParsing:
     """Test AsyncRuntime component parsing with async startup requirements."""
 

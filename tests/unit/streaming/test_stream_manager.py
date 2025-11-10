@@ -8,6 +8,7 @@ from woodwork.core.simple_message_bus import SimpleMessageBus
 from woodwork.types.streaming_data import StreamDataType
 
 
+@pytest.mark.slow
 class TestStreamManager:
     """Test suite for StreamManager."""
 
@@ -106,6 +107,7 @@ class TestStreamManager:
             assert expected_event in subscribe_calls
 
 
+@pytest.mark.slow
 class TestStreamManagerErrorHandling:
     """Test error handling in StreamManager."""
 

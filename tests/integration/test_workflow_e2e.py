@@ -13,6 +13,7 @@ from unittest.mock import Mock, AsyncMock, patch
 import json
 
 
+@pytest.mark.slow
 class TestWorkflowEndToEnd:
     """End-to-end integration tests for workflow system."""
 

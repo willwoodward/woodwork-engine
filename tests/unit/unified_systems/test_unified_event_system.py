@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from woodwork.types import InputReceivedPayload, AgentThoughtPayload, ToolCallPayload
 
 
+@pytest.mark.slow
 class TestUnifiedEventBus:
     """Test the UnifiedEventBus that replaces EventManager + DeclarativeRouter + MessageBus"""
 
@@ -207,6 +208,7 @@ class TestUnifiedEventBus:
             assert delay_from_start < 0.1, f"Event {i} ({event_type}) delay: {delay_from_start:.4f}s"
 
 
+@pytest.mark.slow
 class TestAsyncRuntime:
     """Test the AsyncRuntime that replaces distributed startup threading"""
 
@@ -308,6 +310,7 @@ class TestAsyncRuntime:
         assert not hasattr(runtime.event_bus, '_cross_thread_event_queue')
 
 
+@pytest.mark.slow
 class TestUnifiedAPIInput:
     """Test the unified API input component without cross-thread processing"""
 
@@ -381,6 +384,7 @@ class TestUnifiedAPIInput:
         assert delivery_delay < 0.05, f"Input event delivery took {delivery_delay:.4f}s"
 
 
+@pytest.mark.slow
 class TestIntegrationScenarios:
     """Integration tests for complete event flow scenarios"""
 

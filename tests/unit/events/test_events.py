@@ -1,8 +1,10 @@
 import asyncio
+import pytest
 from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.types import ToolObservationPayload, AgentThoughtPayload
 
 
+@pytest.mark.asyncio
 async def test_pipes_transform_sync_and_async():
     emitter = UnifiedEventBus()
 
@@ -44,6 +46,7 @@ async def test_pipes_transform_sync_and_async():
     assert "[async_added]" in result.observation
 
 
+@pytest.mark.asyncio
 async def test_hooks_on_once_off():
     emitter = UnifiedEventBus()
     calls = []

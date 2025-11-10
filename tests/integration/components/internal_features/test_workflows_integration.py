@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import Mock, patch
 
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.workflows]
+
 
 @pytest.mark.integration
 @pytest.mark.workflows

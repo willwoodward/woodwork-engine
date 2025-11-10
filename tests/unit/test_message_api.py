@@ -22,6 +22,7 @@ from woodwork.core.message_bus.integration import (
 )
 
 
+@pytest.mark.slow
 class TestMessageAPIDesign:
     """Test-driven development tests for the message API design."""
 
@@ -265,6 +266,7 @@ class TestMessageAPIDesign:
         assert chunk.is_final is True
 
 
+@pytest.mark.slow
 class TestMessageAPIImplementation:
     """Test the actual implementation of the message API."""
 
@@ -407,6 +409,7 @@ class TestMessageAPIImplementation:
         assert "stream_test" in chunks[0].data
 
 
+@pytest.mark.slow
 class TestMessageAPIErrorHandling:
     """Test error handling in the message API."""
 
@@ -542,6 +545,7 @@ class TestMessageAPIErrorHandling:
         assert "Error:" in chunks[0].data
 
 
+@pytest.mark.slow
 class TestMessageAPIEdgeCases:
     """Test edge cases and validation in the message API."""
 

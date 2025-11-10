@@ -7,6 +7,7 @@ from woodwork.core.unified_event_bus import UnifiedEventBus
 from tests.unit.fixtures.event_fixtures import MockPayload, create_mock_hooks, create_mock_pipes
 
 
+@pytest.mark.slow
 class TestEventRouting:
     """Test suite for event routing logic using UnifiedEventBus."""
 
@@ -131,6 +132,7 @@ class TestEventRouting:
         assert len(event_router._hooks["performance.test"]) == 10
 
 
+@pytest.mark.slow
 class TestEventRoutingErrorHandling:
     """Test error handling in event routing."""
 

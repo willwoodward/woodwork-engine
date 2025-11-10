@@ -1,4 +1,5 @@
 """
+import pytest
 Unit tests for unified WorkflowsFeature (merging graph_cache + workflows).
 
 Following TDD - these tests are written BEFORE implementation.
@@ -10,6 +11,7 @@ from dataclasses import replace
 import json
 
 
+@pytest.mark.slow
 class TestUnifiedWorkflowsFeature:
     """Test unified workflows feature with all functionality."""
 

@@ -15,6 +15,8 @@ import logging
 from woodwork.core.async_runtime import AsyncRuntime
 from woodwork.components.mcp.mcp_server import MCPServer
 
+pytestmark = pytest.mark.slow
+
 
 class TestToolDiscoveryIntegration:
     """Integration tests for tool discovery fix."""

@@ -1,4 +1,5 @@
 """
+import pytest
 Comprehensive tests for AsyncRuntime startup and lifecycle management.
 
 Tests component initialization, startup sequences, API server handling,
@@ -12,6 +13,7 @@ from woodwork.core.async_runtime import AsyncRuntime
 from woodwork.core.unified_event_bus import UnifiedEventBus
 
 
+@pytest.mark.slow
 class TestAsyncRuntime:
     """Test suite for AsyncRuntime functionality."""
 
@@ -90,6 +92,7 @@ class TestAsyncRuntime:
         assert not runtime._running
         assert runtime._api_server_task is None
 
+    @pytest.mark.asyncio
     async def test_component_parsing_from_config(self, runtime, mock_config):
         """Test parsing components from configuration."""
         with patch('woodwork.parser.config_parser.parse_config_dict') as mock_parser:
@@ -102,6 +105,7 @@ class TestAsyncRuntime:
             assert 'comp1' in components
             assert 'comp2' in components
 
+    @pytest.mark.asyncio
     async def test_component_initialization(self, runtime, mock_config, mock_components):
         """Test component initialization process."""
         with patch.object(runtime, '_parse_components', return_value=list(mock_components.values())):
@@ -129,6 +133,7 @@ class TestAsyncRuntime:
         del runtime.components["input"]
         assert not runtime.has_api_component()
 
+    @pytest.mark.asyncio
     async def test_api_server_startup(self, runtime, mock_components):
         """Test API server startup process."""
         # Setup components - the input component in mock_components is api_input
@@ -144,6 +149,7 @@ class TestAsyncRuntime:
         # Verify API server task was created
         assert runtime._api_server_task is not None
 
+    @pytest.mark.asyncio
     async def test_main_loop_with_api_components(self, runtime, mock_components):
         """Test main loop behavior with API components."""
         # Setup components
@@ -167,6 +173,7 @@ class TestAsyncRuntime:
             # Verify keep-alive was called
             mock_keep_alive.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_main_loop_with_input_components(self, runtime):
         """Test main loop behavior with non-API input components."""
         # Create non-API input component
@@ -193,6 +200,7 @@ class TestAsyncRuntime:
             # Verify input loop was called
             mock_input_loop.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_user_input_processing(self, runtime, mock_components):
         """Test processing user input through components."""
         # Setup components
@@ -205,6 +213,7 @@ class TestAsyncRuntime:
         # Should emit input.received event and process through event bus
         # Verify this by checking if event bus processed the input
 
+    @pytest.mark.asyncio
     async def test_component_input_processing(self, runtime, mock_components):
         """Test direct component input processing."""
         agent_comp = mock_components["agent"]
@@ -216,6 +225,7 @@ class TestAsyncRuntime:
         agent_comp.input.assert_called_once_with("test query")
         assert result == "agent response"
 
+    @pytest.mark.asyncio
     async def test_runtime_startup_sequence(self, runtime, mock_config, mock_components):
         """Test complete runtime startup sequence."""
         with patch.object(runtime, '_parse_components', return_value=list(mock_components.values())):
@@ -233,6 +243,7 @@ class TestAsyncRuntime:
                 # Verify main loop was called
                 mock_main_loop.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_runtime_shutdown_sequence(self, runtime, mock_components):
         """Test runtime shutdown sequence."""
         # Setup runtime as running
@@ -247,6 +258,7 @@ class TestAsyncRuntime:
         # Verify shutdown
         assert not runtime._running
 
+    @pytest.mark.asyncio
     async def test_runtime_cleanup(self, runtime, mock_components):
         """Test runtime cleanup process."""
         # Setup components with cleanup methods
@@ -277,6 +289,7 @@ class TestAsyncRuntime:
         assert stats["has_api_component"] == True  # mock_components has API component
         assert "event_bus_stats" in stats
 
+    @pytest.mark.asyncio
     async def test_error_handling_in_component_initialization(self, runtime, mock_config):
         """Test error handling during component initialization."""
         with patch('woodwork.parser.config_parser.parse_config_dict') as mock_parser:
@@ -289,6 +302,7 @@ class TestAsyncRuntime:
             # Should return empty list when error occurs
             assert components == []
 
+    @pytest.mark.asyncio
     async def test_error_handling_in_startup(self, runtime, mock_config):
         """Test error handling during startup."""
         with patch.object(runtime, 'initialize_components', side_effect=Exception("Init failed")):
@@ -299,6 +313,7 @@ class TestAsyncRuntime:
                 # Should either handle gracefully or propagate with useful info
                 assert "Init failed" in str(e) or True  # Test passes if handled gracefully
 
+    @pytest.mark.asyncio
     async def test_keyboard_interrupt_handling(self, runtime, mock_components):
         """Test handling of keyboard interrupts."""
         # Setup components
@@ -316,6 +331,7 @@ class TestAsyncRuntime:
                 # Runtime should stop
                 assert not runtime._running
 
+    @pytest.mark.asyncio
     async def test_concurrent_component_processing(self, runtime):
         """Test concurrent processing of multiple components."""
         # Create multiple async components
@@ -341,6 +357,7 @@ class TestAsyncRuntime:
         for i, result in enumerate(results):
             assert result == f"result_{i}"
 
+    @pytest.mark.asyncio
     async def test_runtime_restart_capability(self, runtime, mock_config, mock_components):
         """Test runtime restart capability."""
         with patch.object(runtime, '_parse_components', return_value=list(mock_components.values())):
@@ -357,6 +374,7 @@ class TestAsyncRuntime:
                 await runtime.start(mock_config)
                 assert runtime._running
 
+    @pytest.mark.asyncio
     async def test_api_component_server_management(self, runtime):
         """Test API component server management."""
         # Create API component with server methods
@@ -392,6 +410,7 @@ class TestAsyncRuntime:
         runtime3 = get_global_runtime()
         assert runtime3 is custom_runtime
 
+    @pytest.mark.asyncio
     async def test_global_runtime_functions(self):
         """Test global runtime utility functions."""
         from woodwork.core.async_runtime import start_runtime, stop_runtime
@@ -416,6 +435,7 @@ class TestAsyncRuntime:
             await stop_runtime()
             mock_runtime.stop.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_input_loop_functionality(self, runtime):
         """Test input loop for non-API components."""
         # Create console input component
@@ -443,6 +463,7 @@ class TestAsyncRuntime:
                 # Should have processed the test input
                 mock_process.assert_called_with("test input", "console_input")
 
+    @pytest.mark.asyncio
     async def test_component_dependencies_handling(self, runtime):
         """Test handling of component dependencies."""
         # Create components with dependencies
@@ -468,6 +489,7 @@ class TestAsyncRuntime:
         assert "llm" in runtime.event_bus._components
         assert "agent" in runtime.event_bus._components
 
+    @pytest.mark.asyncio
     async def test_parse_components_with_different_config_formats(self, runtime):
         """Test component parsing with different configuration formats."""
         # Test with direct components list
@@ -492,6 +514,7 @@ class TestAsyncRuntime:
         result3 = await runtime._parse_components(config3)
         assert result3 == []
 
+    @pytest.mark.asyncio
     async def test_get_user_input_with_sync_and_async_functions(self, runtime):
         """Test user input handling with both sync and async input functions."""
         # Test with async input function
@@ -519,6 +542,7 @@ class TestAsyncRuntime:
         result = await runtime._get_user_input(no_input_comp)
         assert isinstance(result, str)
 
+    @pytest.mark.asyncio
     async def test_sync_component_input_processing(self, runtime):
         """Test processing components with sync input methods."""
         # Create component with sync input method
@@ -536,6 +560,7 @@ class TestAsyncRuntime:
         result = await runtime.process_component_input(no_input_comp, "test_data")
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_api_server_task_cancellation(self, runtime):
         """Test proper cancellation of API server task."""
         # Create API component
@@ -554,6 +579,7 @@ class TestAsyncRuntime:
         await runtime.stop()
         assert runtime._api_server_task.cancelled() or runtime._api_server_task.done()
 
+    @pytest.mark.asyncio
     async def test_runtime_stats_accuracy(self, runtime, mock_components):
         """Test runtime statistics accuracy."""
         # Setup runtime state
@@ -569,6 +595,7 @@ class TestAsyncRuntime:
         assert stats["api_server_running"] == True
         assert "event_bus_stats" in stats
 
+    @pytest.mark.asyncio
     async def test_runtime_with_mixed_component_types(self, runtime):
         """Test runtime with mixed sync/async component types."""
         # Create mixed components

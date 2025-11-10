@@ -517,6 +517,41 @@ class UnifiedEventBus:
             "target_count": len(self._routing_table.get(component_name, []))
         }
 
+    def get_routing_stats(self) -> Dict[str, Any]:
+        """Get routing statistics"""
+        return {
+            "total_components": len(self._components),
+            "routed_components": len(self._routing_table),
+            "total_routes": sum(len(targets) for targets in self._routing_table.values()),
+            "unrouted_components": len(self._components) - len(self._routing_table)
+        }
+
+    def validate_routing_configuration(self) -> Dict[str, Any]:
+        """Validate routing configuration and return validation results"""
+        issues = []
+        warnings = []
+
+        # Check for components without routing
+        for component_name in self._components:
+            if component_name not in self._routing_table or not self._routing_table[component_name]:
+                warnings.append(f"Component '{component_name}' has no routing targets")
+
+        # Check for routes to non-existent components
+        for component_name, targets in self._routing_table.items():
+            for target in targets:
+                # Built-in targets are allowed
+                if target.startswith('_'):
+                    continue
+                # Check if target exists
+                if target not in self._components:
+                    warnings.append(f"Component '{component_name}' routes to non-existent target '{target}'")
+
+        return {
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "warnings": warnings
+        }
+
     # Message Bus Integration compatibility methods
     async def send_to_component_with_response(self, name: str, source_component_name: str, data: dict) -> tuple[bool, str]:
         """Send message to component and return (success, request_id) for response tracking"""

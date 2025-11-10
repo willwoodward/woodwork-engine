@@ -4,6 +4,8 @@ import pytest
 from unittest.mock import Mock, patch
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager
 
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.internal_features]
+
 
 @pytest.mark.integration
 @pytest.mark.internal_features

@@ -7,6 +7,8 @@ from woodwork.components.internal_features import InternalFeatureRegistry, Inter
 from woodwork.core.async_runtime import AsyncRuntime
 from woodwork.core.unified_event_bus import UnifiedEventBus
 
+pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.internal_features]
+
 
 @pytest.mark.integration
 @pytest.mark.internal_features

@@ -51,12 +51,12 @@ class TestAgentConsoleOutputIssue:
         """Test if _infer_routing_patterns adds _console_output for agents"""
         event_bus = UnifiedEventBus()
 
-        # Create agent without explicit output
-        mock_agent = Mock()
+        # Create agent without explicit output - use spec to prevent auto-creation of attributes
+        mock_agent = Mock(spec=['name', 'type', '__class__'])
         mock_agent.name = "coding_ag"
         mock_agent.type = "agent"
-        if hasattr(mock_agent, 'to'):
-            delattr(mock_agent, 'to')
+        # Set __class__ for type inference to work
+        mock_agent.__class__ = type('llm', (), {})
 
         event_bus.register_component(mock_agent)
         event_bus.configure_routing()
@@ -90,11 +90,10 @@ class TestAgentConsoleOutputIssue:
 
         message_bus.register_component_handler("_console_output", console_handler)
 
-        # Create agent WITHOUT routing
-        mock_agent = Mock()
+        # Create agent WITHOUT routing - use spec to prevent auto-creation
+        mock_agent = Mock(spec=['name', '__class__'])
         mock_agent.name = "coding_ag"
-        if hasattr(mock_agent, 'to'):
-            delattr(mock_agent, 'to')
+        mock_agent.__class__ = type('llm', (), {})
 
         event_bus.register_component(mock_agent)
         event_bus.configure_routing()

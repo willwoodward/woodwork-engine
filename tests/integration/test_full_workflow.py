@@ -8,6 +8,7 @@ from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput
 
 
+@pytest.mark.slow
 class TestFullWorkflow:
     """Test complete workflows integrating message bus, streaming, and events."""
 
@@ -307,6 +308,7 @@ class TestFullWorkflow:
         assert len(event_manager.emitted_events) <= 50
 
 
+@pytest.mark.slow
 class TestRealWorldCompleteScenarios:
     """Test complete real-world scenarios."""
 

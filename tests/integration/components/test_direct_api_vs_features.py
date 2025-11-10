@@ -7,6 +7,8 @@ This shows both ways to add components and hooks/pipes to agents.
 import pytest
 from unittest.mock import Mock, patch
 
+pytestmark = [pytest.mark.slow, pytest.mark.integration]
+
 
 @pytest.mark.integration
 class TestDirectAPIVsFeatures:

@@ -7,6 +7,8 @@ and that sessions preserve context so the user's response continues the conversa
 import pytest
 from woodwork.core.session import ConversationSession
 
+pytestmark = [pytest.mark.slow, pytest.mark.integration]
+
 
 @pytest.mark.integration
 def test_natural_conversation_flow_concept():

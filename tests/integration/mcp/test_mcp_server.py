@@ -17,6 +17,8 @@ from woodwork.components.mcp.channels import MCPChannel, SSEChannel, StdioChanne
 from woodwork.components.mcp.manager import MCPServerManager
 from woodwork.components.mcp.messages import MCPMessage
 
+pytestmark = pytest.mark.slow
+
 
 class TestMCPRegistry:
     """Test MCP Registry service for server metadata resolution."""

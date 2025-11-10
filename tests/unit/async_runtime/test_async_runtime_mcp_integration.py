@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pytest
 """
 Unit tests for AsyncRuntime MCP server integration and blocking initialization.
 
@@ -15,6 +16,9 @@ from woodwork.core.async_runtime import AsyncRuntime
 from woodwork.components.mcp.mcp_server import MCPServer
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
+@pytest.mark.slow
 class TestAsyncRuntimeMCPIntegration:
     """Test AsyncRuntime integration with MCP server blocking initialization."""
 
@@ -199,10 +203,11 @@ class TestAsyncRuntimeMCPIntegration:
         await runtime._cleanup()
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
 class TestMCPServerBlockingInitialization:
     """Test MCP server blocking initialization behavior."""
 
-    @pytest.mark.asyncio
     async def test_mcp_server_creates_blocking_startup_task(self):
         """Test that MCP server creates blocking startup task during initialization."""
         with patch.object(asyncio, 'get_running_loop', return_value=Mock()):
@@ -299,6 +304,7 @@ class TestMCPServerBlockingInitialization:
         assert not server._capabilities_fetched
 
 
+@pytest.mark.slow
 class TestMCPServerDescriptionIntegration:
     """Test MCP server description property with blocking initialization."""
 
@@ -374,10 +380,11 @@ class TestMCPServerDescriptionIntegration:
         assert "+5 more" in description
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
 class TestEndToEndIntegration:
     """End-to-end integration tests for the complete flow."""
 
-    @pytest.mark.asyncio
     async def test_complete_initialization_flow(self):
         """Test the complete flow from component creation to tool documentation."""
         # Create MCP server

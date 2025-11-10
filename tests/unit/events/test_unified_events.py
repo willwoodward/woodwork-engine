@@ -11,6 +11,7 @@ from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.types import AgentThoughtPayload, ToolCallPayload, InputReceivedPayload
 
 
+@pytest.mark.slow
 class TestUnifiedEvents:
     """Test suite for unified event system."""
 

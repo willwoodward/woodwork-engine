@@ -7,6 +7,7 @@ from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.test_messages import create_component_message, MockMessageEnvelope
 
 
+@pytest.mark.slow
 class TestInMemoryMessageBus:
     """Test suite for InMemoryMessageBus."""
 
@@ -216,6 +217,7 @@ class TestInMemoryMessageBus:
         assert received_messages == [0, 1, 2, 3, 4]
 
 
+@pytest.mark.slow
 class TestInMemoryMessageBusCleanup:
     """Test cleanup and resource management."""
 

@@ -6,6 +6,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from tests.unit.fixtures.mock_components import MockStream
 
 
+@pytest.mark.slow
 class TestStreamingFlow:
     """Test end-to-end streaming workflows."""
 
@@ -201,6 +202,7 @@ class TestStreamingFlow:
         assert len(streamer.active_streams) == 0
 
 
+@pytest.mark.slow
 class TestRealWorldStreamingScenarios:
     """Test real-world streaming scenarios."""
 

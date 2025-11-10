@@ -1,4 +1,5 @@
 """Unit tests for Internal Features Integration."""
+import pytest
 
 import pytest
 from unittest.mock import Mock, patch
@@ -8,6 +9,7 @@ from woodwork.components.internal_features import InternalFeatureRegistry
 @pytest.mark.unit
 @pytest.mark.internal_features
 @pytest.mark.graph_cache
+@pytest.mark.slow
 class TestGraphCacheFeatureIntegration:
     """Integration tests for GraphCacheFeature with actual registration."""
 

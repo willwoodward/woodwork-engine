@@ -1,4 +1,5 @@
 """Unit tests for WorkflowsFeature with auto-component creation."""
+import pytest
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
@@ -9,6 +10,7 @@ from woodwork.types.events import AgentActionPayload, AgentStepCompletePayload, 
 
 @pytest.mark.unit
 @pytest.mark.workflows
+@pytest.mark.slow
 class TestWorkflowsFeature:
     """Test suite for WorkflowsFeature functionality."""
 

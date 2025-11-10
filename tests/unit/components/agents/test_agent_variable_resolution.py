@@ -30,13 +30,14 @@ class TestAgentVariableResolution:
         with patch('woodwork.components.agents.llm.InternalFeatureRegistry') as mock_registry:
             mock_registry.create_features.return_value = []
 
-            agent = llm(
-                model=mock_model,
-                task_m=mock_task_master,
-                name="test_agent",
-                tools=[]
-            )
-            return agent
+            with patch('woodwork.components.agents.llm.get_prompt', return_value="Test prompt"):
+                agent = llm(
+                    model=mock_model,
+                    task_m=mock_task_master,
+                    name="test_agent",
+                    tools=[]
+                )
+                return agent
 
     def test_resolve_action_inputs_no_variables(self, agent):
         """Test that literal values are kept when no variables exist."""

@@ -8,6 +8,7 @@ from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput, MockMessageBus
 
 
+@pytest.mark.slow
 class TestComponentCommunicationFlow:
     """Test end-to-end component communication."""
 
@@ -221,6 +222,7 @@ class TestComponentCommunicationFlow:
         assert received_order == list(range(10))
 
 
+@pytest.mark.slow
 class TestAgentToolTimeoutIssue:
     """Test to reproduce and fix the agent-tool communication timeout issue."""
 
@@ -385,6 +387,7 @@ class TestAgentToolTimeoutIssue:
             assert "Tool executed" in result
 
 
+@pytest.mark.slow
 class TestRealWorldScenarios:
     """Test real-world communication scenarios."""
 
@@ -539,6 +542,7 @@ class TestRealWorldScenarios:
         assert (end_time - start_time) < 1.0   # But not too slow overall
 
 
+@pytest.mark.slow
 class TestComponentLifecycle:
     """Test component lifecycle in communication."""
 

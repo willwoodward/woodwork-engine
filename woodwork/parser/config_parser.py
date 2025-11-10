@@ -379,7 +379,7 @@ def parse_component_declaration(entry: str) -> tuple[str, str, str]:
         Example: ("model", "llm", "openai")
     """
     # Match: variable = component type {
-    pattern = r"(\w+)\s*=\s*(\w+)\s+(\w+)\s*\{"
+    pattern = r"^\s*(\w+)\s*=\s*(\w+)\s+(\w+)\s*\{"
     match = re.match(pattern, entry)
 
     if not match:
@@ -595,14 +595,11 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
                     array_items.append(cleaned_item)
             
             value = array_items
-            
-            # Only add to dependencies if they look like simple variable references
-            for item in value:
-                # Only treat as dependency if it's a simple string identifier
-                if (isinstance(item, str) and
-                    re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', item) and
-                    not item.startswith('$')):
-                    depends_on.append(item)
+
+            # Note: Array items are not treated as dependencies because we can't distinguish
+            # between quoted string literals (like ["GET", "POST"]) and actual variable references
+            # after quotes have been stripped during parsing. If variable references in arrays
+            # are needed, they should be handled explicitly.
 
         elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
             value = value[1:-1:]
@@ -616,8 +613,16 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
             value = False
 
         else:
-            # Add variable to depends_on
-            depends_on.append(value)
+            # Check if it's a numeric value
+            try:
+                # Try to convert to int or float
+                if '.' in value:
+                    value = float(value)
+                else:
+                    value = int(value)
+            except (ValueError, AttributeError):
+                # Not a number, treat as variable dependency
+                depends_on.append(value)
 
         config[key] = value
 

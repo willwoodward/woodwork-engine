@@ -18,6 +18,7 @@ from woodwork.core.message_bus.interface import MessageEnvelope, create_componen
 from woodwork.core.message_bus.integration import MessageBusIntegration
 
 
+@pytest.mark.slow
 class TestAPIInputComponentDesign:
     """TDD tests that drive the API input component design."""
 
@@ -83,8 +84,16 @@ class TestAPIInputComponentDesign:
         assert True  # Placeholder until we implement api_input
 
 
+@pytest.mark.slow
 class TestAPIInputWebSocketIntegration:
     """TDD tests for websocket integration with messaging system."""
+
+    @pytest.fixture
+    async def message_bus_setup(self):
+        """Setup mock message bus for testing."""
+        from woodwork.core.unified_event_bus import UnifiedEventBus
+        bus = UnifiedEventBus()
+        return bus
 
     @pytest.fixture
     async def mock_websocket_setup(self):
@@ -205,6 +214,7 @@ class TestAPIInputWebSocketIntegration:
         assert True  # Placeholder for session isolation logic
 
 
+@pytest.mark.slow
 class TestAPIInputMessageBusIntegration:
     """TDD tests for message bus integration."""
 
@@ -320,6 +330,7 @@ class TestAPIInputMessageBusIntegration:
         assert response.payload["response"] == "Agent processed the input"
 
 
+@pytest.mark.slow
 class TestAPIInputPerformance:
     """TDD tests for performance and efficiency."""
 
@@ -353,6 +364,7 @@ class TestAPIInputPerformance:
         assert True  # Placeholder for subscription efficiency testing
 
 
+@pytest.mark.slow
 class TestRealTimeEventStreaming:
     """TDD tests for real-time event streaming from LLM to WebSocket."""
 

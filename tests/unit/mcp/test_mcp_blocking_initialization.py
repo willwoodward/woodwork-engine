@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pytest
 """
 Unit tests for MCP server blocking initialization mechanism.
 
@@ -15,6 +16,7 @@ import logging
 from woodwork.components.mcp.mcp_server import MCPServer
 
 
+@pytest.mark.slow
 class TestMCPServerBlockingInitialization:
     """Test MCP server blocking initialization behavior."""
 
@@ -275,6 +277,7 @@ class TestMCPServerBlockingInitialization:
         assert end_time - start_time < 1.0, "Should not wait longer than timeout"
 
 
+@pytest.mark.slow
 class TestMCPServerDescriptionWithBlocking:
     """Test MCP server description property with blocking initialization."""
 
@@ -357,6 +360,7 @@ class TestMCPServerDescriptionWithBlocking:
             mock_sleep.assert_called()
 
 
+@pytest.mark.slow
 class TestBlockingInitializationEdgeCases:
     """Test edge cases and error conditions for blocking initialization."""
 

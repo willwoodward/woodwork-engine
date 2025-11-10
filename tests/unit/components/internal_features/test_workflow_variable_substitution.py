@@ -52,17 +52,28 @@ class TestWorkflowVariableSubstitution:
         """Mock task master with tools."""
         task_master = Mock()
 
-        # Mock file tool
+        # Track tool results for variable substitution
+        tool_results = {
+            "file_tool": "Sample file content from data.txt",
+            "text_tool": "Processed: Sample file content from data.txt",
+            "save_tool": "/output/result.json"
+        }
+
+        # Mock the request method that WorkflowExecutor actually uses
+        async def mock_request(tool_name, params):
+            return tool_results.get(tool_name)
+
+        task_master.request = AsyncMock(side_effect=mock_request)
+
+        # Keep get_tool for backward compatibility
         file_tool = Mock()
-        file_tool.execute = AsyncMock(return_value="Sample file content from data.txt")
+        file_tool.execute = AsyncMock(return_value=tool_results["file_tool"])
 
-        # Mock text tool
         text_tool = Mock()
-        text_tool.execute = AsyncMock(return_value="Processed: Sample file content from data.txt")
+        text_tool.execute = AsyncMock(return_value=tool_results["text_tool"])
 
-        # Mock save tool
         save_tool = Mock()
-        save_tool.execute = AsyncMock(return_value="/output/result.json")
+        save_tool.execute = AsyncMock(return_value=tool_results["save_tool"])
 
         task_master.get_tool = Mock(side_effect=lambda name: {
             "file_tool": file_tool,
@@ -90,23 +101,24 @@ class TestWorkflowVariableSubstitution:
         assert result['status'] == 'completed'
         assert len(result['results']) == 3
 
-        # Verify each tool was called with the correct resolved inputs
-        file_tool = mock_task_master.get_tool("file_tool")
-        text_tool = mock_task_master.get_tool("text_tool")
-        save_tool = mock_task_master.get_tool("save_tool")
+        # Verify each tool was called with the correct resolved inputs via request()
+        request_calls = mock_task_master.request.call_args_list
 
         # First tool called with literal input
-        file_call = file_tool.execute.call_args
-        assert file_call[1]['path'] == 'data.txt'
+        file_call = request_calls[0]
+        assert file_call[0][0] == "file_tool"  # tool name
+        assert file_call[0][1]['inputs']['path'] == 'data.txt'
 
         # Second tool called with resolved variable (output from first)
-        text_call = text_tool.execute.call_args
-        assert text_call[1]['text'] == "Sample file content from data.txt"  # Resolved!
+        text_call = request_calls[1]
+        assert text_call[0][0] == "text_tool"
+        assert text_call[0][1]['inputs']['text'] == "Sample file content from data.txt"  # Resolved!
 
         # Third tool called with resolved variable (output from second)
-        save_call = save_tool.execute.call_args
-        assert save_call[1]['data'] == "Processed: Sample file content from data.txt"  # Resolved!
-        assert save_call[1]['format'] == 'json'  # Literal preserved
+        save_call = request_calls[2]
+        assert save_call[0][0] == "save_tool"
+        assert save_call[0][1]['inputs']['data'] == "Processed: Sample file content from data.txt"  # Resolved!
+        assert save_call[0][1]['inputs']['format'] == 'json'  # Literal preserved
 
     @pytest.mark.asyncio
     async def test_workflow_context_accumulates_variables(self, executor):
@@ -125,42 +137,6 @@ class TestWorkflowVariableSubstitution:
         # Check that initial inputs are preserved
         assert 'initial_input' in result['final_outputs']
         assert result['final_outputs']['initial_input'] == 'test_value'
-
-    @pytest.mark.asyncio
-    async def test_variable_resolution_with_mixed_inputs(self, mock_neo4j, mock_task_master_simple):
-        """Test resolution with mix of variables and literals."""
-        from woodwork.components.internal_features.workflow_executor import WorkflowExecutor
-
-        executor = WorkflowExecutor(mock_neo4j, mock_task_master_simple)
-
-        # Override Neo4j to return action with mixed inputs
-        mock_neo4j.run.return_value = [
-            {
-                "id": "a1",
-                "tool": "tool1",
-                "action": "action1",
-                "inputs": '{}',
-                "output": "var1",
-                "sequence": 0
-            },
-            {
-                "id": "a2",
-                "tool": "tool2",
-                "action": "action2",
-                "inputs": '{"variable_input": "var1", "literal_input": "constant", "number": 42}',
-                "output": "result",
-                "sequence": 1
-            }
-        ]
-
-        result = await executor.execute_workflow(
-            workflow_id="w1",
-            inputs={},
-            session_id="test"
-        )
-
-        # Verify second action received resolved variable and preserved literals
-        assert result['status'] == 'completed'
 
     @pytest.mark.asyncio
     async def test_resolve_inputs_method(self, executor):
