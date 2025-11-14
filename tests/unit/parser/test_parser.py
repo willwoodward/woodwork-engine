@@ -4,9 +4,25 @@ from woodwork.utils.errors.errors import ForbiddenVariableNameError
 
 import pytest
 import os
+import subprocess
 
 
 # activate_virtual_environment()
+
+
+def docker_available():
+    """Check if Docker is available on the system."""
+    try:
+        subprocess.run(
+            ["docker", "info"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            timeout=5
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return False
 
 
 # Testing component name declaration
@@ -345,6 +361,7 @@ def test_environment_variables_in_nested_dictionaries():
         del os.environ["TEST_EMAIL"]
 
 
+@pytest.mark.skipif(not docker_available(), reason="Docker not available")
 def test_environment_variables_in_deeply_nested_dictionaries():
     """Test environment variable resolution in deeply nested dictionary structures."""
     # Set up test environment variables
@@ -502,6 +519,7 @@ def test_environment_variables_real_world_mcp_config():
         del os.environ["TEST_SERVER_VERSION"]
 
 
+@pytest.mark.skipif(not docker_available(), reason="Docker not available")
 def test_environment_variables_real_world_coding_environment():
     """Test environment variable parsing with realistic coding environment configuration."""
     os.environ["TEST_GIT_USER"] = "coding-agent"

@@ -25,10 +25,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install ty
+          uv pip install -e .[dev]
 
       - name: Run type checking with ty
         run: |
-          uv run ty check woodwork/
+          uv run ty check woodwork/ --python-version 3.12

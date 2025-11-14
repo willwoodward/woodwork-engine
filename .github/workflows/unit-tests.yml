@@ -25,10 +25,11 @@ jobs:
           version: "0.7.8"
 
       - name: Install dependencies
+        run: |
+          uv pip install -e .[all]
+
+      - name: Run unit tests
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .[all]
-          pip install pytest
-          pytest --tb short -v tests/
+          uv run pytest --tb short -v tests/
