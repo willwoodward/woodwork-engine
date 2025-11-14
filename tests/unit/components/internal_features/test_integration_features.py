@@ -1,46 +1,42 @@
 """Unit tests for Internal Features Integration."""
 
 import pytest
-from unittest.mock import Mock, patch
-from woodwork.components.internal_features import InternalFeatureRegistry
+
+from woodwork.components.internal_features import InternalFeatureRegistry, WorkflowsFeature
 
 
 @pytest.mark.unit
 @pytest.mark.internal_features
-@pytest.mark.graph_cache
-class TestGraphCacheFeatureIntegration:
-    """Integration tests for GraphCacheFeature with actual registration."""
+@pytest.mark.workflows
+@pytest.mark.slow
+class TestWorkflowsFeatureIntegration:
+    """Integration tests for WorkflowsFeature with actual registration."""
 
     def setup_method(self):
-        """Ensure graph cache feature is registered before each test."""
-        from woodwork.components.internal_features.graph_cache import GraphCacheFeature
+        """Ensure workflows feature is registered before each test."""
         from woodwork.components.internal_features.base import InternalFeatureRegistry
-        InternalFeatureRegistry.register("graph_cache", GraphCacheFeature)
 
-    def test_graph_cache_feature_is_registered(self):
-        """Test that GraphCacheFeature is properly registered."""
-        # Import should trigger registration
-        from woodwork.components.internal_features.graph_cache import GraphCacheFeature
+        InternalFeatureRegistry.register("workflows", WorkflowsFeature)
 
+    def test_workflows_feature_is_registered(self):
+        """Test that WorkflowsFeature is properly registered."""
         registered_features = InternalFeatureRegistry.get_registered_features()
-        assert "graph_cache" in registered_features
-        assert registered_features["graph_cache"] is GraphCacheFeature
+        assert "workflows" in registered_features
+        assert registered_features["workflows"] is WorkflowsFeature
 
-    def test_graph_cache_feature_creation(self):
-        """Test that graph_cache feature is created when enabled."""
-        from woodwork.components.internal_features.graph_cache import GraphCacheFeature
-
-        config = {"graph_cache": True}
+    def test_workflows_feature_creation(self):
+        """Test that workflows feature is created when enabled."""
+        config = {"workflows": True}
         features = InternalFeatureRegistry.create_features(config)
 
         # Should have one feature
         assert len(features) == 1
-        assert isinstance(features[0], GraphCacheFeature)
+        assert isinstance(features[0], WorkflowsFeature)
 
     def test_no_features_created_when_disabled(self):
         """Test that no features are created when none are enabled."""
-        config = {"graph_cache": False, "other_setting": True}
+        config = {"workflows": False, "other_setting": True}
         features = InternalFeatureRegistry.create_features(config)
 
-        # Should have no features because graph_cache is False
-        assert len([f for f in features if isinstance(f, type(GraphCacheFeature))]) == 0
+        # Should have no features because workflows is False
+        assert len([f for f in features if isinstance(f, WorkflowsFeature)]) == 0

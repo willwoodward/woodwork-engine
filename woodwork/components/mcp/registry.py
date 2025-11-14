@@ -5,7 +5,6 @@ Provides access to the Model Context Protocol registry for server discovery and 
 Implements caching and version resolution as specified in the technical design.
 """
 
-import asyncio
 import time
 import logging
 from typing import Dict, List, Optional, Any
@@ -18,6 +17,7 @@ log = logging.getLogger(__name__)
 
 class TransportType(Enum):
     """Supported transport types for MCP servers."""
+
     STDIO = "stdio"
     SSE = "sse"
     WEBSOCKET = "websocket"
@@ -27,6 +27,7 @@ class TransportType(Enum):
 @dataclass
 class PackageInfo:
     """Information about a local package (OCI container)."""
+
     type: str
     identifier: str
     version: str
@@ -36,6 +37,7 @@ class PackageInfo:
 @dataclass
 class RemoteInfo:
     """Information about a remote server endpoint."""
+
     type: str
     url: str
     headers: List[Dict[str, str]] = field(default_factory=list)
@@ -44,6 +46,7 @@ class RemoteInfo:
 @dataclass
 class EnvVar:
     """Environment variable requirement."""
+
     name: str
     required: bool = True
     description: str = ""
@@ -52,6 +55,7 @@ class EnvVar:
 @dataclass
 class ServerMetadata:
     """Complete metadata for an MCP server."""
+
     name: str
     version: str
     description: str
@@ -96,35 +100,32 @@ class ServerMetadata:
         """Create ServerMetadata from registry response."""
         packages = []
         for package_data in server_data.get("packages", []):
-            packages.append(PackageInfo(
-                type=package_data["type"],
-                identifier=package_data["identifier"],
-                version=package_data["version"],
-                registry_base_url=package_data.get("registry_base_url", "")
-            ))
+            packages.append(
+                PackageInfo(
+                    type=package_data["type"],
+                    identifier=package_data["identifier"],
+                    version=package_data["version"],
+                    registry_base_url=package_data.get("registry_base_url", ""),
+                )
+            )
 
         remotes = []
         for remote_data in server_data.get("remotes", []):
             headers = []
             for header_data in remote_data.get("headers", []):
-                headers.append({
-                    "name": header_data["name"],
-                    "value": header_data["value"]
-                })
+                headers.append({"name": header_data["name"], "value": header_data["value"]})
 
-            remotes.append(RemoteInfo(
-                type=remote_data["type"],
-                url=remote_data["url"],
-                headers=headers
-            ))
+            remotes.append(RemoteInfo(type=remote_data["type"], url=remote_data["url"], headers=headers))
 
         env_vars = []
         for env_data in server_data.get("env_vars", []):
-            env_vars.append(EnvVar(
-                name=env_data["name"],
-                required=env_data.get("required", True),
-                description=env_data.get("description", "")
-            ))
+            env_vars.append(
+                EnvVar(
+                    name=env_data["name"],
+                    required=env_data.get("required", True),
+                    description=env_data.get("description", ""),
+                )
+            )
 
         return cls(
             name=server_data["name"],
@@ -132,12 +133,13 @@ class ServerMetadata:
             description=server_data.get("description", ""),
             packages=packages,
             remotes=remotes,
-            env_vars=env_vars
+            env_vars=env_vars,
         )
 
 
 class UnsupportedTransportError(Exception):
     """Raised when no supported transport is available."""
+
     pass
 
 
@@ -159,7 +161,9 @@ class MCPRegistry:
             self._http_client = aiohttp.ClientSession(connector=connector)
         return self._http_client
 
-    async def get_server(self, name: str, version: str = "latest", toolsets: Optional[str] = None, readonly: Optional[bool] = None) -> ServerMetadata:
+    async def get_server(
+        self, name: str, version: str = "latest", toolsets: Optional[str] = None, readonly: Optional[bool] = None
+    ) -> ServerMetadata:
         """
         Fetch server metadata from registry with fallback for known servers.
 
@@ -191,7 +195,7 @@ class MCPRegistry:
 
             http_client = await self._get_http_client()
             # Use correct server endpoint format
-            server_id = name.replace('/', '-')  # Convert name to valid server ID
+            server_id = name.replace("/", "-")  # Convert name to valid server ID
             url = f"{self.BASE_URL}/server/{server_id}"
 
             async with http_client.get(url) as response:
@@ -206,10 +210,7 @@ class MCPRegistry:
             metadata = ServerMetadata.from_registry(data)
 
             # Cache the result
-            self._cache[cache_key] = {
-                "metadata": metadata,
-                "timestamp": time.time()
-            }
+            self._cache[cache_key] = {"metadata": metadata, "timestamp": time.time()}
 
             log.info(f"[MCPRegistry] Successfully fetched metadata for {name}:{version}")
             return metadata
@@ -218,8 +219,9 @@ class MCPRegistry:
             log.warning(f"[MCPRegistry] Registry lookup failed for {name}: {e}, trying fallback")
             return self._get_fallback_metadata(name, version, toolsets, readonly)
 
-
-    def _get_fallback_metadata(self, name: str, version: str, toolsets: Optional[str] = None, readonly: Optional[bool] = None) -> ServerMetadata:
+    def _get_fallback_metadata(
+        self, name: str, version: str, toolsets: Optional[str] = None, readonly: Optional[bool] = None
+    ) -> ServerMetadata:
         """
         Get fallback metadata for known MCP servers when registry is unavailable.
 
@@ -244,7 +246,7 @@ class MCPRegistry:
             headers = [
                 {"name": "Authorization", "value": "Bearer {GITHUB_TOKEN}"},
                 {"name": "Content-Type", "value": "application/json"},
-                {"name": "Accept", "value": "application/json"}
+                {"name": "Accept", "value": "application/json"},
             ]
 
             # Add toolsets header if specified
@@ -252,7 +254,7 @@ class MCPRegistry:
                 log.debug(f"[MCPRegistry] Using configured toolsets: {toolsets}")
                 headers.append({"name": "X-MCP-Toolsets", "value": toolsets})
             else:
-                log.debug(f"[MCPRegistry] Using default toolsets: all")
+                log.debug("[MCPRegistry] Using default toolsets: all")
                 headers.append({"name": "X-MCP-Toolsets", "value": "all"})
 
             # Add readonly header if specified
@@ -276,20 +278,14 @@ class MCPRegistry:
                 version=version,
                 description=" - ".join(description_parts),
                 packages=[],
-                remotes=[
-                    RemoteInfo(
-                        type="http",
-                        url="https://api.githubcopilot.com/mcp/",
-                        headers=headers
-                    )
-                ],
+                remotes=[RemoteInfo(type="http", url="https://api.githubcopilot.com/mcp/", headers=headers)],
                 env_vars=[
                     EnvVar(
                         name="GITHUB_TOKEN",
                         required=True,
-                        description="GitHub Personal Access Token with appropriate scopes"
+                        description="GitHub Personal Access Token with appropriate scopes",
                     )
-                ]
+                ],
             )
 
         raise ValueError(f"Server '{name}' not found in registry and no fallback available")

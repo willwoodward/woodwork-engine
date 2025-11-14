@@ -18,6 +18,7 @@ class web(api):
         self._url = url
 
         # Ingest the API documentation
+        self._documentation = ""
         if "documentation" in config:
             with open(os.getcwd() + "/" + config["documentation"]) as f:
                 self._documentation = f.read()

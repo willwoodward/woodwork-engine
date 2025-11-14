@@ -63,6 +63,7 @@ class neo4j(graph_database, Startable):
         if not self._docker_started:
             if queue:
                 from woodwork.types import Update
+
                 queue.put(Update(progress=10, component_name=self.name))
 
             self.docker.init()

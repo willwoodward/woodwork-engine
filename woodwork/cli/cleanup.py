@@ -7,8 +7,8 @@ log = logging.getLogger(__name__)
 
 def _rm_tree(path: pathlib.Path) -> None:
     """Recursively remove a directory if it exists.
-    
-    Since Docker containers now run as the current user, files should be 
+
+    Since Docker containers now run as the current user, files should be
     owned by the current user and removable without special permissions.
     """
     try:
@@ -69,10 +69,10 @@ def _cleanup_docker():
                         cname = container.name
                     except Exception:
                         cname = "<unknown>"
-                    
+
                     # Check if container is running
                     try:
-                        if container.status == 'running':
+                        if container.status == "running":
                             log.info("Stopping container %s...", cname)
                             container.stop(timeout=10)  # Give it 10 seconds to stop gracefully
                             containers_to_wait_for.append((container, cname))
@@ -90,24 +90,24 @@ def _cleanup_docker():
         log.info("Waiting for containers to stop...")
         max_wait_time = 30  # Maximum time to wait in seconds
         start_time = time.time()
-        
+
         while containers_to_wait_for and (time.time() - start_time) < max_wait_time:
             containers_still_running = []
             for container, cname in containers_to_wait_for:
                 try:
                     container.reload()
-                    if container.status != 'exited':
+                    if container.status != "exited":
                         containers_still_running.append((container, cname))
                     else:
                         log.debug("Container %s has stopped", cname)
                 except Exception:
                     # If we can't check status, assume it's stopped
                     pass
-            
+
             containers_to_wait_for = containers_still_running
             if containers_to_wait_for:
                 time.sleep(1)
-        
+
         # Force stop any remaining containers
         for container, cname in containers_to_wait_for:
             log.warning("Force stopping container %s (didn't stop gracefully)", cname)
@@ -128,7 +128,7 @@ def _cleanup_docker():
 
                 matches = any("woodwork" in t for t in image_tags)
                 if matches:
-                    cname = container.name if hasattr(container, 'name') else "<unknown>"
+                    cname = container.name if hasattr(container, "name") else "<unknown>"
                     log.info("Removing container %s...", cname)
                     try:
                         container.remove(force=True)
@@ -198,11 +198,11 @@ def clean_all(root_path: pathlib.Path | None = None) -> None:
     # Clean up Docker resources FIRST
     log.info("Cleaning up Docker containers, volumes, and images...")
     _cleanup_docker()
-    
+
     # Remove the .woodwork directory
     log.info("Removing .woodwork directory...")
     _rm_tree(ww_dir)
-    
+
     # Verify cleanup
     if ww_dir.exists():
         log.warning("Directory still exists after cleanup: %s", ww_dir)

@@ -69,7 +69,7 @@ def activate_virtual_environment():
     # Remove ALL site-packages from sys.path except the one we're about to add
     # This prevents conflicts with parent venv or system packages
     original_paths = sys.path.copy()
-    sys.path[:] = [p for p in sys.path if 'site-packages' not in p]
+    sys.path[:] = [p for p in sys.path if "site-packages" not in p]
 
     # Add the project virtual environment site-packages
     site_packages = os.path.join(
@@ -80,7 +80,7 @@ def activate_virtual_environment():
     )
     sys.path.insert(0, site_packages)
 
-    removed_paths = [p for p in original_paths if 'site-packages' in p]
+    removed_paths = [p for p in original_paths if "site-packages" in p]
     log.debug("Virtual environment activated. Removed all site-packages paths: %s", removed_paths)
 
 
@@ -172,6 +172,7 @@ def get_all_requirements(root_dir, output_file):
 
 def init(options={"isolated": False, "all": False}):
     from rich.console import Console
+
     console = Console()
 
     # Make sure the virtual environment is set up properly

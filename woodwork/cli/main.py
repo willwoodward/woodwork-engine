@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 def parse_and_validate_config():
     """Parse .ww configuration files and return components."""
     import time
+
     console = Console()
 
     console.print("Parsing configuration...", style="dim", highlight=False)
@@ -42,6 +43,7 @@ def parse_and_validate_config():
 def generate_exports():
     """Generate exported objects file for the registry."""
     import time
+
     console = Console()
 
     start = time.time()
@@ -53,6 +55,7 @@ def generate_exports():
 def deploy_containers():
     """Deploy Docker containers for components that need them."""
     import time
+
     console = Console()
 
     console.print("Deploying containers...", style="dim", highlight=False)
@@ -65,17 +68,17 @@ def deploy_containers():
 def start_components(components):
     """Start all components with progress bar display."""
     import time
+
     console = Console()
 
     console.print(f"Starting {len(components)} components...", style="dim", highlight=False)
-    start = time.time()
+    time.time()
     parallel_func_apply(components, start_component, "started", "starting")
 
 
 def start_runtime(components):
     """Start the appropriate runtime (async or task master)."""
-    import time
-    console = Console()
+    Console()
 
     if globals.global_config.get("message_bus_active", False):
         _start_async_runtime(components)
@@ -97,8 +100,8 @@ def _start_async_runtime(components):
     for tool in components:
         component_config[tool.name] = {
             "component": tool.__class__.__name__.lower(),
-            "type": getattr(tool, 'type', 'unknown'),
-            "object": tool
+            "type": getattr(tool, "type", "unknown"),
+            "object": tool,
         }
 
     async def start_async_runtime():
@@ -109,7 +112,14 @@ def _start_async_runtime(components):
             print("\n", flush=True)
             sys.stderr.flush()
 
-            with Live(Spinner("dots", text="[dim]Shutting down...[/dim]"), console=console, refresh_per_second=10, redirect_stdout=False, redirect_stderr=False, transient=False):
+            with Live(
+                Spinner("dots", text="[dim]Shutting down...[/dim]"),
+                console=console,
+                refresh_per_second=10,
+                redirect_stdout=False,
+                redirect_stderr=False,
+                transient=False,
+            ):
                 await runtime.stop()
         except Exception as e:
             log.error("Runtime error: %s", e)
@@ -138,7 +148,7 @@ def app_entrypoint(args):
     - --clean: Clean up resources
     - default: Run Woodwork with configured components
     """
-    registry = get_registry()
+    get_registry()
 
     # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
@@ -219,7 +229,7 @@ def app_entrypoint(args):
             config_parser.main_function()
             from woodwork.gui.gui import GUI
 
-            gui = GUI(config_parser.task_m)
+            gui = GUI(config_parser.task_m)  # type: ignore[arg-type]
             gui.run()
             return
         elif args.gui == "fastapi":

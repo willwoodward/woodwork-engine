@@ -1,8 +1,10 @@
 import asyncio
+import pytest
 from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.types import ToolObservationPayload, AgentThoughtPayload
 
 
+@pytest.mark.asyncio
 async def test_pipes_transform_sync_and_async():
     emitter = UnifiedEventBus()
 
@@ -10,10 +12,10 @@ async def test_pipes_transform_sync_and_async():
         # Create new payload with additional info
         new_payload = ToolObservationPayload(
             observation=payload.observation + " [sync_added]",
-            tool=payload.tool if hasattr(payload, 'tool') and payload.tool else "test_tool",
+            tool=payload.tool if hasattr(payload, "tool") and payload.tool else "test_tool",
             timestamp=payload.timestamp,
             component_id=payload.component_id,
-            component_type=payload.component_type
+            component_type=payload.component_type,
         )
         return new_payload
 
@@ -25,7 +27,7 @@ async def test_pipes_transform_sync_and_async():
             tool=payload.tool,
             timestamp=payload.timestamp,
             component_id=payload.component_id,
-            component_type=payload.component_type
+            component_type=payload.component_type,
         )
         return new_payload
 
@@ -33,10 +35,7 @@ async def test_pipes_transform_sync_and_async():
     emitter.register_pipe("tool.observation", pipe_async)
 
     # Emit with data (unified event bus will create the payload)
-    result = await emitter.emit("tool.observation", {
-        "observation": "original observation",
-        "tool": "test_tool"
-    })
+    result = await emitter.emit("tool.observation", {"observation": "original observation", "tool": "test_tool"})
 
     assert result is not None
     assert "original observation" in result.observation
@@ -44,6 +43,7 @@ async def test_pipes_transform_sync_and_async():
     assert "[async_added]" in result.observation
 
 
+@pytest.mark.asyncio
 async def test_hooks_on_once_off():
     emitter = UnifiedEventBus()
     calls = []
@@ -58,16 +58,8 @@ async def test_hooks_on_once_off():
     emitter.register_hook("agent.thought", once_listener)
 
     # Create proper payloads with required fields
-    payload1 = AgentThoughtPayload(
-        thought="thought 1",
-        component_id="test_agent",
-        component_type="agent"
-    )
-    payload2 = AgentThoughtPayload(
-        thought="thought 2",
-        component_id="test_agent",
-        component_type="agent"
-    )
+    AgentThoughtPayload(thought="thought 1", component_id="test_agent", component_type="agent")
+    AgentThoughtPayload(thought="thought 2", component_id="test_agent", component_type="agent")
 
     # First emit: both listeners should run
     await emitter.emit("agent.thought", {"thought": "thought 1"})

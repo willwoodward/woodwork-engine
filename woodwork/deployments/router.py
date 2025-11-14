@@ -24,10 +24,10 @@ class DeploymentWrapper:
                     return resp[1:-1]
         else:
             # Check if component has async process method (for streaming)
-            if hasattr(self.component, 'process'):
+            if hasattr(self.component, "process"):
                 result = self.component.process(data)
                 # Handle both sync and async process methods
-                if hasattr(result, '__await__'):  # asyncio.iscoroutine doesn't work with some coroutines
+                if hasattr(result, "__await__"):  # asyncio.iscoroutine doesn't work with some coroutines
                     return await result
                 return result
             else:
@@ -50,34 +50,36 @@ class Router:
         self.components[component.name] = DeploymentWrapper(deployment, component)
         if deployment.name not in self.deployments:
             self.deployments[deployment.name] = deployment
-    
+
     async def setup_streaming(self):
         """Set up stream managers for all streaming-enabled components"""
         from woodwork.core.simple_message_bus import get_global_message_bus
         from woodwork.core.stream_manager import StreamManager
-        
+
         try:
             # Get global message bus and stream manager
             message_bus = await get_global_message_bus()
             stream_manager = StreamManager(message_bus)
             await stream_manager.start()
-            
+
             # Set stream manager for all streaming components
             streaming_count = 0
             for component_wrapper in self.components.values():
                 component = component_wrapper.component
-                if hasattr(component, 'streaming_enabled') and component.streaming_enabled:
-                    if hasattr(component, 'set_stream_manager'):
+                if hasattr(component, "streaming_enabled") and component.streaming_enabled:
+                    if hasattr(component, "set_stream_manager"):
                         component.set_stream_manager(stream_manager)
                         streaming_count += 1
                         log.debug(f"✅ Set up streaming for component: {component.name}")
                     else:
-                        log.debug(f"❌ Component {component.name} has streaming enabled but no set_stream_manager method")
-            
+                        log.debug(
+                            f"❌ Component {component.name} has streaming enabled but no set_stream_manager method"
+                        )
+
             log.debug(f"Router set up streaming for {streaming_count} components")
-            
+
             return stream_manager
-            
+
         except Exception as e:
             log.error(f"Error setting up streaming: {e}")
             return None

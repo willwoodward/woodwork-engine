@@ -6,9 +6,10 @@ Implements transport abstraction as specified in the technical design.
 """
 
 import asyncio
+import asyncio.subprocess
 import logging
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Dict, List, Optional, Any
+from typing import AsyncIterator, Dict, Optional, Any, cast
 import json
 
 from .messages import MCPMessage, MCPError
@@ -80,8 +81,12 @@ class StdioChannel(MCPChannel):
         try:
             # Build Docker command
             docker_cmd = [
-                "docker", "run", "-i", "--rm",
-                "--name", f"mcp-{self.package_info.identifier.replace('/', '-')}",
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                "--name",
+                f"mcp-{self.package_info.identifier.replace('/', '-')}",
             ]
 
             # Add environment variables
@@ -89,17 +94,19 @@ class StdioChannel(MCPChannel):
                 docker_cmd.extend(["-e", f"{key}={value}"])
 
             # Add image
-            image_url = f"{self.package_info.registry_base_url}/{self.package_info.identifier}:{self.package_info.version}"
+            image_url = (
+                f"{self.package_info.registry_base_url}/{self.package_info.identifier}:{self.package_info.version}"
+            )
             docker_cmd.append(image_url)
 
             log.debug(f"[StdioChannel] Docker command: {' '.join(docker_cmd)}")
 
             # Start process
-            self.process = await asyncio.create_subprocess_exec(
+            self.process = await asyncio.create_subprocess_exec(  # type: ignore[misc]
                 *docker_cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
 
             self._connected = True
@@ -120,7 +127,7 @@ class StdioChannel(MCPChannel):
             await self.process.stdin.drain()
 
             log.debug(f"[StdioChannel] Sent message: {message.method} (id: {message.id})")
-            return message.id
+            return cast(str, message.id)
 
         except Exception as e:
             log.error(f"[StdioChannel] Failed to send message: {e}")
@@ -392,9 +399,11 @@ class HTTPChannel(MCPChannel):
                         session_id = result["result"]["id"]
 
                     # Also check response headers (GitHub uses 'mcp-session-id')
-                    session_header = (response.headers.get("mcp-session-id") or
-                                    response.headers.get("X-Session-ID") or
-                                    response.headers.get("Session-ID"))
+                    session_header = (
+                        response.headers.get("mcp-session-id")
+                        or response.headers.get("X-Session-ID")
+                        or response.headers.get("Session-ID")
+                    )
                     if session_header:
                         session_id = session_header
 
@@ -402,7 +411,7 @@ class HTTPChannel(MCPChannel):
                         self._session_id = session_id
                         log.info(f"[HTTPChannel] Extracted session ID: {session_id}")
                     else:
-                        log.warning(f"[HTTPChannel] No session ID found in initialize response")
+                        log.warning("[HTTPChannel] No session ID found in initialize response")
                         log.debug(f"[HTTPChannel] Initialize result keys: {list(result.get('result', {}).keys())}")
                         log.debug(f"[HTTPChannel] Response headers: {dict(response.headers)}")
 

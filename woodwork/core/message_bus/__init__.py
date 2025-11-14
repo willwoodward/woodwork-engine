@@ -1,13 +1,13 @@
 """
 Distributed Message Bus for Woodwork Components
 
-This module provides the message bus abstraction that replaces the centralized 
-Task Master with distributed component communication while preserving declarative 
+This module provides the message bus abstraction that replaces the centralized
+Task Master with distributed component communication while preserving declarative
 routing via the 'to:' property.
 
 Key Features:
 - Seamless integration with existing event system
-- Zero-configuration component-to-component communication  
+- Zero-configuration component-to-component communication
 - Declarative routing based on .ww configuration
 - Support for multiple backends (in-memory, Redis, NATS)
 """
@@ -19,23 +19,19 @@ from .integration import MessageBusIntegration
 
 __all__ = [
     # Core interfaces
-    'MessageBusInterface',
-    'MessageEnvelope', 
-    'MessageDeliveryMode',
-    'MessagePattern',
-    
+    "MessageBusInterface",
+    "MessageEnvelope",
+    "MessageDeliveryMode",
+    "MessagePattern",
     # Implementations
-    'InMemoryMessageBus',
-    
+    "InMemoryMessageBus",
     # Factory and globals
-    'MessageBusFactory',
-    'create_default_message_bus',
-    'get_global_message_bus',
-    'set_global_message_bus',
-    
+    "MessageBusFactory",
+    "create_default_message_bus",
+    "get_global_message_bus",
+    "set_global_message_bus",
     # Routing
-    'DeclarativeRouter',
-    
+    "DeclarativeRouter",
     # Integration
-    'MessageBusIntegration',
+    "MessageBusIntegration",
 ]

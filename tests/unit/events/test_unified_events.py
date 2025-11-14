@@ -8,9 +8,10 @@ import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock
 from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.types import AgentThoughtPayload, ToolCallPayload, InputReceivedPayload
+from woodwork.types import AgentThoughtPayload
 
 
+@pytest.mark.slow
 class TestUnifiedEvents:
     """Test suite for unified event system."""
 
@@ -56,6 +57,7 @@ class TestUnifiedEvents:
 
     async def test_pipe_registration_and_transformation(self, event_bus):
         """Test pipe registration and payload transformation."""
+
         def transform_thought(payload):
             payload.thought = f"Enhanced: {payload.thought}"
             return payload
@@ -118,9 +120,7 @@ class TestUnifiedEvents:
 
         # Test send_to_component_with_response
         success, request_id = await event_bus.send_to_component_with_response(
-            name="test_component",
-            source_component_name="test_source",
-            data={"action": "test", "inputs": {}}
+            name="test_component", source_component_name="test_source", data={"action": "test", "inputs": {}}
         )
 
         # Verify delivery
@@ -211,6 +211,7 @@ class TestUnifiedEvents:
 
     async def test_pipe_error_handling(self, event_bus):
         """Test that errors in pipes are handled gracefully."""
+
         def failing_pipe(payload):
             raise Exception("Pipe error!")
 

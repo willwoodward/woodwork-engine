@@ -20,11 +20,11 @@ class inputs(component):
 
         self._task_master = config.get("task_master")
         self._output = config.get("to")
-    
+
     def _can_stream_input(self) -> bool:
         """Input components typically don't receive streams"""
         return False
-    
+
     def _can_stream_output(self) -> bool:
         """Input components can stream output if configured"""
         return True

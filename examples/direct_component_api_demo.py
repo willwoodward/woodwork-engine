@@ -6,6 +6,12 @@ This demonstrates two approaches to adding components to agents:
 2. Feature System: my_feature: true in config
 """
 
+from typing import Optional
+
+from woodwork.components.internal_features import InternalComponentManager
+from woodwork.components.agents.llm import llm as Agent
+
+
 # Approach 1: Direct Component Creation API
 class DirectComponentAgent:
     """Agent with direct component creation API."""
@@ -13,14 +19,14 @@ class DirectComponentAgent:
     def __init__(self, **config):
         self._internal_component_manager = InternalComponentManager()
 
-    def create_component(self, component_type: str, component_id: str = None, **config):
+    def create_component(self, component_type: str, component_id: Optional[str] = None, **config):
         """Direct API to create and attach internal components."""
-        component_id = component_id or f"{self.name}_{component_type}_{len(self._internal_component_manager._components)}"
+        component_id = (
+            component_id or f"{self.name}_{component_type}_{len(self._internal_component_manager._components)}"
+        )
 
         # Create component through internal manager
-        component = self._internal_component_manager.get_or_create_component(
-            component_id, component_type, config
-        )
+        component = self._internal_component_manager.get_or_create_component(component_id, component_type, config)
 
         # Auto-attach to agent
         setattr(self, f"_{component_type}", component)
@@ -30,16 +36,20 @@ class DirectComponentAgent:
     def add_hook(self, event_name: str, hook_function):
         """Add hook to this agent."""
         from woodwork.core.unified_event_bus import get_global_event_bus
+
         event_bus = get_global_event_bus()
         event_bus.register_hook(event_name, hook_function)
 
     def add_pipe(self, event_name: str, pipe_function):
         """Add pipe to this agent."""
         from woodwork.core.unified_event_bus import get_global_event_bus
+
         event_bus = get_global_event_bus()
         event_bus.register_pipe(event_name, pipe_function)
 
+
 # Usage Examples:
+
 
 # Approach 1: Direct API (Imperative)
 def setup_agent_direct_api():
@@ -48,11 +58,7 @@ def setup_agent_direct_api():
 
     # Create Neo4j component directly
     neo4j = agent.create_component(
-        "neo4j",
-        uri="bolt://localhost:7687",
-        user="neo4j",
-        password="testpassword",
-        api_key="my-api-key"
+        "neo4j", uri="bolt://localhost:7687", user="neo4j", password="testpassword", api_key="my-api-key"
     )
 
     # Add hooks manually
@@ -70,12 +76,7 @@ def setup_agent_direct_api():
     agent.add_pipe("input.received", enhance_input)
 
     # Create Redis component
-    redis = agent.create_component(
-        "redis",
-        host="localhost",
-        port=6379,
-        db=0
-    )
+    redis = agent.create_component("redis", host="localhost", port=6379, db=0)
 
     # Add Redis caching hook
     def cache_actions(payload):
@@ -85,6 +86,7 @@ def setup_agent_direct_api():
 
     return agent
 
+
 # Approach 2: Feature System (Declarative)
 def setup_agent_feature_system():
     """Feature system approach - less code, standardized patterns."""
@@ -93,14 +95,15 @@ def setup_agent_feature_system():
     config = {
         "name": "my_agent",
         "knowledge_graph": True,  # Auto-creates Neo4j + hooks/pipes
-        "action_cache": True,     # Auto-creates Redis + caching hooks
-        "custom_analytics": True  # Auto-creates analytics pipeline
+        "action_cache": True,  # Auto-creates Redis + caching hooks
+        "custom_analytics": True,  # Auto-creates analytics pipeline
     }
 
     # All components, hooks, and pipes created automatically
     agent = Agent(**config)
 
     return agent
+
 
 print("=== COMPARISON ===")
 

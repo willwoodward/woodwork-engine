@@ -1,8 +1,11 @@
 """Base classes for Internal Features System."""
 
 import logging
-from typing import Dict, List, Callable, Type, Optional, Any, Tuple
+from typing import Dict, List, Callable, Type, Optional, Any, Tuple, TYPE_CHECKING
 from abc import ABC, abstractmethod
+
+if TYPE_CHECKING:
+    from woodwork.components.component import component
 
 log = logging.getLogger(__name__)
 
@@ -10,7 +13,7 @@ log = logging.getLogger(__name__)
 class InternalFeature(ABC):
     """Base class for internal features that can be auto-wired to components."""
 
-    def setup(self, component: 'component', config: Dict, component_manager: 'InternalComponentManager') -> None:
+    def setup(self, component: "component", config: Dict, component_manager: "InternalComponentManager") -> None:
         """Setup the feature for the given component."""
         # Call feature-specific setup
         self._setup_feature(component, config, component_manager)
@@ -18,7 +21,9 @@ class InternalFeature(ABC):
         self._register_hooks_and_pipes()
 
     @abstractmethod
-    def _setup_feature(self, component: 'component', config: Dict, component_manager: 'InternalComponentManager') -> None:
+    def _setup_feature(
+        self, component: "component", config: Dict, component_manager: "InternalComponentManager"
+    ) -> None:
         """Setup the specific feature implementation. Override this instead of setup()."""
         pass
 
@@ -26,6 +31,7 @@ class InternalFeature(ABC):
         """Register this feature's hooks and pipes with the UnifiedEventBus."""
         try:
             from woodwork.core.unified_event_bus import get_global_event_bus
+
             event_bus = get_global_event_bus()
 
             # Register hooks
@@ -44,7 +50,7 @@ class InternalFeature(ABC):
             log.warning(f"Failed to register hooks/pipes for feature {self.__class__.__name__}: {e}")
 
     @abstractmethod
-    def teardown(self, component: 'component', component_manager: 'InternalComponentManager') -> None:
+    def teardown(self, component: "component", component_manager: "InternalComponentManager") -> None:
         """Clean up the feature when component closes."""
         pass
 
@@ -83,6 +89,7 @@ class InternalComponentManager:
         else:
             try:
                 from woodwork.core.async_runtime import get_global_runtime
+
                 self._async_runtime = get_global_runtime()
                 log.debug("InternalComponentManager using global AsyncRuntime")
             except Exception as e:
@@ -102,7 +109,7 @@ class InternalComponentManager:
         self._components[component_id] = component
 
         # Register with modern AsyncRuntime
-        if self._async_runtime and hasattr(self._async_runtime, 'register_internal_component'):
+        if self._async_runtime and hasattr(self._async_runtime, "register_internal_component"):
             log.debug(f"Registering component {component_id} with AsyncRuntime")
             self._async_runtime.register_internal_component(component_id, component)
         else:
@@ -119,7 +126,8 @@ class InternalComponentManager:
         # Try to import and register Neo4j factory
         try:
             from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
-            component_factories['neo4j'] = neo4j
+
+            component_factories["neo4j"] = neo4j
             log.debug("Neo4j component factory registered")
         except ImportError as e:
             log.debug(f"Neo4j component factory not available: {e}")
@@ -127,7 +135,8 @@ class InternalComponentManager:
         # Try to import and register Chroma factory
         try:
             from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
-            component_factories['chroma'] = chroma
+
+            component_factories["chroma"] = chroma
             log.debug("Chroma component factory registered")
         except ImportError as e:
             log.debug(f"Chroma component factory not available: {e}")
@@ -149,7 +158,7 @@ class InternalComponentManager:
         log.debug(f"Cleaning up {len(self._components)} internal components")
         for component_id, component in self._components.items():
             try:
-                if hasattr(component, 'close'):
+                if hasattr(component, "close"):
                     log.debug(f"Closing component: {component_id}")
                     component.close()
             except Exception as e:
@@ -163,10 +172,10 @@ class InternalComponentManager:
 
         startup_tasks = []
         for component_id, component in self._components.items():
-            if hasattr(component, 'start') and asyncio.iscoroutinefunction(component.start):
+            if hasattr(component, "start") and asyncio.iscoroutinefunction(component.start):
                 log.debug(f"Scheduling async startup for component: {component_id}")
                 startup_tasks.append(component.start())
-            elif hasattr(component, 'start'):
+            elif hasattr(component, "start"):
                 log.debug(f"Starting sync component: {component_id}")
                 try:
                     component.start()
@@ -194,7 +203,7 @@ class InternalFeatureRegistry:
     @classmethod
     def register(cls, config_key: str, feature_class: Type[InternalFeature]):
         """Register a feature class for a config key."""
-        class_name = getattr(feature_class, '__name__', str(feature_class))
+        class_name = getattr(feature_class, "__name__", str(feature_class))
         log.debug(f"Registering internal feature: {config_key} -> {class_name}")
         cls._features[config_key] = feature_class
 
@@ -222,14 +231,8 @@ class InternalFeatureRegistry:
     def _ensure_features_loaded(cls):
         """Ensure all available features are loaded and registered."""
         try:
-            # Import graph_cache feature to trigger registration
-            from woodwork.components.internal_features.graph_cache import GraphCacheFeature
-        except ImportError as e:
-            log.debug(f"Could not import GraphCacheFeature: {e}")
-
-        try:
             # Import knowledge_graph feature to trigger registration
-            from woodwork.components.internal_features.knowledge_graph import KnowledgeGraphFeature
+            from woodwork.components.internal_features.knowledge_graph import KnowledgeGraphFeature  # noqa: F401
         except ImportError as e:
             log.debug(f"Could not import KnowledgeGraphFeature: {e}")
 

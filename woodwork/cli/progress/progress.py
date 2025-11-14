@@ -53,7 +53,11 @@ class SpinnerOrCheckColumn(ProgressColumn):
 
 
 def component_progression_display(
-    console, components: List[component], progress_queue: queue.Queue, present_verb: str, threads: List[threading.Thread]
+    console,
+    components: List[component],
+    progress_queue: queue.Queue,
+    present_verb: str,
+    threads: List[threading.Thread],
 ):
     progress = Progress(
         TextColumn("[grey23]|-", justify="right"),
@@ -119,9 +123,7 @@ def component_progression_display(
     return completed
 
 
-def parallel_func_apply(
-    components: List[component], component_func: Callable, past_verb: str, present_verb: str
-):
+def parallel_func_apply(components: List[component], component_func: Callable, past_verb: str, present_verb: str):
     progress_queue = queue.Queue()
 
     # Start threads - each thread calls start() on its component

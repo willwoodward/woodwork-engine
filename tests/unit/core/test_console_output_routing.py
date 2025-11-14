@@ -6,7 +6,8 @@ _console_output but the handler is never invoked, resulting in {} output.
 
 import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from dataclasses import asdict
+from unittest.mock import Mock, patch, AsyncMock
 from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.types.events import GenericPayload
 from woodwork.core.message_bus.interface import MessageEnvelope
@@ -28,15 +29,12 @@ class TestConsoleOutputRouting:
         payload = GenericPayload(
             component_id="coding_ag",
             component_type="agent",
-            data={"response": "Test response", "source_component": "coding_ag"}
+            data={"response": "Test response", "source_component": "coding_ag"},
         )
 
         # Execute: deliver to virtual component _console_output
         await event_bus._deliver_to_component(
-            target_name="_console_output",
-            event_type="agent.response",
-            payload=payload,
-            source_component="coding_ag"
+            target_name="_console_output", event_type="agent.response", payload=payload, source_component="coding_ag"
         )
 
         # Assert: message bus send_to_component should be called
@@ -49,7 +47,7 @@ class TestConsoleOutputRouting:
         assert envelope.target_component == "_console_output"
         assert envelope.event_type == "agent.response"
         assert envelope.sender_component == "coding_ag"
-        assert envelope.payload == payload
+        assert envelope.payload == asdict(payload)
 
     @pytest.mark.asyncio
     async def test_deliver_to_virtual_component_without_message_bus(self):
@@ -58,18 +56,11 @@ class TestConsoleOutputRouting:
         event_bus = UnifiedEventBus()
         # Don't set message bus
 
-        payload = GenericPayload(
-            component_id="coding_ag",
-            component_type="agent",
-            data={"response": "Test response"}
-        )
+        payload = GenericPayload(component_id="coding_ag", component_type="agent", data={"response": "Test response"})
 
         # Execute
         result = await event_bus._deliver_to_component(
-            target_name="_console_output",
-            event_type="agent.response",
-            payload=payload,
-            source_component="coding_ag"
+            target_name="_console_output", event_type="agent.response", payload=payload, source_component="coding_ag"
         )
 
         # Assert: should return None without crashing
@@ -99,7 +90,7 @@ class TestConsoleOutputRouting:
         payload = GenericPayload(
             component_id="coding_ag",
             component_type="agent",
-            data={"response": "Test agent response", "source_component": "coding_ag"}
+            data={"response": "Test agent response", "source_component": "coding_ag"},
         )
 
         # Execute: emit agent.response from the agent
@@ -141,9 +132,7 @@ class TestConsoleOutputRouting:
 
         # Create payload
         payload = GenericPayload(
-            component_id="coding_ag",
-            component_type="agent",
-            data={"response": "Test response from agent"}
+            component_id="coding_ag", component_type="agent", data={"response": "Test response from agent"}
         )
 
         # Execute: emit agent.response
@@ -159,7 +148,7 @@ class TestConsoleOutputRouting:
         assert received_envelope is not None
         assert received_envelope.target_component == "_console_output"
         assert received_envelope.event_type == "agent.response"
-        assert received_envelope.payload == payload
+        assert received_envelope.payload == asdict(payload)
 
         # Cleanup
         await message_bus.stop()
@@ -167,7 +156,6 @@ class TestConsoleOutputRouting:
     @pytest.mark.asyncio
     async def test_console_handler_processes_response_data(self):
         """Test that console handler correctly processes response data from payload"""
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
         from woodwork.core.message_bus.integration import GlobalMessageBusManager
 
         # Setup
@@ -177,10 +165,7 @@ class TestConsoleOutputRouting:
         payload = GenericPayload(
             component_id="coding_ag",
             component_type="agent",
-            data={
-                "response": "This is the agent response that should be displayed",
-                "source_component": "coding_ag"
-            }
+            data={"response": "This is the agent response that should be displayed", "source_component": "coding_ag"},
         )
 
         envelope = MessageEnvelope(
@@ -189,7 +174,7 @@ class TestConsoleOutputRouting:
             event_type="agent.response",
             payload=payload,
             sender_component="coding_ag",
-            target_component="_console_output"
+            target_component="_console_output",
         )
 
         # Capture print output
@@ -201,7 +186,7 @@ class TestConsoleOutputRouting:
             original_print(f"[TEST] Captured print: {text}")
 
         # Execute with mocked print
-        with patch('builtins.print', mock_print):
+        with patch("builtins.print", mock_print):
             await manager._handle_console_message(envelope)
 
         # Assert: the response should be printed
@@ -233,11 +218,7 @@ class TestMessageBusComponentHandlerInvocation:
         message_bus.register_component_handler("test_component", test_handler)
 
         # Create envelope
-        payload = GenericPayload(
-            component_id="sender",
-            component_type="agent",
-            data={"test": "data"}
-        )
+        payload = GenericPayload(component_id="sender", component_type="agent", data={"test": "data"})
 
         envelope = MessageEnvelope(
             message_id="test-msg-456",
@@ -245,7 +226,7 @@ class TestMessageBusComponentHandlerInvocation:
             event_type="test.event",
             payload=payload,
             sender_component="sender",
-            target_component="test_component"
+            target_component="test_component",
         )
 
         # Execute

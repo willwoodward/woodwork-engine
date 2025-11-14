@@ -72,9 +72,7 @@ class ToolSchema:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ToolSchema":
         """Deserialize from dict."""
-        parameters = [
-            ToolParameter.from_dict(p) for p in data.get("parameters", [])
-        ]
+        parameters = [ToolParameter.from_dict(p) for p in data.get("parameters", [])]
         return cls(
             tool_name=data["tool_name"],
             display_name=data["display_name"],

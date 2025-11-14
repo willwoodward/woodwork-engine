@@ -6,10 +6,10 @@ components, hooks, and pipes at startup time.
 """
 
 from woodwork.components.component import component
-from unittest.mock import Mock
 import logging
 
 log = logging.getLogger(__name__)
+
 
 class IntelligentComponent(component):
     """Component that uses direct API in __init__ for startup setup."""
@@ -39,7 +39,7 @@ class IntelligentComponent(component):
 
         # Hook to collect thoughts
         def collect_thoughts(payload):
-            if hasattr(payload, 'thought'):
+            if hasattr(payload, "thought"):
                 self.thought_history.append(payload.thought)
                 log.info(f"Component '{self.name}' collected thought: {payload.thought[:30]}...")
 
@@ -47,7 +47,7 @@ class IntelligentComponent(component):
 
         # Pipe to enhance input with component context
         def add_component_context(payload):
-            if hasattr(payload, 'input'):
+            if hasattr(payload, "input"):
                 enhanced = f"[{self.name}] {payload.input}"
                 log.info(f"Component '{self.name}' enhanced input")
                 return payload._replace(input=enhanced)
@@ -57,7 +57,7 @@ class IntelligentComponent(component):
 
         # Pipe to add action history context
         def add_history_context(payload):
-            if hasattr(payload, 'input') and self.action_count > 0:
+            if hasattr(payload, "input") and self.action_count > 0:
                 context = f"\\n[Previous Actions: {self.action_count}]"
                 enhanced = payload.input + context
                 return payload._replace(input=enhanced)
@@ -73,11 +73,7 @@ def demo_startup_direct_api():
     print("=" * 50)
 
     # Create component - hooks and pipes are set up automatically in __init__!
-    comp = IntelligentComponent(
-        name="smart_processor",
-        component_type="processor",
-        type_name="intelligent"
-    )
+    comp = IntelligentComponent(name="smart_processor", component_type="processor", type_name="intelligent")
 
     print(f"✅ Component '{comp.name}' created successfully!")
     print(f"✅ Action count tracker: {comp.action_count}")
@@ -88,7 +84,8 @@ def demo_startup_direct_api():
 
     # Test hooks by simulating events
     from woodwork.core.unified_event_bus import get_global_event_bus
-    event_bus = get_global_event_bus()
+
+    get_global_event_bus()
 
     # Mock payloads
     class MockPayload:
@@ -105,10 +102,10 @@ def demo_startup_direct_api():
             return new_payload
 
     # Test action hook
-    action_payload = MockPayload(action="test_action", tool="test_tool")
+    MockPayload(action="test_action", tool="test_tool")
 
     # Manually trigger hooks for demo (in real system, events would do this)
-    for hook_name, hook_func in [("agent.action", lambda p: comp.action_count.__setattr__('', comp.action_count + 1))]:
+    for hook_name, hook_func in [("agent.action", lambda p: comp.action_count.__setattr__("", comp.action_count + 1))]:
         try:
             comp.action_count += 1  # Simulate hook effect
             print(f"✅ Action hook triggered: {comp.action_count} actions tracked")
@@ -127,7 +124,7 @@ def demo_startup_direct_api():
     enhanced1 = f"[{comp.name}] {input_payload.input}"
     enhanced2 = enhanced1 + f"\\n[Previous Actions: {comp.action_count}]"
 
-    print(f"✅ Input pipes triggered:")
+    print("✅ Input pipes triggered:")
     print(f"   Original: '{input_payload.input}'")
     print(f"   Enhanced: '{enhanced2}'")
 

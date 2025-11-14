@@ -1,11 +1,7 @@
 """Tests for MessageBus interface and data structures."""
 
-import pytest
 import time
-from unittest.mock import Mock
-from woodwork.core.message_bus.interface import (
-    MessageEnvelope, MessageDeliveryMode, MessagePattern
-)
+from woodwork.core.message_bus.interface import MessageEnvelope, MessageDeliveryMode, MessagePattern
 
 
 class TestMessageEnvelope:
@@ -14,10 +10,7 @@ class TestMessageEnvelope:
     def test_basic_creation(self):
         """Test creating a basic message envelope."""
         envelope = MessageEnvelope(
-            message_id="test_123",
-            session_id="session_456",
-            event_type="test.event",
-            payload={"data": "test"}
+            message_id="test_123", session_id="session_456", event_type="test.event", payload={"data": "test"}
         )
 
         assert envelope.message_id == "test_123"
@@ -45,7 +38,7 @@ class TestMessageEnvelope:
             pattern=MessagePattern.PUBLISH_SUBSCRIBE,
             retry_count=1,
             max_retries=5,
-            ttl_seconds=600
+            ttl_seconds=600,
         )
 
         assert envelope.message_id == "msg_789"
@@ -62,12 +55,7 @@ class TestMessageEnvelope:
     def test_created_at_timestamp(self):
         """Test that created_at is set to current time."""
         before = time.time()
-        envelope = MessageEnvelope(
-            message_id="test",
-            session_id="session",
-            event_type="test.event",
-            payload={}
-        )
+        envelope = MessageEnvelope(message_id="test", session_id="session", event_type="test.event", payload={})
         after = time.time()
 
         assert before <= envelope.created_at <= after
@@ -76,47 +64,36 @@ class TestMessageEnvelope:
         """Test different delivery modes."""
         # AT_MOST_ONCE
         envelope1 = MessageEnvelope(
-            message_id="1", session_id="s", event_type="e", payload={},
-            delivery_mode=MessageDeliveryMode.AT_MOST_ONCE
+            message_id="1", session_id="s", event_type="e", payload={}, delivery_mode=MessageDeliveryMode.AT_MOST_ONCE
         )
         assert envelope1.delivery_mode == MessageDeliveryMode.AT_MOST_ONCE
 
         # AT_LEAST_ONCE (default)
-        envelope2 = MessageEnvelope(
-            message_id="2", session_id="s", event_type="e", payload={}
-        )
+        envelope2 = MessageEnvelope(message_id="2", session_id="s", event_type="e", payload={})
         assert envelope2.delivery_mode == MessageDeliveryMode.AT_LEAST_ONCE
 
         # EXACTLY_ONCE
         envelope3 = MessageEnvelope(
-            message_id="3", session_id="s", event_type="e", payload={},
-            delivery_mode=MessageDeliveryMode.EXACTLY_ONCE
+            message_id="3", session_id="s", event_type="e", payload={}, delivery_mode=MessageDeliveryMode.EXACTLY_ONCE
         )
         assert envelope3.delivery_mode == MessageDeliveryMode.EXACTLY_ONCE
 
     def test_message_patterns(self):
         """Test different message patterns."""
         # POINT_TO_POINT (default)
-        envelope1 = MessageEnvelope(
-            message_id="1", session_id="s", event_type="e", payload={}
-        )
+        envelope1 = MessageEnvelope(message_id="1", session_id="s", event_type="e", payload={})
         assert envelope1.pattern == MessagePattern.POINT_TO_POINT
 
         # PUBLISH_SUBSCRIBE
         envelope2 = MessageEnvelope(
-            message_id="2", session_id="s", event_type="e", payload={},
-            pattern=MessagePattern.PUBLISH_SUBSCRIBE
+            message_id="2", session_id="s", event_type="e", payload={}, pattern=MessagePattern.PUBLISH_SUBSCRIBE
         )
         assert envelope2.pattern == MessagePattern.PUBLISH_SUBSCRIBE
 
     def test_retry_logic_fields(self):
         """Test retry-related fields."""
         envelope = MessageEnvelope(
-            message_id="retry_test",
-            session_id="session",
-            event_type="test.event",
-            payload={},
-            max_retries=10
+            message_id="retry_test", session_id="session", event_type="test.event", payload={}, max_retries=10
         )
 
         assert envelope.retry_count == 0  # Starts at 0
@@ -129,23 +106,21 @@ class TestMessageEnvelope:
     def test_ttl_configuration(self):
         """Test TTL (time-to-live) configuration."""
         # Default TTL
-        envelope1 = MessageEnvelope(
-            message_id="1", session_id="s", event_type="e", payload={}
-        )
+        envelope1 = MessageEnvelope(message_id="1", session_id="s", event_type="e", payload={})
         assert envelope1.ttl_seconds == 300
 
         # Custom TTL
         envelope2 = MessageEnvelope(
-            message_id="2", session_id="s", event_type="e", payload={},
-            ttl_seconds=1800  # 30 minutes
+            message_id="2",
+            session_id="s",
+            event_type="e",
+            payload={},
+            ttl_seconds=1800,  # 30 minutes
         )
         assert envelope2.ttl_seconds == 1800
 
         # No TTL
-        envelope3 = MessageEnvelope(
-            message_id="3", session_id="s", event_type="e", payload={},
-            ttl_seconds=None
-        )
+        envelope3 = MessageEnvelope(message_id="3", session_id="s", event_type="e", payload={}, ttl_seconds=None)
         assert envelope3.ttl_seconds is None
 
     def test_complex_payload(self):
@@ -154,26 +129,14 @@ class TestMessageEnvelope:
             "action": "execute_tool",
             "data": {
                 "tool_name": "github_api",
-                "arguments": {
-                    "repo": "test/repo",
-                    "issue_number": 42
-                },
-                "metadata": {
-                    "request_id": "req_123",
-                    "timestamp": 1234567890
-                }
+                "arguments": {"repo": "test/repo", "issue_number": 42},
+                "metadata": {"request_id": "req_123", "timestamp": 1234567890},
             },
-            "session_context": {
-                "user_id": "user_456",
-                "conversation_id": "conv_789"
-            }
+            "session_context": {"user_id": "user_456", "conversation_id": "conv_789"},
         }
 
         envelope = MessageEnvelope(
-            message_id="complex_test",
-            session_id="session",
-            event_type="tool.execute",
-            payload=complex_payload
+            message_id="complex_test", session_id="session", event_type="tool.execute", payload=complex_payload
         )
 
         assert envelope.payload == complex_payload

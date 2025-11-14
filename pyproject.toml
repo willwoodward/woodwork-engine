@@ -50,8 +50,16 @@ all = [
     "langchain>=0.3.25",
     "langchain-chroma>=0.2.4",
     "langchain-community>=0.3.24",
+    "langchain-openai>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-ollama>=0.3.0",
     "sentence-transformers>=4.1.0",
     "docker>=6.1.3",
+    "mcp>=1.1.2",
+    "neo4j>=5.0.0",
+    "tiktoken>=0.8.0",
+    "openai>=1.0.0",
+    "aiohttp>=3.9.0",
 ]
 
 [project.scripts]
@@ -82,6 +90,11 @@ ignore = ["E722"]
 [tool.ty.rules]
 unknown-argument = "ignore"
 unresolved-import = "ignore"
+
+# NOTE: To check types without test/example noise, run: ty check woodwork/
+# Tests and examples have intentional mocking patterns (e.g., obj.method = Mock())
+# that cause invalid-assignment warnings. These should be fixed in the future with
+# proper mock typing, but for now just exclude tests/ and examples/ when type checking.
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

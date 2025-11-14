@@ -4,8 +4,11 @@ Integration test: Natural conversation flow replaces ask_user tool.
 Tests that agents can ask questions by returning them as Final Answer,
 and that sessions preserve context so the user's response continues the conversation.
 """
+
 import pytest
 from woodwork.core.session import ConversationSession
+
+pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
 
 @pytest.mark.integration
@@ -43,7 +46,7 @@ def test_natural_conversation_flow_concept():
     # Verify full conversation preserved
     assert len(session.conversation_history) == 3
     assert session.conversation_history[0]["role"] == "assistant"  # Question
-    assert session.conversation_history[1]["role"] == "user"       # Answer
+    assert session.conversation_history[1]["role"] == "user"  # Answer
     assert session.conversation_history[2]["role"] == "assistant"  # Completion
 
 

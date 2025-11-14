@@ -10,54 +10,41 @@ import asyncio
 import pytest
 import time
 from unittest.mock import Mock, AsyncMock, patch
-import logging
 
 from woodwork.components.mcp.mcp_server import MCPServer
 
 
+@pytest.mark.slow
 class TestMCPServerBlockingInitialization:
     """Test MCP server blocking initialization behavior."""
 
     @pytest.fixture
     def basic_mcp_server(self):
         """Create a basic MCP server for testing."""
-        with patch('woodwork.components.mcp.mcp_server.asyncio.get_running_loop'):
-            server = MCPServer(
-                name="test_mcp",
-                server="test/server",
-                version="1.0",
-                env={"TEST_TOKEN": "test-value"}
-            )
+        with patch("woodwork.components.mcp.mcp_server.asyncio.get_running_loop"):
+            server = MCPServer(name="test_mcp", server="test/server", version="1.0", env={"TEST_TOKEN": "test-value"})
         return server
 
     def test_mcp_server_initializes_blocking_startup_task_attribute(self, basic_mcp_server):
         """Test that MCP server initializes the blocking startup task attribute."""
-        assert hasattr(basic_mcp_server, '_blocking_startup_task')
+        assert hasattr(basic_mcp_server, "_blocking_startup_task")
         # Initially None until event loop is available
         assert basic_mcp_server._blocking_startup_task is None
 
     @pytest.mark.asyncio
     async def test_trigger_blocking_initialization_creates_task(self):
         """Test that _trigger_blocking_initialization creates a background task."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Should have created the blocking startup task
-        assert hasattr(server, '_blocking_startup_task')
+        assert hasattr(server, "_blocking_startup_task")
         assert server._blocking_startup_task is not None
         assert isinstance(server._blocking_startup_task, asyncio.Task)
 
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_successful_flow(self):
         """Test the complete blocking startup sequence with successful execution."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mock the external dependencies
         startup_call_order = []
@@ -75,10 +62,10 @@ class TestMCPServerBlockingInitialization:
             server._capabilities = {
                 "tools": [
                     {"name": "test_tool_1", "description": "First test tool"},
-                    {"name": "test_tool_2", "description": "Second test tool"}
+                    {"name": "test_tool_2", "description": "Second test tool"},
                 ],
                 "resources": [],
-                "prompts": []
+                "prompts": [],
             }
             server._capabilities_fetched = True
 
@@ -108,11 +95,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_with_already_started_server(self):
         """Test blocking startup when server is already started."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mark server as already started
         server._started = True
@@ -131,11 +114,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_handles_start_failure(self):
         """Test that blocking startup handles server start failures gracefully."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mock start method that raises an exception
         async def failing_start():
@@ -153,11 +132,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_handles_capability_fetch_failure(self):
         """Test that blocking startup handles capability fetch failures gracefully."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mock successful start but failing capability fetch
         async def mock_start():
@@ -179,11 +154,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_blocking_startup_sequence_timeout_handling(self):
         """Test that blocking startup handles slow capability fetching with timeout."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mock fast start but very slow capability fetch
         async def quick_start():
@@ -208,11 +179,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_wait_for_capabilities_with_existing_capabilities(self):
         """Test _wait_for_capabilities when capabilities are already loaded."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mark capabilities as already fetched
         server._capabilities_fetched = True
@@ -228,11 +195,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_wait_for_capabilities_with_blocking_task(self):
         """Test _wait_for_capabilities waits for blocking startup task."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Create a blocking startup task that completes successfully
         async def mock_blocking_task():
@@ -252,11 +215,7 @@ class TestMCPServerBlockingInitialization:
     @pytest.mark.asyncio
     async def test_wait_for_capabilities_timeout(self):
         """Test _wait_for_capabilities handles timeout correctly."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Create a blocking startup task that takes too long
         async def slow_blocking_task():
@@ -275,17 +234,14 @@ class TestMCPServerBlockingInitialization:
         assert end_time - start_time < 1.0, "Should not wait longer than timeout"
 
 
+@pytest.mark.slow
 class TestMCPServerDescriptionWithBlocking:
     """Test MCP server description property with blocking initialization."""
 
     def test_description_property_shows_initializing_status(self):
         """Test that description shows initializing status during startup."""
-        with patch('woodwork.components.mcp.mcp_server.asyncio.get_running_loop'):
-            server = MCPServer(
-                name="test_mcp",
-                server="github/mcp-server",
-                version="latest"
-            )
+        with patch("woodwork.components.mcp.mcp_server.asyncio.get_running_loop"):
+            server = MCPServer(name="test_mcp", server="github/mcp-server", version="latest")
 
         description = server.description
 
@@ -295,12 +251,8 @@ class TestMCPServerDescriptionWithBlocking:
 
     def test_description_property_with_completed_capabilities(self):
         """Test description property when capabilities are fully loaded."""
-        with patch('woodwork.components.mcp.mcp_server.asyncio.get_running_loop'):
-            server = MCPServer(
-                name="test_mcp",
-                server="github/mcp-server",
-                version="latest"
-            )
+        with patch("woodwork.components.mcp.mcp_server.asyncio.get_running_loop"):
+            server = MCPServer(name="test_mcp", server="github/mcp-server", version="latest")
 
         # Mock completed state
         server._started = True
@@ -311,12 +263,10 @@ class TestMCPServerDescriptionWithBlocking:
             "tools": [
                 {"name": "get_issue", "description": "Get GitHub issue by number"},
                 {"name": "create_pull_request", "description": "Create new PR"},
-                {"name": "list_repositories", "description": "List user repositories"}
+                {"name": "list_repositories", "description": "List user repositories"},
             ],
-            "resources": [
-                {"name": "repository", "description": "Repository resource"}
-            ],
-            "prompts": []
+            "resources": [{"name": "repository", "description": "Repository resource"}],
+            "prompts": [],
         }
 
         description = server.description
@@ -328,11 +278,7 @@ class TestMCPServerDescriptionWithBlocking:
 
     def test_description_property_waits_for_blocking_startup(self):
         """Test that description property attempts to wait for blocking startup."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Create a mock blocking startup task
         startup_completed = False
@@ -350,13 +296,12 @@ class TestMCPServerDescriptionWithBlocking:
 
         # Access description property - should attempt to wait briefly
         # Note: This is synchronous so it uses time.sleep, not asyncio.sleep
-        with patch('time.sleep') as mock_sleep:
-            description = server.description
-
+        with patch("time.sleep") as mock_sleep:
             # Should have attempted to wait
             mock_sleep.assert_called()
 
 
+@pytest.mark.slow
 class TestBlockingInitializationEdgeCases:
     """Test edge cases and error conditions for blocking initialization."""
 
@@ -364,37 +309,25 @@ class TestBlockingInitializationEdgeCases:
     async def test_blocking_initialization_without_event_loop(self):
         """Test blocking initialization when no event loop is available."""
         # Create server without event loop context
-        with patch('asyncio.get_running_loop', side_effect=RuntimeError("No event loop")):
-            server = MCPServer(
-                name="test_mcp",
-                server="test/server",
-                version="1.0"
-            )
+        with patch("asyncio.get_running_loop", side_effect=RuntimeError("No event loop")):
+            server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Should not have blocking startup task
         assert server._blocking_startup_task is None
 
     def test_blocking_initialization_trigger_with_exception(self):
         """Test that _trigger_blocking_initialization handles exceptions gracefully."""
-        with patch('asyncio.get_running_loop', side_effect=Exception("Unexpected error")):
+        with patch("asyncio.get_running_loop", side_effect=Exception("Unexpected error")):
             # Should not raise exception during initialization
-            server = MCPServer(
-                name="test_mcp",
-                server="test/server",
-                version="1.0"
-            )
+            server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Should handle exception gracefully
-        assert hasattr(server, '_blocking_startup_task')
+        assert hasattr(server, "_blocking_startup_task")
 
     @pytest.mark.asyncio
     async def test_multiple_blocking_startup_calls(self):
         """Test that multiple calls to blocking startup sequence are handled safely."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         start_call_count = 0
 
@@ -417,11 +350,7 @@ class TestBlockingInitializationEdgeCases:
     @pytest.mark.asyncio
     async def test_blocking_startup_with_partial_success(self):
         """Test blocking startup when server starts but capability fetch partially fails."""
-        server = MCPServer(
-            name="test_mcp",
-            server="test/server",
-            version="1.0"
-        )
+        server = MCPServer(name="test_mcp", server="test/server", version="1.0")
 
         # Mock successful start but partial capability fetch
         async def mock_start():

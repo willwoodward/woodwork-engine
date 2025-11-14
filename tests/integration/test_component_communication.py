@@ -2,12 +2,13 @@
 
 import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock
 from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput, MockMessageBus
+from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput
 
 
+@pytest.mark.slow
 class TestComponentCommunicationFlow:
     """Test end-to-end component communication."""
 
@@ -29,7 +30,7 @@ class TestComponentCommunicationFlow:
         components = {
             "test_agent": {"object": agent, "component": "llm"},
             "test_tool": {"object": tool, "component": "functions"},
-            "test_output": {"object": output, "component": "console"}
+            "test_output": {"object": output, "component": "console"},
         }
 
         # Register components and configure routing
@@ -43,7 +44,7 @@ class TestComponentCommunicationFlow:
             "agent": agent,
             "tool": tool,
             "output": output,
-            "components": components
+            "components": components,
         }
 
         # Cleanup
@@ -53,7 +54,7 @@ class TestComponentCommunicationFlow:
         """Test agent sending request to tool and receiving response."""
         setup = communication_setup
         router = setup["router"]
-        agent = setup["agent"]
+        setup["agent"]
         tool = setup["tool"]
 
         # Mock the tool's input method to return a result
@@ -63,7 +64,7 @@ class TestComponentCommunicationFlow:
         success, request_id = await router.send_to_component_with_response(
             name="test_tool",
             source_component_name="test_agent",
-            data={"action": "execute", "inputs": {"param": "value"}}
+            data={"action": "execute", "inputs": {"param": "value"}},
         )
 
         assert success
@@ -78,7 +79,7 @@ class TestComponentCommunicationFlow:
     async def test_request_response_cycle(self, communication_setup):
         """Test complete request-response cycle."""
         setup = communication_setup
-        router = setup["router"]
+        setup["router"]
         message_bus = setup["message_bus"]
 
         # Register components with message bus
@@ -92,9 +93,7 @@ class TestComponentCommunicationFlow:
         from tests.unit.fixtures.test_messages import create_component_message
 
         message = create_component_message(
-            source="test_agent",
-            target="test_tool",
-            data={"action": "test", "inputs": {}}
+            source="test_agent", target="test_tool", data={"action": "test", "inputs": {}}
         )
 
         # Send message
@@ -113,10 +112,7 @@ class TestComponentCommunicationFlow:
         output = setup["output"]
 
         # Set up routing chain: agent -> tool -> output
-        router.routing_table = {
-            "test_agent": ["test_tool"],
-            "test_tool": ["test_output"]
-        }
+        router.routing_table = {"test_agent": ["test_tool"], "test_tool": ["test_output"]}
 
         # Mock component methods
         agent.execute_tool = AsyncMock(return_value="agent_result")
@@ -131,7 +127,7 @@ class TestComponentCommunicationFlow:
     async def test_error_propagation(self, communication_setup):
         """Test error propagation through component chain."""
         setup = communication_setup
-        router = setup["router"]
+        setup["router"]
         message_bus = setup["message_bus"]
 
         # Create component that raises errors
@@ -141,11 +137,7 @@ class TestComponentCommunicationFlow:
         # Send message to error component
         from tests.unit.fixtures.test_messages import create_component_message
 
-        message = create_component_message(
-            source="test_agent",
-            target="error_component",
-            data={"action": "fail"}
-        )
+        message = create_component_message(source="test_agent", target="error_component", data={"action": "fail"})
 
         # Should handle error gracefully
         success = await message_bus.send_to_component(message)
@@ -160,7 +152,7 @@ class TestComponentCommunicationFlow:
     async def test_concurrent_communications(self, communication_setup):
         """Test concurrent component communications."""
         setup = communication_setup
-        router = setup["router"]
+        setup["router"]
         message_bus = setup["message_bus"]
 
         # Register multiple component handlers
@@ -176,11 +168,7 @@ class TestComponentCommunicationFlow:
 
         tasks = []
         for i in range(5):
-            message = create_component_message(
-                source="test_agent",
-                target=f"component_{i}",
-                data={"task_id": i}
-            )
+            message = create_component_message(source="test_agent", target=f"component_{i}", data={"task_id": i})
             tasks.append(message_bus.send_to_component(message))
 
         results = await asyncio.gather(*tasks)
@@ -207,11 +195,7 @@ class TestComponentCommunicationFlow:
         from tests.unit.fixtures.test_messages import create_component_message
 
         for i in range(10):
-            message = create_component_message(
-                source="test_agent",
-                target="ordered_component",
-                data={"message_id": i}
-            )
+            message = create_component_message(source="test_agent", target="ordered_component", data={"message_id": i})
             await message_bus.send_to_component(message)
 
         # Wait for all messages to be processed
@@ -221,6 +205,7 @@ class TestComponentCommunicationFlow:
         assert received_order == list(range(10))
 
 
+@pytest.mark.slow
 class TestAgentToolTimeoutIssue:
     """Test to reproduce and fix the agent-tool communication timeout issue."""
 
@@ -247,6 +232,7 @@ class TestAgentToolTimeoutIssue:
             async def _wait_for_response(self, request_id, timeout=5.0):
                 """Wait for response with timeout (reproduces current broken behavior)."""
                 import asyncio
+
                 poll_interval = 0.05
                 waited = 0.0
 
@@ -274,7 +260,7 @@ class TestAgentToolTimeoutIssue:
 
         components = {
             "test_agent": {"object": agent, "component": "agent"},
-            "test_tool": {"object": tool, "component": "tool"}
+            "test_tool": {"object": tool, "component": "tool"},
         }
 
         # Register components and configure routing
@@ -282,12 +268,7 @@ class TestAgentToolTimeoutIssue:
             router.register_component(comp_data["object"])
         router.configure_routing()
 
-        yield {
-            "router": router,
-            "message_bus": message_bus,
-            "agent": agent,
-            "tool": tool
-        }
+        yield {"router": router, "message_bus": message_bus, "agent": agent, "tool": tool}
 
         await message_bus.stop()
 
@@ -312,7 +293,7 @@ class TestAgentToolTimeoutIssue:
         success, request_id = await router.send_to_component_with_response(
             name="test_tool",
             source_component_name="test_agent",
-            data={"action": "test_action", "inputs": {"param": "value"}}
+            data={"action": "test_action", "inputs": {"param": "value"}},
         )
 
         assert success
@@ -355,7 +336,7 @@ class TestAgentToolTimeoutIssue:
                     agent._received_responses[request_id] = {
                         "result": result,
                         "source_component": data.get("source_component"),
-                        "received_at": asyncio.get_event_loop().time()
+                        "received_at": asyncio.get_event_loop().time(),
                     }
 
         # Register the fixed handler
@@ -365,7 +346,7 @@ class TestAgentToolTimeoutIssue:
         success, request_id = await router.send_to_component_with_response(
             name="test_tool",
             source_component_name="test_agent",
-            data={"action": "test_action", "inputs": {"param": "value"}}
+            data={"action": "test_action", "inputs": {"param": "value"}},
         )
 
         assert success
@@ -385,6 +366,7 @@ class TestAgentToolTimeoutIssue:
             assert "Tool executed" in result
 
 
+@pytest.mark.slow
 class TestRealWorldScenarios:
     """Test real-world communication scenarios."""
 
@@ -406,7 +388,7 @@ class TestRealWorldScenarios:
             "coding_ag": {"object": coding_agent, "component": "llm"},
             "planning_tools": {"object": planning_tools, "component": "planning_tools"},
             "github_api": {"object": github_api, "component": "functions"},
-            "console_output": {"object": output, "component": "console"}
+            "console_output": {"object": output, "component": "console"},
         }
 
         # Register components and configure routing
@@ -420,7 +402,7 @@ class TestRealWorldScenarios:
             "coding_agent": coding_agent,
             "planning_tools": planning_tools,
             "github_api": github_api,
-            "output": output
+            "output": output,
         }
 
         await message_bus.stop()
@@ -429,7 +411,7 @@ class TestRealWorldScenarios:
         """Test planning workflow scenario."""
         setup = scenario_setup
         router = setup["router"]
-        coding_agent = setup["coding_agent"]
+        setup["coding_agent"]
         planning_tools = setup["planning_tools"]
 
         # Mock planning tools response
@@ -439,10 +421,7 @@ class TestRealWorldScenarios:
         success, request_id = await router.send_to_component_with_response(
             name="planning_tools",
             source_component_name="coding_ag",
-            data={
-                "action": "write_todos",
-                "inputs": {"todos": ["Analyze issue", "Create plan"]}
-            }
+            data={"action": "write_todos", "inputs": {"todos": ["Analyze issue", "Create plan"]}},
         )
 
         assert success
@@ -461,10 +440,7 @@ class TestRealWorldScenarios:
         success, request_id = await router.send_to_component_with_response(
             name="github_api",
             source_component_name="coding_ag",
-            data={
-                "action": "get_issue",
-                "inputs": {"repo": "willwoodward/woodwork-engine", "issue": 113}
-            }
+            data={"action": "get_issue", "inputs": {"repo": "willwoodward/woodwork-engine", "issue": 113}},
         )
 
         assert success
@@ -493,16 +469,14 @@ class TestRealWorldScenarios:
             await router.send_to_component_with_response(
                 name="github_api",
                 source_component_name="coding_ag",
-                data={"action": "get_issue", "inputs": {"issue": 113}}
+                data={"action": "get_issue", "inputs": {"issue": 113}},
             )
         except Exception:
             pass
 
         # Second call should succeed
         success, request_id = await router.send_to_component_with_response(
-            name="github_api",
-            source_component_name="coding_ag",
-            data={"action": "get_issue", "inputs": {"issue": 113}}
+            name="github_api", source_component_name="coding_ag", data={"action": "get_issue", "inputs": {"issue": 113}}
         )
 
         assert success
@@ -511,7 +485,7 @@ class TestRealWorldScenarios:
     async def test_timeout_scenario(self, scenario_setup):
         """Test slow handler processing in component communication."""
         setup = scenario_setup
-        router = setup["router"]
+        setup["router"]
         message_bus = setup["message_bus"]
 
         # Create slow component
@@ -523,11 +497,7 @@ class TestRealWorldScenarios:
         # Send message
         from tests.unit.fixtures.test_messages import create_component_message
 
-        message = create_component_message(
-            source="coding_ag",
-            target="slow_component",
-            data={"action": "slow_task"}
-        )
+        message = create_component_message(source="coding_ag", target="slow_component", data={"action": "slow_task"})
 
         # Message delivery includes handler execution in current implementation
         start_time = asyncio.get_event_loop().time()
@@ -536,9 +506,10 @@ class TestRealWorldScenarios:
 
         assert success
         assert (end_time - start_time) >= 0.1  # Should wait for handler completion
-        assert (end_time - start_time) < 1.0   # But not too slow overall
+        assert (end_time - start_time) < 1.0  # But not too slow overall
 
 
+@pytest.mark.slow
 class TestComponentLifecycle:
     """Test component lifecycle in communication."""
 

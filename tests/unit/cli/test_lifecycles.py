@@ -6,7 +6,7 @@ components are started correctly in parallel.
 
 import pytest
 import queue
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from woodwork.cli.progress.lifecycles import start_component
 from woodwork.interfaces.startable import Startable
 from woodwork.types import Update
@@ -163,10 +163,7 @@ class TestIntegrationWithProgress:
         """Simulate parallel execution of multiple components."""
         import threading
 
-        components = [
-            MockStartableComponent(name=f"comp{i}")
-            for i in range(5)
-        ]
+        components = [MockStartableComponent(name=f"comp{i}") for i in range(5)]
         q = queue.Queue()
         threads = []
 

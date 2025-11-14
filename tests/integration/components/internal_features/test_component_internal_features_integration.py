@@ -4,6 +4,8 @@ import pytest
 from unittest.mock import Mock, patch
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager
 
+pytestmark = pytest.mark.slow
+
 
 class MockComponent:
     """Mock component class for testing internal features."""
@@ -15,7 +17,7 @@ class MockComponent:
         self.config = config
 
         # Create internal component manager
-        task_master = config.get('task_m', None)
+        task_master = config.get("task_m", None)
         self._internal_component_manager = InternalComponentManager(task_master)
 
         # Setup internal features
@@ -47,9 +49,7 @@ class MockComponent:
             is_optional = component_spec.get("optional", False)
 
             try:
-                self._internal_component_manager.get_or_create_component(
-                    component_id, component_type, component_config
-                )
+                self._internal_component_manager.get_or_create_component(component_id, component_type, component_config)
             except Exception as e:
                 if not is_optional:
                     raise RuntimeError(f"Failed to create required internal component {component_id}: {e}")
@@ -65,12 +65,12 @@ class MockComponent:
             for feature in self._internal_features:
                 try:
                     feature.teardown(self, self._internal_component_manager)
-                except Exception as e:
+                except Exception:
                     pass
 
             # Then cleanup all internal components
             self._internal_component_manager.cleanup_components()
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -78,14 +78,14 @@ class MockComponent:
 @pytest.mark.internal_features
 @pytest.mark.graph_cache
 class TestComponentInternalFeaturesIntegration:
-
     def setup_method(self):
         """Ensure graph cache feature is registered before each test."""
         from woodwork.components.internal_features.graph_cache import GraphCacheFeature
         from woodwork.components.internal_features.base import InternalFeatureRegistry
+
         InternalFeatureRegistry.register("graph_cache", GraphCacheFeature)
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_component_with_graph_cache_feature(self, mock_neo4j_factory):
         """Test component initialization with graph_cache feature enabled."""
         # Setup mocks
@@ -115,7 +115,7 @@ class TestComponentInternalFeaturesIntegration:
             # Check the call that includes the API key
             api_key_call = None
             for call in mock_neo4j_factory.call_args_list:
-                if 'api_key' in call[1]:
+                if "api_key" in call[1]:
                     api_key_call = call
                     break
 
@@ -125,13 +125,13 @@ class TestComponentInternalFeaturesIntegration:
             assert "test_component_cache" in call_kwargs["name"]
 
             # Verify component has cache references
-            assert hasattr(comp, '_graph_cache')
+            assert hasattr(comp, "_graph_cache")
             assert comp._cache_mode is True
             assert comp._graph_cache is mock_neo4j_instance
 
         # Verify internal component manager was set up
-        assert hasattr(comp, '_internal_component_manager')
-        assert hasattr(comp, '_internal_features')
+        assert hasattr(comp, "_internal_component_manager")
+        assert hasattr(comp, "_internal_features")
         assert len(comp._internal_features) == 1
 
     def test_component_without_internal_features(self):
@@ -144,11 +144,11 @@ class TestComponentInternalFeaturesIntegration:
         comp = MockComponent(**config)
 
         # Verify internal systems are still set up but empty
-        assert hasattr(comp, '_internal_component_manager')
-        assert hasattr(comp, '_internal_features')
+        assert hasattr(comp, "_internal_component_manager")
+        assert hasattr(comp, "_internal_features")
         assert len(comp._internal_features) == 0
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_component_cleanup(self, mock_neo4j_factory):
         """Test that component cleanup properly tears down internal features."""
         mock_neo4j_instance = Mock()
@@ -177,7 +177,7 @@ class TestComponentInternalFeaturesIntegration:
         # Verify Neo4j component was closed (may be called multiple times for multiple components)
         assert mock_neo4j_instance.close.call_count >= 1
 
-    @patch('woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j')
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_component_get_internal_component(self, mock_neo4j_factory):
         """Test that component can access internal components."""
         mock_neo4j_instance = Mock()
@@ -214,7 +214,7 @@ class TestComponentInternalFeaturesIntegration:
         comp = MockComponent(**config)
         # No model with API key, so feature setup should fail but component should still exist
         assert comp.name == "test_component"
-        assert hasattr(comp, '_internal_component_manager')
+        assert hasattr(comp, "_internal_component_manager")
 
     def test_multiple_components_have_separate_managers(self):
         """Test that multiple components have separate internal component managers."""

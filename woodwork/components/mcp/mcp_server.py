@@ -7,7 +7,6 @@ Implements the architecture described in docs/design/mcp-server-component.md
 
 import asyncio
 import logging
-import time
 import uuid
 from typing import Dict, Any, Optional, List
 
@@ -35,7 +34,7 @@ class MCPServer(component, tool_interface):
         auth: Optional[Dict[str, str]] = None,
         toolsets: Optional[str] = None,
         readonly: Optional[bool] = None,
-        **config
+        **config,
     ):
         """
         Initialize MCP server component.
@@ -143,7 +142,9 @@ class MCPServer(component, tool_interface):
                     tool_count = len(self._capabilities.get("tools", []))
                     log.info(f"[MCPServer] Blocking startup complete for {self.name}: {tool_count} tools discovered")
                 else:
-                    log.warning(f"[MCPServer] Blocking startup timeout for {self.name}: capabilities not ready within {max_wait}s")
+                    log.warning(
+                        f"[MCPServer] Blocking startup timeout for {self.name}: capabilities not ready within {max_wait}s"
+                    )
 
         except Exception as e:
             log.warning(f"[MCPServer] Blocking startup failed for {self.name}: {e}")
@@ -154,7 +155,7 @@ class MCPServer(component, tool_interface):
             return True
 
         # If we have a blocking startup task, wait for it
-        if hasattr(self, '_blocking_startup_task') and self._blocking_startup_task:
+        if hasattr(self, "_blocking_startup_task") and self._blocking_startup_task:
             try:
                 await asyncio.wait_for(self._blocking_startup_task, timeout=timeout)
                 return self._capabilities_fetched
@@ -166,7 +167,6 @@ class MCPServer(component, tool_interface):
                 return False
 
         return False
-
 
     async def start(self) -> None:
         """Initialize and start MCP server connection."""
@@ -180,7 +180,9 @@ class MCPServer(component, tool_interface):
             # Registry resolution
             log.debug(f"[MCPServer] Resolving {self.server_name}:{self.server_version} from registry")
             log.debug(f"[MCPServer] Passing to registry - toolsets: {self.toolsets}, readonly: {self.readonly}")
-            self.metadata = await self.registry.get_server(self.server_name, self.server_version, self.toolsets, self.readonly)
+            self.metadata = await self.registry.get_server(
+                self.server_name, self.server_version, self.toolsets, self.readonly
+            )
 
             # Channel creation
             log.debug(f"[MCPServer] Creating channel for {self.server_name}")
@@ -253,21 +255,13 @@ class MCPServer(component, tool_interface):
                 method="initialize",
                 params={
                     "protocolVersion": "2024-11-05",
-                    "capabilities": {
-                        "roots": {
-                            "listChanged": True
-                        },
-                        "sampling": {}
-                    },
-                    "clientInfo": {
-                        "name": "woodwork-engine",
-                        "version": "1.0.0"
-                    }
-                }
+                    "capabilities": {"roots": {"listChanged": True}, "sampling": {}},
+                    "clientInfo": {"name": "woodwork-engine", "version": "1.0.0"},
+                },
             )
 
             # For HTTP channels, send and get immediate response
-            if hasattr(self.channel, 'send') and 'HTTP' in str(type(self.channel)):
+            if hasattr(self.channel, "send") and "HTTP" in str(type(self.channel)):
                 log.debug(f"[MCPServer] Sending MCP initialize request for {self.name}")
                 result = await self.channel.send(message)
 
@@ -323,12 +317,18 @@ class MCPServer(component, tool_interface):
 
                     if self._capabilities_fetched:
                         tool_count = len(self._capabilities.get("tools", []))
-                        log.info(f"[MCPServer] Framework auto-start complete for {self.name}: {tool_count} tools discovered")
+                        log.info(
+                            f"[MCPServer] Framework auto-start complete for {self.name}: {tool_count} tools discovered"
+                        )
                     else:
-                        log.warning(f"[MCPServer] Framework auto-start timeout for {self.name}: capabilities not fetched within {max_wait}s")
+                        log.warning(
+                            f"[MCPServer] Framework auto-start timeout for {self.name}: capabilities not fetched within {max_wait}s"
+                        )
 
                 except Exception as start_error:
-                    log.warning(f"[MCPServer] Framework auto-start failed during server start for {self.name}: {start_error}")
+                    log.warning(
+                        f"[MCPServer] Framework auto-start failed during server start for {self.name}: {start_error}"
+                    )
                     # Don't re-raise, allow component to work in lazy mode
 
         except Exception as e:
@@ -372,14 +372,7 @@ class MCPServer(component, tool_interface):
         log.debug(f"[MCPServer] Calling tool {action} on {self.name} (request: {request_id})")
 
         # Create MCP tool call message
-        message = MCPMessage(
-            id=request_id,
-            method="tools/call",
-            params={
-                "name": action,
-                "arguments": inputs
-            }
-        )
+        message = MCPMessage(id=request_id, method="tools/call", params={"name": action, "arguments": inputs})
 
         # Create future for response correlation
         future = asyncio.Future()
@@ -388,6 +381,7 @@ class MCPServer(component, tool_interface):
         try:
             # For HTTP channels, response comes back immediately
             from .channels import HTTPChannel
+
             if isinstance(self.channel, HTTPChannel):
                 # Send and get immediate response
                 response = await self.channel.send(message)
@@ -402,6 +396,7 @@ class MCPServer(component, tool_interface):
                     # Convert complex results to strings for agent consumption
                     if isinstance(result, (dict, list)):
                         import json
+
                         return json.dumps(result, indent=2, ensure_ascii=False)
                     return str(result) if result is not None else ""
             else:
@@ -416,6 +411,7 @@ class MCPServer(component, tool_interface):
                 # Convert complex results to strings for agent consumption
                 if isinstance(result, (dict, list)):
                     import json
+
                     return json.dumps(result, indent=2, ensure_ascii=False)
                 return str(result) if result is not None else ""
 
@@ -435,7 +431,7 @@ class MCPServer(component, tool_interface):
     def description(self) -> str:
         """Get component description with available capabilities."""
         # Try to wait for capabilities if we have a blocking startup task
-        if not self._capabilities_fetched and hasattr(self, '_blocking_startup_task') and self._blocking_startup_task:
+        if not self._capabilities_fetched and hasattr(self, "_blocking_startup_task") and self._blocking_startup_task:
             try:
                 # Check if we're in an event loop and can wait
                 loop = asyncio.get_running_loop()
@@ -447,6 +443,7 @@ class MCPServer(component, tool_interface):
                             break
                         # Very brief sleep to let other tasks run
                         import time
+
                         time.sleep(0.05)
             except RuntimeError:
                 # No event loop, can't wait
@@ -500,7 +497,9 @@ class MCPServer(component, tool_interface):
                                 # Format as: param_name (type, required/optional) - description
                                 param_status = "required" if param_name in required else "optional"
                                 if escaped_param_desc:
-                                    param_parts.append(f"{param_name} ({param_type}, {param_status}) - {escaped_param_desc}")
+                                    param_parts.append(
+                                        f"{param_name} ({param_type}, {param_status}) - {escaped_param_desc}"
+                                    )
                                 else:
                                     param_parts.append(f"{param_name} ({param_type}, {param_status})")
 
@@ -559,15 +558,27 @@ class MCPServer(component, tool_interface):
         # Fallback description while capabilities are loading or failed
         if self._capabilities_fetched and self._capabilities:
             # Capabilities were fetched but are empty
-            base = f"MCP Server: {self.metadata.description}" if self.metadata else f"MCP Server: {self.server_name}:{self.server_version}"
+            base = (
+                f"MCP Server: {self.metadata.description}"
+                if self.metadata
+                else f"MCP Server: {self.server_name}:{self.server_version}"
+            )
             return f"{base} (no capabilities available)"
         elif self._started:
             # Server is started but capabilities still loading
-            base = f"MCP Server: {self.metadata.description}" if self.metadata else f"MCP Server: {self.server_name}:{self.server_version}"
+            base = (
+                f"MCP Server: {self.metadata.description}"
+                if self.metadata
+                else f"MCP Server: {self.server_name}:{self.server_version}"
+            )
             return f"{base} (loading capabilities...)"
         else:
             # Server not started yet (this should be rare with blocking initialization)
-            base = f"MCP Server: {self.metadata.description}" if self.metadata else f"MCP Server: {self.server_name}:{self.server_version}"
+            base = (
+                f"MCP Server: {self.metadata.description}"
+                if self.metadata
+                else f"MCP Server: {self.server_name}:{self.server_version}"
+            )
             # Check if we're in blocking startup process
             return f"{base} (initializing for tool discovery...)"
 
@@ -582,14 +593,10 @@ class MCPServer(component, tool_interface):
             raise ConnectionError(f"MCP server {self.name} failed to start")
 
         request_id = str(uuid.uuid4())
-        message = MCPMessage(
-            id=request_id,
-            method="tools/list",
-            params={}
-        )
+        message = MCPMessage(id=request_id, method="tools/list", params={})
 
         # Handle HTTP channels differently (immediate response)
-        if hasattr(self.channel, 'send') and 'HTTP' in str(type(self.channel)):
+        if hasattr(self.channel, "send") and "HTTP" in str(type(self.channel)):
             try:
                 result = await self.channel.send(message)
                 # Extract the result part for JSON-RPC response
@@ -626,14 +633,10 @@ class MCPServer(component, tool_interface):
             raise ConnectionError(f"MCP server {self.name} failed to start")
 
         request_id = str(uuid.uuid4())
-        message = MCPMessage(
-            id=request_id,
-            method="resources/list",
-            params={}
-        )
+        message = MCPMessage(id=request_id, method="resources/list", params={})
 
         # Handle HTTP channels differently (immediate response)
-        if hasattr(self.channel, 'send') and 'HTTP' in str(type(self.channel)):
+        if hasattr(self.channel, "send") and "HTTP" in str(type(self.channel)):
             try:
                 result = await self.channel.send(message)
                 # Extract the result part for JSON-RPC response
@@ -670,14 +673,10 @@ class MCPServer(component, tool_interface):
             raise ConnectionError(f"MCP server {self.name} failed to start")
 
         request_id = str(uuid.uuid4())
-        message = MCPMessage(
-            id=request_id,
-            method="prompts/list",
-            params={}
-        )
+        message = MCPMessage(id=request_id, method="prompts/list", params={})
 
         # Handle HTTP channels differently (immediate response)
-        if hasattr(self.channel, 'send') and 'HTTP' in str(type(self.channel)):
+        if hasattr(self.channel, "send") and "HTTP" in str(type(self.channel)):
             try:
                 result = await self.channel.send(message)
                 # Extract the result part for JSON-RPC response
@@ -759,12 +758,16 @@ class MCPServer(component, tool_interface):
             self._capabilities = capabilities
             self._capabilities_fetched = True
 
-            total_capabilities = len(capabilities['tools']) + len(capabilities['resources']) + len(capabilities['prompts'])
-            log.info(f"[MCPServer] Capabilities cached for {self.name}: "
-                    f"{len(capabilities['tools'])} tools, "
-                    f"{len(capabilities['resources'])} resources, "
-                    f"{len(capabilities['prompts'])} prompts "
-                    f"(total: {total_capabilities})")
+            total_capabilities = (
+                len(capabilities["tools"]) + len(capabilities["resources"]) + len(capabilities["prompts"])
+            )
+            log.info(
+                f"[MCPServer] Capabilities cached for {self.name}: "
+                f"{len(capabilities['tools'])} tools, "
+                f"{len(capabilities['resources'])} resources, "
+                f"{len(capabilities['prompts'])} prompts "
+                f"(total: {total_capabilities})"
+            )
 
         except Exception as e:
             log.error(f"[MCPServer] Critical error fetching capabilities for {self.name}: {e}")
@@ -840,7 +843,7 @@ class MCPServer(component, tool_interface):
         try:
             if message.error:
                 # Response contains error
-                error = MCPError(message.error)
+                error = MCPError(message.error)  # type: ignore[arg-type]
                 future.set_exception(error)
                 log.debug(f"[MCPServer] Request {message.id} failed: {error.message}")
             else:
@@ -859,7 +862,7 @@ class MCPServer(component, tool_interface):
             "tool/progress": "tool.progress",
             "resource/updated": "resource.changed",
             "server/status": "mcp.status",
-            "notifications/cancelled": "mcp.cancelled"
+            "notifications/cancelled": "mcp.cancelled",
         }
 
         event_type = event_mappings.get(message.method)
@@ -867,7 +870,7 @@ class MCPServer(component, tool_interface):
             log.debug(f"[MCPServer] Converting notification {message.method} to {event_type}")
 
             # Emit framework event via the component's event system
-            if hasattr(self, 'emit'):
+            if hasattr(self, "emit"):
                 await self.emit(event_type, message.params)
             else:
                 log.warning(f"[MCPServer] No emit method available for event {event_type}")
@@ -881,7 +884,7 @@ class MCPServer(component, tool_interface):
             "tool/progress": "tool.progress",
             "resource/updated": "resource.changed",
             "server/status": "mcp.status",
-            "notifications/cancelled": "mcp.cancelled"
+            "notifications/cancelled": "mcp.cancelled",
         }
         return event_mappings.get(mcp_method, f"mcp.{mcp_method.replace('/', '.')}")
 
@@ -900,11 +903,7 @@ class MCPServer(component, tool_interface):
 
         try:
             request_id = str(uuid.uuid4())
-            message = MCPMessage(
-                id=request_id,
-                method="ping",
-                params={}
-            )
+            message = MCPMessage(id=request_id, method="ping", params={})
 
             future = asyncio.Future()
             self.pending_requests[request_id] = future
@@ -925,17 +924,13 @@ class MCPServer(component, tool_interface):
         if not self._capabilities:
             return {"status": "capabilities not loaded"}
 
-        details = {
-            "tools": [],
-            "resources": [],
-            "prompts": []
-        }
+        details = {"tools": [], "resources": [], "prompts": []}
 
         # Detailed tool information
         for tool in self._capabilities.get("tools", []):
             tool_info = {
                 "name": tool.get("name", "unknown"),
-                "description": tool.get("description", "No description available")
+                "description": tool.get("description", "No description available"),
             }
             if "inputSchema" in tool:
                 schema = tool["inputSchema"]
@@ -949,7 +944,7 @@ class MCPServer(component, tool_interface):
                 "uri": resource.get("uri", "unknown"),
                 "name": resource.get("name", "unknown"),
                 "description": resource.get("description", "No description available"),
-                "mimeType": resource.get("mimeType", "unknown")
+                "mimeType": resource.get("mimeType", "unknown"),
             }
             details["resources"].append(resource_info)
 
@@ -957,7 +952,7 @@ class MCPServer(component, tool_interface):
         for prompt in self._capabilities.get("prompts", []):
             prompt_info = {
                 "name": prompt.get("name", "unknown"),
-                "description": prompt.get("description", "No description available")
+                "description": prompt.get("description", "No description available"),
             }
             if "arguments" in prompt:
                 prompt_info["arguments"] = [arg.get("name", "unknown") for arg in prompt["arguments"]]
@@ -1002,7 +997,7 @@ class MCPServer(component, tool_interface):
             "pending_requests": len(self.pending_requests),
             "transport": self.metadata.get_preferred_transport().value if self.metadata else None,
             "description": self.description,
-            "capabilities_loaded": self._capabilities_fetched
+            "capabilities_loaded": self._capabilities_fetched,
         }
 
         # Add capability counts if available
@@ -1010,7 +1005,7 @@ class MCPServer(component, tool_interface):
             status["capabilities"] = {
                 "tools": len(self._capabilities.get("tools", [])),
                 "resources": len(self._capabilities.get("resources", [])),
-                "prompts": len(self._capabilities.get("prompts", []))
+                "prompts": len(self._capabilities.get("prompts", [])),
             }
 
         return status

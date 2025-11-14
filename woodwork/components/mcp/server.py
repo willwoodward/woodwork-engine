@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 from woodwork.components.mcp.mcp_base import mcp
 from woodwork.deployments.docker import Docker
 from woodwork.utils import format_kwargs
@@ -9,7 +9,6 @@ from mcp.client.sse import sse_client
 from mcp import ClientSession
 import asyncio
 from urllib.parse import urlparse
-import os
 import logging
 
 log = logging.getLogger(__name__)
@@ -19,10 +18,10 @@ class mcp_server(mcp, Startable):
     def __init__(
         self,
         transport: Literal["stdio", "sse"],
-        image_url: str = None,
-        api_key: str = None,
-        remote_url: str = None,
-        **config
+        image_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        remote_url: Optional[str] = None,
+        **config,
     ):
         """
         :param transport: "stdio" for local Docker server, "sse" for remote HTTP/SSE server
@@ -51,6 +50,7 @@ class mcp_server(mcp, Startable):
 
         if queue:
             from woodwork.types import Update
+
             queue.put(Update(progress=10, component_name=self.name))
 
         asyncio.run(self.connect())
@@ -66,14 +66,11 @@ class mcp_server(mcp, Startable):
             if not self.image_url:
                 raise ValueError("image_url is required for stdio transport")
 
-            self.docker = Docker(
+            self.docker = Docker(  # type: ignore[call-arg]
                 image_name="ghcr.io/github/github-mcp-server",
                 container_name=self.name,
-                dockerfile=None,
                 container_args={
-                    "environment": {
-                        "GITHUB_PERSONAL_ACCESS_TOKEN": self.api_key
-                    },
+                    "environment": {"GITHUB_PERSONAL_ACCESS_TOKEN": self.api_key},
                     "network_mode": "host",
                     "stdin_open": True,
                 },
@@ -83,7 +80,10 @@ class mcp_server(mcp, Startable):
             params = StdioServerParameters(
                 command="docker",
                 args=[
-                    "exec", "-i", self.name, "github-mcp-server",
+                    "exec",
+                    "-i",
+                    self.name,
+                    "github-mcp-server",
                 ],
             )
             # Store the context manager to keep connection alive

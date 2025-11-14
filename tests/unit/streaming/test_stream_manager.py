@@ -1,13 +1,13 @@
 """Tests for StreamManager component."""
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 from woodwork.core.stream_manager import StreamManager
 from woodwork.core.simple_message_bus import SimpleMessageBus
 from woodwork.types.streaming_data import StreamDataType
 
 
+@pytest.mark.slow
 class TestStreamManager:
     """Test suite for StreamManager."""
 
@@ -50,7 +50,7 @@ class TestStreamManager:
             session_id="test_session",
             component_source="test_source",
             component_target="test_target",
-            data_type=StreamDataType.TEXT
+            data_type=StreamDataType.TEXT,
         )
 
         assert stream_id is not None
@@ -72,7 +72,7 @@ class TestStreamManager:
             session_id="test_session",
             component_source="test_source",
             component_target="test_target",
-            data_type=StreamDataType.TEXT
+            data_type=StreamDataType.TEXT,
         )
 
         # Should now have one stream
@@ -94,18 +94,14 @@ class TestStreamManager:
     def test_message_bus_integration(self, stream_manager, mock_message_bus):
         """Test that stream manager sets up message bus handlers."""
         # Verify that subscribe was called for expected events
-        expected_calls = [
-            "stream.chunk",
-            "stream.created",
-            "stream.completed",
-            "stream.failed"
-        ]
+        expected_calls = ["stream.chunk", "stream.created", "stream.completed", "stream.failed"]
 
         subscribe_calls = [call[0][0] for call in mock_message_bus.subscribe.call_args_list]
         for expected_event in expected_calls:
             assert expected_event in subscribe_calls
 
 
+@pytest.mark.slow
 class TestStreamManagerErrorHandling:
     """Test error handling in StreamManager."""
 

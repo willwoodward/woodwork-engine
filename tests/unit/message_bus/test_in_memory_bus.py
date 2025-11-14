@@ -7,6 +7,7 @@ from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.test_messages import create_component_message, MockMessageEnvelope
 
 
+@pytest.mark.slow
 class TestInMemoryMessageBus:
     """Test suite for InMemoryMessageBus."""
 
@@ -19,11 +20,7 @@ class TestInMemoryMessageBus:
 
     @pytest.fixture
     def test_message(self):
-        return create_component_message(
-            source="test_agent",
-            target="test_tool",
-            data={"action": "test", "inputs": {}}
-        )
+        return create_component_message(source="test_agent", target="test_tool", data={"action": "test", "inputs": {}})
 
     def test_initialization(self):
         """Test message bus initializes correctly."""
@@ -172,8 +169,12 @@ class TestInMemoryMessageBus:
         stats = message_bus.get_stats()
 
         expected_keys = [
-            "running", "messages_delivered", "messages_published",
-            "queued_messages", "registered_components", "delivery_failures"
+            "running",
+            "messages_delivered",
+            "messages_published",
+            "queued_messages",
+            "registered_components",
+            "delivery_failures",
         ]
         for key in expected_keys:
             assert key in stats
@@ -207,15 +208,13 @@ class TestInMemoryMessageBus:
 
         # Send multiple messages
         for i in range(5):
-            message = create_component_message(
-                target="test_component",
-                data={"sequence": i}
-            )
+            message = create_component_message(target="test_component", data={"sequence": i})
             await message_bus.send_to_component(message)
 
         assert received_messages == [0, 1, 2, 3, 4]
 
 
+@pytest.mark.slow
 class TestInMemoryMessageBusCleanup:
     """Test cleanup and resource management."""
 

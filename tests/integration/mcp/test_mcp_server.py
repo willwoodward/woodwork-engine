@@ -7,8 +7,7 @@ with registry integration, transport abstraction, and proper framework integrati
 
 import asyncio
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from typing import Dict, Any
+from unittest.mock import Mock, AsyncMock, patch
 import json
 
 from woodwork.components.mcp.mcp_server import MCPServer
@@ -16,6 +15,8 @@ from woodwork.components.mcp.registry import MCPRegistry, ServerMetadata, Transp
 from woodwork.components.mcp.channels import MCPChannel, SSEChannel, StdioChannel
 from woodwork.components.mcp.manager import MCPServerManager
 from woodwork.components.mcp.messages import MCPMessage
+
+pytestmark = pytest.mark.slow
 
 
 class TestMCPRegistry:
@@ -35,24 +36,20 @@ class TestMCPRegistry:
                             "type": "oci",
                             "identifier": "ghcr.io/github/github-mcp-server",
                             "version": "1.2.0",
-                            "registry_base_url": "ghcr.io"
+                            "registry_base_url": "ghcr.io",
                         }
                     ],
                     "remotes": [
                         {
                             "type": "sse",
                             "url": "https://api.github.com/mcp/sse",
-                            "headers": [
-                                {"name": "Authorization", "value": "Bearer {GITHUB_TOKEN}"}
-                            ]
+                            "headers": [{"name": "Authorization", "value": "Bearer {GITHUB_TOKEN}"}],
                         }
                     ],
                     "env_vars": [
                         {"name": "GITHUB_TOKEN", "required": True, "description": "GitHub Personal Access Token"}
                     ],
-                    "_meta": {
-                        "publishedAt": "2024-12-01T10:00:00Z"
-                    }
+                    "_meta": {"publishedAt": "2024-12-01T10:00:00Z"},
                 }
             ]
         }
@@ -64,7 +61,7 @@ class TestMCPRegistry:
     @pytest.mark.asyncio
     async def test_get_server_success(self, registry, mock_http_response):
         """Test successful server metadata retrieval."""
-        with patch('aiohttp.ClientSession.get') as mock_get:
+        with patch("aiohttp.ClientSession.get") as mock_get:
             mock_response = AsyncMock()
             mock_response.json.return_value = mock_http_response
             mock_get.return_value.__aenter__.return_value = mock_response
@@ -81,7 +78,7 @@ class TestMCPRegistry:
     @pytest.mark.asyncio
     async def test_get_server_latest_version(self, registry, mock_http_response):
         """Test retrieving latest version when 'latest' specified."""
-        with patch('aiohttp.ClientSession.get') as mock_get:
+        with patch("aiohttp.ClientSession.get") as mock_get:
             mock_response = AsyncMock()
             mock_response.json.return_value = mock_http_response
             mock_get.return_value.__aenter__.return_value = mock_response
@@ -93,7 +90,7 @@ class TestMCPRegistry:
     @pytest.mark.asyncio
     async def test_get_server_not_found(self, registry):
         """Test handling of server not found."""
-        with patch('aiohttp.ClientSession.get') as mock_get:
+        with patch("aiohttp.ClientSession.get") as mock_get:
             mock_response = AsyncMock()
             mock_response.json.return_value = {"servers": []}
             mock_get.return_value.__aenter__.return_value = mock_response
@@ -112,7 +109,7 @@ class TestServerMetadata:
             version="1.0.0",
             description="Test server",
             packages=[Mock(type="oci")],
-            remotes=[Mock(type="sse")]
+            remotes=[Mock(type="sse")],
         )
 
         assert metadata.get_preferred_transport() == TransportType.STDIO
@@ -120,11 +117,7 @@ class TestServerMetadata:
     def test_get_preferred_transport_sse(self):
         """Test fallback to SSE transport when no packages."""
         metadata = ServerMetadata(
-            name="test/server",
-            version="1.0.0",
-            description="Test server",
-            packages=[],
-            remotes=[Mock(type="sse")]
+            name="test/server", version="1.0.0", description="Test server", packages=[], remotes=[Mock(type="sse")]
         )
 
         assert metadata.get_preferred_transport() == TransportType.SSE
@@ -132,11 +125,7 @@ class TestServerMetadata:
     def test_get_preferred_transport_unsupported(self):
         """Test exception when no supported transports."""
         metadata = ServerMetadata(
-            name="test/server",
-            version="1.0.0",
-            description="Test server",
-            packages=[],
-            remotes=[]
+            name="test/server", version="1.0.0", description="Test server", packages=[], remotes=[]
         )
 
         with pytest.raises(Exception, match="No supported transport"):
@@ -155,8 +144,8 @@ class TestMCPChannels:
 
         channel = SSEChannel(remote_info)
 
-        with patch('woodwork.components.mcp.channels.aiohttp') as mock_aiohttp:
-            with patch('woodwork.components.mcp.channels.aiohttp_sse') as mock_sse_module:
+        with patch("woodwork.components.mcp.channels.aiohttp") as mock_aiohttp:
+            with patch("woodwork.components.mcp.channels.aiohttp_sse") as mock_sse_module:
                 mock_session = AsyncMock()
                 mock_aiohttp.ClientSession.return_value = mock_session
 
@@ -180,11 +169,7 @@ class TestMCPChannels:
         channel.session = AsyncMock()
         channel._connected = True  # Mock connected state
 
-        message = MCPMessage(
-            id="test-123",
-            method="tools/call",
-            params={"name": "test_tool", "arguments": {}}
-        )
+        message = MCPMessage(id="test-123", method="tools/call", params={"name": "test_tool", "arguments": {}})
 
         mock_response = AsyncMock()
         mock_response.json.return_value = {"request_id": "test-123"}
@@ -205,7 +190,7 @@ class TestMCPChannels:
 
         channel = StdioChannel(package_info, {"GITHUB_TOKEN": "test-token"})
 
-        with patch('asyncio.create_subprocess_exec') as mock_subprocess:
+        with patch("asyncio.create_subprocess_exec") as mock_subprocess:
             mock_process = AsyncMock()
             mock_subprocess.return_value = mock_process
 
@@ -227,9 +212,7 @@ class TestMCPMessage:
     def test_mcp_message_creation(self):
         """Test MCP message creation and serialization."""
         message = MCPMessage(
-            id="test-123",
-            method="tools/call",
-            params={"name": "test_tool", "arguments": {"param1": "value1"}}
+            id="test-123", method="tools/call", params={"name": "test_tool", "arguments": {"param1": "value1"}}
         )
 
         assert message.id == "test-123"
@@ -240,11 +223,7 @@ class TestMCPMessage:
 
     def test_mcp_message_json_serialization(self):
         """Test JSON serialization/deserialization."""
-        message = MCPMessage(
-            id="test-123",
-            method="tools/call",
-            params={"name": "test_tool"}
-        )
+        message = MCPMessage(id="test-123", method="tools/call", params={"name": "test_tool"})
 
         json_str = message.to_json()
         parsed = json.loads(json_str)
@@ -281,7 +260,7 @@ class TestMCPServerManager:
         metadata.remotes = [mock_remote]
         metadata.env_vars = []  # No required env vars
 
-        with patch('woodwork.components.mcp.channels.SSEChannel') as mock_channel_class:
+        with patch("woodwork.components.mcp.channels.SSEChannel") as mock_channel_class:
             mock_channel = AsyncMock()
             mock_channel_class.return_value = mock_channel
 
@@ -305,7 +284,7 @@ class TestMCPServerManager:
         metadata.packages = [mock_package]
         metadata.env_vars = []  # No required env vars
 
-        with patch('woodwork.components.mcp.channels.StdioChannel') as mock_channel_class:
+        with patch("woodwork.components.mcp.channels.StdioChannel") as mock_channel_class:
             mock_channel = AsyncMock()
             mock_channel_class.return_value = mock_channel
 
@@ -348,8 +327,8 @@ class TestMCPServerComponent:
     @pytest.mark.asyncio
     async def test_mcp_server_initialization(self, mock_registry_response, mock_channel):
         """Test MCP server component initialization."""
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class:
-            with patch('woodwork.components.mcp.manager.MCPServerManager') as mock_manager_class:
+        with patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class:
+            with patch("woodwork.components.mcp.manager.MCPServerManager") as mock_manager_class:
                 # Setup mocks
                 mock_registry = AsyncMock()
                 mock_registry.get_server.return_value = mock_registry_response
@@ -364,16 +343,14 @@ class TestMCPServerComponent:
                     name="test_github_mcp",
                     server="io.github.github/mcp-server",
                     version="1.2.0",
-                    env={"GITHUB_TOKEN": "test-token"}
+                    env={"GITHUB_TOKEN": "test-token"},
                 )
 
                 # Start the server
                 await mcp_server.start()
 
                 # Verify registry was called
-                mock_registry.get_server.assert_called_once_with(
-                    "io.github.github/mcp-server", "1.2.0"
-                )
+                mock_registry.get_server.assert_called_once_with("io.github.github/mcp-server", "1.2.0")
 
                 # Verify channel was created
                 mock_manager.create_channel.assert_called_once()
@@ -390,9 +367,9 @@ class TestMCPServerComponent:
         response_future = asyncio.Future()
         response_future.set_result({"content": [{"type": "text", "text": "Tool result"}]})
 
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class:
-            with patch('woodwork.components.mcp.manager.MCPServerManager') as mock_manager_class:
-                with patch('asyncio.wait_for', return_value="Tool result"):
+        with patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class:
+            with patch("woodwork.components.mcp.manager.MCPServerManager") as mock_manager_class:
+                with patch("asyncio.wait_for", return_value="Tool result"):
                     # Setup mocks
                     mock_registry = AsyncMock()
                     mock_registry.get_server.return_value = mock_registry_response
@@ -407,7 +384,7 @@ class TestMCPServerComponent:
                         name="test_github_mcp",
                         server="io.github.github/mcp-server",
                         version="1.2.0",
-                        env={"GITHUB_TOKEN": "test-token"}
+                        env={"GITHUB_TOKEN": "test-token"},
                     )
 
                     await mcp_server.start()
@@ -433,9 +410,7 @@ class TestMCPServerComponent:
 
         # Create response message
         response_message = MCPMessage(
-            id="test-request-123",
-            result={"content": [{"type": "text", "text": "Success"}]},
-            error=None
+            id="test-request-123", result={"content": [{"type": "text", "text": "Success"}]}, error=None
         )
 
         async def mock_listen():
@@ -443,8 +418,8 @@ class TestMCPServerComponent:
 
         mock_channel.listen.return_value = mock_listen()
 
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class:
-            with patch('woodwork.components.mcp.manager.MCPServerManager') as mock_manager_class:
+        with patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class:
+            with patch("woodwork.components.mcp.manager.MCPServerManager") as mock_manager_class:
                 # Setup mocks
                 mock_registry = AsyncMock()
                 mock_registry.get_server.return_value = mock_registry_response
@@ -459,11 +434,11 @@ class TestMCPServerComponent:
                     name="test_github_mcp",
                     server="io.github.github/mcp-server",
                     version="1.2.0",
-                    env={"GITHUB_TOKEN": "test-token"}
+                    env={"GITHUB_TOKEN": "test-token"},
                 )
 
                 # Mock the request ID generation to match response
-                with patch('uuid.uuid4') as mock_uuid:
+                with patch("uuid.uuid4") as mock_uuid:
                     mock_uuid.return_value.hex = "test-request-123"
 
                     await mcp_server.start()
@@ -481,8 +456,8 @@ class TestMCPServerComponent:
     async def test_mcp_server_error_handling(self, mock_registry_response, mock_channel):
         """Test error handling in MCP server."""
         # Test registry error
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class:
-            with patch('woodwork.components.mcp.manager.MCPServerManager') as mock_manager_class:
+        with patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class:
+            with patch("woodwork.components.mcp.manager.MCPServerManager") as mock_manager_class:
                 mock_registry = AsyncMock()
                 mock_registry.get_server.side_effect = Exception("Registry error")
                 mock_registry_class.return_value = mock_registry
@@ -490,30 +465,20 @@ class TestMCPServerComponent:
                 mock_manager = AsyncMock()
                 mock_manager_class.return_value = mock_manager
 
-                mcp_server = MCPServer(
-                    name="test_github_mcp",
-                    server="invalid/server",
-                    version="1.0.0"
-                )
+                mcp_server = MCPServer(name="test_github_mcp", server="invalid/server", version="1.0.0")
 
                 with pytest.raises(Exception, match="Registry error"):
                     await mcp_server.start()
 
     def test_mcp_server_event_translation(self):
         """Test MCP event to framework event translation."""
-        mcp_server = MCPServer(
-            name="test_github_mcp",
-            server="io.github.github/mcp-server",
-            version="1.2.0"
-        )
+        mcp_server = MCPServer(name="test_github_mcp", server="io.github.github/mcp-server", version="1.2.0")
 
         # Test notification handling
-        notification = MCPMessage(
-            method="tool/progress",
-            params={"progress": 50, "message": "Processing..."}
-        )
+        notification = MCPMessage(method="tool/progress", params={"progress": 50, "message": "Processing..."})
 
         # This would normally emit a framework event
+        assert notification.method is not None  # Type narrowing
         event_type = mcp_server._get_framework_event_type(notification.method)
         assert event_type == "tool.progress"
 
@@ -534,36 +499,30 @@ class TestMCPServerIntegration:
     @pytest.mark.asyncio
     async def test_framework_event_emission(self):
         """Test that MCP server properly emits framework events."""
-        with patch('woodwork.components.mcp.registry.MCPRegistry'):
-            with patch('woodwork.components.mcp.manager.MCPServerManager'):
-                mcp_server = MCPServer(
-                    name="test_mcp",
-                    server="test/server",
-                    version="1.0.0"
-                )
+        with patch("woodwork.components.mcp.registry.MCPRegistry"):
+            with patch("woodwork.components.mcp.manager.MCPServerManager"):
+                mcp_server = MCPServer(name="test_mcp", server="test/server", version="1.0.0")
 
                 # Mock the emit method
                 mcp_server.emit = AsyncMock()
 
                 # Simulate MCP notification
                 notification = MCPMessage(
-                    method="resource/updated",
-                    params={"resource": "test.txt", "action": "modified"}
+                    method="resource/updated", params={"resource": "test.txt", "action": "modified"}
                 )
 
                 await mcp_server._handle_notification(notification)
 
                 # Verify framework event was emitted
                 mcp_server.emit.assert_called_once_with(
-                    "resource.changed",
-                    {"resource": "test.txt", "action": "modified"}
+                    "resource.changed", {"resource": "test.txt", "action": "modified"}
                 )
 
     @pytest.mark.asyncio
     async def test_component_lifecycle(self):
         """Test complete component lifecycle."""
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class:
-            with patch('woodwork.components.mcp.manager.MCPServerManager') as mock_manager_class:
+        with patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class:
+            with patch("woodwork.components.mcp.manager.MCPServerManager") as mock_manager_class:
                 # Setup successful mocks
                 mock_registry = AsyncMock()
                 mock_metadata = Mock()
@@ -598,10 +557,7 @@ class TestMCPServerIntegration:
 
                 # Create component
                 mcp_server = MCPServer(
-                    name="test_mcp",
-                    server="test/server",
-                    version="1.0.0",
-                    env={"API_KEY": "test-key"}
+                    name="test_mcp", server="test/server", version="1.0.0", env={"API_KEY": "test-key"}
                 )
 
                 # Test start
@@ -609,7 +565,7 @@ class TestMCPServerIntegration:
                 assert mcp_server.channel is not None
 
                 # Test tool call
-                with patch('asyncio.wait_for', return_value="test result"):
+                with patch("asyncio.wait_for", return_value="test result"):
                     result = await mcp_server.input("test_tool", {"param": "value"})
                     assert result == "test result"
 
@@ -654,10 +610,10 @@ class TestToolDiscoveryIssue:
                         "properties": {
                             "owner": {"type": "string", "description": "Repository owner"},
                             "repo": {"type": "string", "description": "Repository name"},
-                            "issue_number": {"type": "integer", "description": "Issue number"}
+                            "issue_number": {"type": "integer", "description": "Issue number"},
                         },
-                        "required": ["owner", "repo", "issue_number"]
-                    }
+                        "required": ["owner", "repo", "issue_number"],
+                    },
                 },
                 {
                     "name": "create_pull_request",
@@ -670,10 +626,10 @@ class TestToolDiscoveryIssue:
                             "title": {"type": "string", "description": "PR title"},
                             "body": {"type": "string", "description": "PR body"},
                             "head": {"type": "string", "description": "Head branch"},
-                            "base": {"type": "string", "description": "Base branch"}
+                            "base": {"type": "string", "description": "Base branch"},
                         },
-                        "required": ["owner", "repo", "title", "head", "base"]
-                    }
+                        "required": ["owner", "repo", "title", "head", "base"],
+                    },
                 },
                 {
                     "name": "list_repositories",
@@ -682,11 +638,15 @@ class TestToolDiscoveryIssue:
                         "type": "object",
                         "properties": {
                             "owner": {"type": "string", "description": "User or organization name"},
-                            "type": {"type": "string", "description": "Repository type", "enum": ["all", "public", "private"]}
+                            "type": {
+                                "type": "string",
+                                "description": "Repository type",
+                                "enum": ["all", "public", "private"],
+                            },
                         },
-                        "required": ["owner"]
-                    }
-                }
+                        "required": ["owner"],
+                    },
+                },
             ]
         }
 
@@ -696,7 +656,7 @@ class TestToolDiscoveryIssue:
         Reproduce the tool discovery issue where descriptions are generic
         before server capabilities are fetched.
         """
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class:
+        with patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class:
             # Setup registry mock
             mock_registry = AsyncMock()
             mock_registry.get_server.return_value = mock_github_metadata
@@ -707,7 +667,7 @@ class TestToolDiscoveryIssue:
                 name="github_mcp",
                 server="io.github.github/mcp-server",
                 version="1.2.0",
-                env={"GITHUB_TOKEN": "test-token"}
+                env={"GITHUB_TOKEN": "test-token"},
             )
 
             # ISSUE REPRODUCTION: Get description before capabilities are fetched
@@ -720,9 +680,11 @@ class TestToolDiscoveryIssue:
             print(f"BLOCKING INIT: Tools available: {len(tools)}")
 
             # The improvement: either we get actual tool info or better status
-            assert ("initializing for tool discovery" in description_before or
-                    "Tools:" in description_before or
-                    len(tools) > 0), f"Expected improved initialization, got: {description_before}"
+            assert (
+                "initializing for tool discovery" in description_before
+                or "Tools:" in description_before
+                or len(tools) > 0
+            ), f"Expected improved initialization, got: {description_before}"
 
             # This demonstrates the blocking initialization fix
             print(f"FIXED: Blocking initialization description: {description_before}")
@@ -733,8 +695,8 @@ class TestToolDiscoveryIssue:
         Show that tools are discovered after manual server start,
         but this is too late for framework initialization.
         """
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class:
-            with patch('woodwork.components.mcp.manager.MCPServerManager') as mock_manager_class:
+        with patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class:
+            with patch("woodwork.components.mcp.manager.MCPServerManager") as mock_manager_class:
                 # Setup mocks
                 mock_registry = AsyncMock()
                 mock_registry.get_server.return_value = mock_github_metadata
@@ -768,14 +730,16 @@ class TestToolDiscoveryIssue:
                     name="github_mcp",
                     server="io.github.github/mcp-server",
                     version="1.2.0",
-                    env={"GITHUB_TOKEN": "test-token"}
+                    env={"GITHUB_TOKEN": "test-token"},
                 )
 
                 # Check description before start (with blocking initialization should show improved status)
                 description_before = mcp_server.description
-                assert ("initializing for tool discovery" in description_before or
-                        "loading capabilities" in description_before or
-                        "Tools:" in description_before)
+                assert (
+                    "initializing for tool discovery" in description_before
+                    or "loading capabilities" in description_before
+                    or "Tools:" in description_before
+                )
 
                 # Manually start server and wait for capabilities
                 await mcp_server.start()
@@ -795,9 +759,11 @@ class TestToolDiscoveryIssue:
                 assert "list_repositories" in tool_names
 
                 # Description should include tool information
-                assert ("get_issue" in description_after or
-                        "Tools:" in description_after or
-                        "loading capabilities" in description_after)
+                assert (
+                    "get_issue" in description_after
+                    or "Tools:" in description_after
+                    or "loading capabilities" in description_after
+                )
 
                 print(f"SOLUTION: Detailed description after start: {description_after}")
                 print(f"Available tools: {tool_names}")
@@ -811,9 +777,10 @@ class TestToolDiscoveryIssue:
         This test demonstrates what the fix should achieve.
         """
         # Start the patches before creating the component
-        with patch('woodwork.components.mcp.registry.MCPRegistry') as mock_registry_class, \
-             patch('woodwork.components.mcp.manager.MCPServerManager') as mock_manager_class:
-
+        with (
+            patch("woodwork.components.mcp.registry.MCPRegistry") as mock_registry_class,
+            patch("woodwork.components.mcp.manager.MCPServerManager") as mock_manager_class,
+        ):
             # Setup mocks
             mock_registry = AsyncMock()
             mock_registry.get_server.return_value = mock_github_metadata
@@ -846,7 +813,7 @@ class TestToolDiscoveryIssue:
                 name="github_mcp",
                 server="io.github.github/mcp-server",
                 version="1.2.0",
-                env={"GITHUB_TOKEN": "test-token"}
+                env={"GITHUB_TOKEN": "test-token"},
             )
 
             # Give time for eager initialization to complete
@@ -870,9 +837,9 @@ class TestToolDiscoveryIssue:
 
             # The key improvement is that we now block until capabilities are available
             # or at least show better status instead of generic lazy message
-            assert ("initializing for tool discovery" in description or
-                    "Tools:" in description or
-                    len(tools) > 0), f"Expected blocking initialization to provide better info, got: {description}"
+            assert "initializing for tool discovery" in description or "Tools:" in description or len(tools) > 0, (
+                f"Expected blocking initialization to provide better info, got: {description}"
+            )
 
             # Should not show the old generic lazy message
             assert "will start automatically on first use" not in description
@@ -886,9 +853,9 @@ class TestToolDiscoveryIssue:
                     assert "list_repositories" in tool_names
 
                     # Verify description includes tool information
-                    assert ("get_issue" in description or
-                            "Tools:" in description or
-                            "GitHub MCP Server" in description), f"Description should show capabilities: {description}"
+                    assert (
+                        "get_issue" in description or "Tools:" in description or "GitHub MCP Server" in description
+                    ), f"Description should show capabilities: {description}"
 
                 await mcp_server.close()
 
@@ -902,14 +869,10 @@ class TestToolDiscoveryIssue:
         complete tool information when server startup succeeds.
         """
         # Create a proper mock that can actually succeed
-        from unittest.mock import AsyncMock, Mock
+        from unittest.mock import Mock
 
         # Create a test component with mocked internals
-        mcp_server = MCPServer(
-            name="test_github_mcp",
-            server="github/mcp-server",
-            version="latest"
-        )
+        mcp_server = MCPServer(name="test_github_mcp", server="github/mcp-server", version="latest")
 
         # Mock the internal methods to simulate successful startup
         async def mock_start():
@@ -924,10 +887,10 @@ class TestToolDiscoveryIssue:
                 "tools": [
                     {"name": "get_issue", "description": "Get GitHub issue details"},
                     {"name": "create_pull_request", "description": "Create a PR"},
-                    {"name": "list_repositories", "description": "List user repositories"}
+                    {"name": "list_repositories", "description": "List user repositories"},
                 ],
                 "resources": [],
-                "prompts": []
+                "prompts": [],
             }
             mcp_server._capabilities_fetched = True
 
@@ -952,8 +915,9 @@ class TestToolDiscoveryIssue:
 
         # Description should show actual capabilities
         assert "Tools:" in description, f"Description should show tools: {description}"
-        assert ("get_issue" in description or
-                "create_pull_request" in description), f"Description should mention specific tools: {description}"
+        assert "get_issue" in description or "create_pull_request" in description, (
+            f"Description should mention specific tools: {description}"
+        )
 
         # Should not show loading/initializing messages
         assert "initializing" not in description
@@ -967,9 +931,7 @@ class TestToolDiscoveryIssue:
         the complete fix behavior when server startup succeeds.
         """
         # Setup complete mock stack
-        with patch.object(MCPServer, 'registry') as mock_registry, \
-             patch.object(MCPServer, 'manager') as mock_manager:
-
+        with patch.object(MCPServer, "registry") as mock_registry, patch.object(MCPServer, "manager") as mock_manager:
             # Mock successful metadata response
             mock_metadata = Mock()
             mock_metadata.name = "io.github.github/mcp-server"
@@ -987,7 +949,7 @@ class TestToolDiscoveryIssue:
             mock_tools_response = {
                 "tools": [
                     {"name": "get_issue", "description": "Get GitHub issue details"},
-                    {"name": "create_pull_request", "description": "Create a new PR"}
+                    {"name": "create_pull_request", "description": "Create a new PR"},
                 ]
             }
 
@@ -1008,7 +970,7 @@ class TestToolDiscoveryIssue:
                 name="github_mcp",
                 server="io.github.github/mcp-server",
                 version="1.2.0",
-                env={"GITHUB_TOKEN": "test-token"}
+                env={"GITHUB_TOKEN": "test-token"},
             )
 
             # Wait for eager initialization
@@ -1029,9 +991,7 @@ class TestToolDiscoveryIssue:
                 assert "create_pull_request" in tool_names
 
                 # Description should show tools or GitHub info
-                assert ("Tools:" in description or
-                        "get_issue" in description or
-                        "GitHub" in description)
+                assert "Tools:" in description or "get_issue" in description or "GitHub" in description
 
             if mcp_server._started:
                 await mcp_server.close()

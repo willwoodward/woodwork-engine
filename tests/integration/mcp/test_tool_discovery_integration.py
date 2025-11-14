@@ -9,11 +9,12 @@ This verifies the complete fix for the tool discovery timing issue.
 
 import asyncio
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-import logging
+from unittest.mock import Mock, AsyncMock
 
 from woodwork.core.async_runtime import AsyncRuntime
 from woodwork.components.mcp.mcp_server import MCPServer
+
+pytestmark = pytest.mark.slow
 
 
 class TestToolDiscoveryIntegration:
@@ -23,10 +24,7 @@ class TestToolDiscoveryIntegration:
     def mock_github_mcp_server(self):
         """Create a mock GitHub MCP server for testing."""
         server = MCPServer(
-            name="github_mcp",
-            server="github/mcp-server",
-            version="latest",
-            env={"GITHUB_TOKEN": "test-token"}
+            name="github_mcp", server="github/mcp-server", version="latest", env={"GITHUB_TOKEN": "test-token"}
         )
 
         # Mock successful GitHub server behavior
@@ -45,12 +43,10 @@ class TestToolDiscoveryIntegration:
                     {"name": "create_pull_request", "description": "Create a new pull request"},
                     {"name": "list_repositories", "description": "List repositories for a user/organization"},
                     {"name": "create_issue", "description": "Create a new GitHub issue"},
-                    {"name": "get_user", "description": "Get user profile information"}
+                    {"name": "get_user", "description": "Get user profile information"},
                 ],
-                "resources": [
-                    {"name": "repository", "description": "Repository data access"}
-                ],
-                "prompts": []
+                "resources": [{"name": "repository", "description": "Repository data access"}],
+                "prompts": [],
             }
             server._capabilities_fetched = True
 
@@ -62,6 +58,7 @@ class TestToolDiscoveryIntegration:
     @pytest.fixture
     def mock_llm_agent(self):
         """Create a mock LLM agent that simulates tool documentation building."""
+
         class MockLLMAgent:
             def __init__(self, name="test_agent"):
                 self.name = name
@@ -122,9 +119,7 @@ class TestToolDiscoveryIntegration:
 
         # Create AsyncRuntime and go through proper startup sequence
         runtime = AsyncRuntime()
-        config = {
-            "components": [mock_github_mcp_server, mock_llm_agent]
-        }
+        config = {"components": [mock_github_mcp_server, mock_llm_agent]}
 
         # Initialize components
         await runtime.initialize_components(config)
@@ -170,11 +165,7 @@ class TestToolDiscoveryIntegration:
         # Create multiple MCP servers
         servers = []
         for i in range(3):
-            server = MCPServer(
-                name=f"mcp_server_{i}",
-                server=f"test/server_{i}",
-                version="1.0"
-            )
+            server = MCPServer(name=f"mcp_server_{i}", server=f"test/server_{i}", version="1.0")
 
             # Mock each server with different startup times
             startup_delay = 0.1 * (i + 1)  # 0.1s, 0.2s, 0.3s
@@ -185,6 +176,7 @@ class TestToolDiscoveryIntegration:
                     srv._started = True
                     srv.metadata = Mock()
                     srv.metadata.description = f"Test Server {srv.name[-1]}"
+
                 return mock_start
 
             async def make_mock_fetch(delay, srv):
@@ -194,6 +186,7 @@ class TestToolDiscoveryIntegration:
                         "tools": [{"name": f"tool_{srv.name[-1]}", "description": f"Tool for server {srv.name[-1]}"}]
                     }
                     srv._capabilities_fetched = True
+
                 return mock_fetch
 
             server.start = await make_mock_start(startup_delay, server)
@@ -208,6 +201,7 @@ class TestToolDiscoveryIntegration:
 
         # All servers should start in parallel
         import time
+
         start_time = time.time()
         await runtime.startup_async_components()
         end_time = time.time()
@@ -231,11 +225,7 @@ class TestToolDiscoveryIntegration:
     async def test_tool_discovery_with_failing_server(self, mock_github_mcp_server):
         """Test that tool discovery works even when some servers fail to start."""
         # Create a server that fails to start
-        failing_server = MCPServer(
-            name="failing_mcp",
-            server="failing/server",
-            version="1.0"
-        )
+        failing_server = MCPServer(name="failing_mcp", server="failing/server", version="1.0")
 
         async def failing_start():
             await asyncio.sleep(0.1)
@@ -312,11 +302,7 @@ class TestToolDiscoveryIntegration:
         # Create several fast-starting servers
         servers = []
         for i in range(5):
-            server = MCPServer(
-                name=f"fast_server_{i}",
-                server=f"fast/server_{i}",
-                version="1.0"
-            )
+            server = MCPServer(name=f"fast_server_{i}", server=f"fast/server_{i}", version="1.0")
 
             async def quick_start(srv):
                 await asyncio.sleep(0.01)  # Very fast startup
@@ -335,6 +321,7 @@ class TestToolDiscoveryIntegration:
 
         # Measure startup time
         import time
+
         start_time = time.time()
         await runtime.startup_async_components()
         end_time = time.time()

@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional
 
 from abc import ABC, abstractmethod
 
@@ -56,6 +57,7 @@ class agent(component, tool_interface, ABC):
         # Auto-discover and register tool schemas with event bus
         try:
             from woodwork.core.unified_event_bus import get_global_event_bus
+
             event_bus = get_global_event_bus()
             schemas = event_bus.discover_tools_from_agent(self)
             log.info(f"[Agent] Auto-discovered {len(schemas)} tool schemas for workflow builder")
@@ -80,7 +82,7 @@ class agent(component, tool_interface, ABC):
             self._cache_mode = False
 
         # Event manager: use component's manager if available, or accept via config, or create default
-        if hasattr(self, '_emitter') and self._emitter is not None:
+        if hasattr(self, "_emitter") and self._emitter is not None:
             # Component already created an event manager with hooks/pipes
             pass
         else:
@@ -113,9 +115,8 @@ class agent(component, tool_interface, ABC):
 
         return {"prompt": best_prompt, "inputs": best_inputs, "actions": actions, "score": score}
 
-
     @abstractmethod
-    def input(self, query: str, inputs: dict = None):
+    def input(self, query: str, inputs: Optional[dict] = None):
         """Given a query, will use the provided tools and memory to perform actions to solve the query."""
         pass
 

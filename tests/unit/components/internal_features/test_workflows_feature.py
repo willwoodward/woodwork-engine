@@ -1,7 +1,8 @@
 """Unit tests for WorkflowsFeature with auto-component creation."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+
+from unittest.mock import Mock
 import json
 from woodwork.components.internal_features.workflows import WorkflowsFeature
 from woodwork.types.events import AgentActionPayload, AgentStepCompletePayload, InputReceivedPayload
@@ -9,6 +10,7 @@ from woodwork.types.events import AgentActionPayload, AgentStepCompletePayload, 
 
 @pytest.mark.unit
 @pytest.mark.workflows
+@pytest.mark.slow
 class TestWorkflowsFeature:
     """Test suite for WorkflowsFeature functionality."""
 
@@ -61,11 +63,7 @@ class TestWorkflowsFeature:
 
     def test_setup_feature_success(self, workflows_feature, mock_component, mock_component_manager, mock_neo4j):
         """Test successful feature setup with Neo4j component creation."""
-        config = {
-            "workflows_uri": "bolt://localhost:7687",
-            "workflows_user": "neo4j",
-            "workflows_password": "testpass"
-        }
+        config = {"workflows_uri": "bolt://localhost:7687", "workflows_user": "neo4j", "workflows_password": "testpass"}
 
         workflows_feature._setup_feature(mock_component, config, mock_component_manager)
 
@@ -80,8 +78,8 @@ class TestWorkflowsFeature:
         assert mock_neo4j.init_vector_index.call_count == 2
 
         # Verify component attributes were set
-        assert hasattr(mock_component, '_workflows_db')
-        assert hasattr(mock_component, '_workflows_mode')
+        assert hasattr(mock_component, "_workflows_db")
+        assert hasattr(mock_component, "_workflows_mode")
         assert mock_component._workflows_db is mock_neo4j
         assert mock_component._workflows_mode is True
 
@@ -108,8 +106,8 @@ class TestWorkflowsFeature:
         workflows_feature.teardown(mock_component, mock_component_manager)
 
         # Verify cleanup
-        assert not hasattr(mock_component, '_workflows_db')
-        assert not hasattr(mock_component, '_workflows_mode')
+        assert not hasattr(mock_component, "_workflows_db")
+        assert not hasattr(mock_component, "_workflows_mode")
         assert workflows_feature._neo4j_component is None
         assert workflows_feature._current_workflow_id is None
         assert workflows_feature._workflow_actions == []
@@ -130,7 +128,9 @@ class TestWorkflowsFeature:
         assert len(pipes) == 1
         assert pipes[0][0] == "input.received"
 
-    def test_check_similar_workflows_pipe_no_match(self, workflows_feature, mock_component, mock_component_manager, mock_neo4j):
+    def test_check_similar_workflows_pipe_no_match(
+        self, workflows_feature, mock_component, mock_component_manager, mock_neo4j
+    ):
         """Test input pipe when no similar workflows found."""
         # Setup
         workflows_feature._setup_feature(mock_component, {}, mock_component_manager)
@@ -142,7 +142,7 @@ class TestWorkflowsFeature:
             inputs={},
             session_id="test",
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         # Execute pipe
@@ -152,7 +152,9 @@ class TestWorkflowsFeature:
         assert result.input == payload.input
         assert workflows_feature._current_workflow_id is not None  # New workflow started
 
-    def test_check_similar_workflows_pipe_with_match(self, workflows_feature, mock_component, mock_component_manager, mock_neo4j):
+    def test_check_similar_workflows_pipe_with_match(
+        self, workflows_feature, mock_component, mock_component_manager, mock_neo4j
+    ):
         """Test input pipe when similar workflow found."""
         # Setup
         workflows_feature._setup_feature(mock_component, {}, mock_component_manager)
@@ -168,8 +170,8 @@ class TestWorkflowsFeature:
                 "prompt": "How to create a file",
                 "workflow": [
                     {"tool": "file_tool", "action": "create", "output": "file_created"},
-                    {"tool": "text_tool", "action": "write", "output": "content_added"}
-                ]
+                    {"tool": "text_tool", "action": "write", "output": "content_added"},
+                ],
             }
         ]
 
@@ -179,7 +181,7 @@ class TestWorkflowsFeature:
             inputs={},
             session_id="test",
             component_id="test_agent",
-            component_type="agent"
+            component_type="agent",
         )
 
         # Execute pipe
@@ -200,14 +202,10 @@ class TestWorkflowsFeature:
             "tool": "file_tool",
             "action": "create",
             "inputs": {"filename": "test.txt"},
-            "output": "file_created"
+            "output": "file_created",
         }
 
-        payload = AgentActionPayload(
-            action=json.dumps(action_data),
-            component_id="test_agent",
-            component_type="agent"
-        )
+        payload = AgentActionPayload(action=json.dumps(action_data), component_id="test_agent", component_type="agent")
 
         # Execute hook
         workflows_feature._sync_action_hook(payload)
@@ -227,9 +225,7 @@ class TestWorkflowsFeature:
 
         # Test payload
         payload = AgentStepCompletePayload(
-            result="Task completed successfully",
-            component_id="test_agent",
-            component_type="agent"
+            result="Task completed successfully", component_id="test_agent", component_type="agent"
         )
 
         # Execute hook
@@ -255,23 +251,23 @@ class TestWorkflowsFeature:
         # Verify Neo4j queries were called
         mock_neo4j.run.assert_called()
 
-    def test_create_action_relationships_no_dependencies(self, workflows_feature, mock_component, mock_component_manager, mock_neo4j):
+    def test_create_action_relationships_no_dependencies(
+        self, workflows_feature, mock_component, mock_component_manager, mock_neo4j
+    ):
         """Test action relationship creation when no dependencies."""
         # Setup
         workflows_feature._setup_feature(mock_component, {}, mock_component_manager)
         workflows_feature._current_workflow_id = "test-workflow"
 
         # Create first action (should link to prompt)
-        workflows_feature._create_action_relationships(
-            "action_1",
-            {"filename": "test.txt"},
-            "file_created"
-        )
+        workflows_feature._create_action_relationships("action_1", {"filename": "test.txt"}, "file_created")
 
         # Verify STARTS relationship was created
         mock_neo4j.run.assert_called()
 
-    def test_create_action_relationships_with_dependencies(self, workflows_feature, mock_component, mock_component_manager, mock_neo4j):
+    def test_create_action_relationships_with_dependencies(
+        self, workflows_feature, mock_component, mock_component_manager, mock_neo4j
+    ):
         """Test action relationship creation with input dependencies."""
         # Setup
         workflows_feature._setup_feature(mock_component, {}, mock_component_manager)
@@ -284,7 +280,7 @@ class TestWorkflowsFeature:
         workflows_feature._create_action_relationships(
             "action_2",
             {"file": "file_created"},  # Depends on previous action's output
-            "content_added"
+            "content_added",
         )
 
         # Verify DEPENDS_ON and NEXT relationships were created
@@ -317,8 +313,8 @@ class TestWorkflowsFeature:
                 "prompt": "Create a file",
                 "workflow": [
                     {"tool": "file_tool", "action": "create", "output": "file_created"},
-                    {"tool": "text_tool", "action": "write", "output": "content_added"}
-                ]
+                    {"tool": "text_tool", "action": "write", "output": "content_added"},
+                ],
             }
         ]
 

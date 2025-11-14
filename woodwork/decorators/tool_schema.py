@@ -10,11 +10,7 @@ from woodwork.types.tool_schema import ToolSchema, ToolParameter
 
 
 def tool_schema(
-    display_name: str,
-    description: str,
-    category: str,
-    parameters: List[ToolParameter],
-    output_type: str = "string"
+    display_name: str, description: str, category: str, parameters: List[ToolParameter], output_type: str = "string"
 ):
     """
     Decorator to attach schema metadata to tool classes.
@@ -61,6 +57,7 @@ def tool_schema(
                 pass
         ```
     """
+
     def decorator(cls):
         # Store schema as class attribute
         schema = ToolSchema(
@@ -69,8 +66,9 @@ def tool_schema(
             description=description,
             category=category,
             parameters=parameters,
-            output_type=output_type
+            output_type=output_type,
         )
         cls.__tool_schema__ = schema
         return cls
+
     return decorator

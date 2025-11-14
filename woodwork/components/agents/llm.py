@@ -32,7 +32,12 @@ class llm(agent, Startable):
         self._llm = model._llm
 
         self._is_planner = get_optional(config, "planning", False)
-        self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"}))
+        self._prompt_config = Prompt.from_dict(
+            config.get(
+                "prompt",
+                {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"},
+            )
+        )
         self._prompt = get_prompt(self._prompt_config.file)
 
         # Event-based ask_user handling
@@ -59,6 +64,7 @@ class llm(agent, Startable):
             # Report progress if queue is available
             if queue:
                 from woodwork.types import Update
+
                 queue.put(Update(progress=10, component_name=self.name))
 
             self._internal_features = InternalFeatureRegistry.create_features(self._internal_features_config)
@@ -87,13 +93,13 @@ class llm(agent, Startable):
                     log.debug(f"[Agent] Received user response for request {request_id}: {payload.response}")
                 else:
                     log.warning(f"[Agent] Received user response for unknown request {request_id}")
-            elif isinstance(payload, dict) and 'request_id' in payload:
+            elif isinstance(payload, dict) and "request_id" in payload:
                 # Handle dict format for compatibility
-                request_id = payload['request_id']
+                request_id = payload["request_id"]
                 if request_id in self._pending_user_requests:
                     future = self._pending_user_requests[request_id]
                     if not future.done():
-                        future.set_result(payload.get('response', ''))
+                        future.set_result(payload.get("response", ""))
                     del self._pending_user_requests[request_id]
                     log.debug(f"[Agent] Received user response for request {request_id}: {payload.get('response', '')}")
         except Exception as e:
@@ -114,7 +120,7 @@ class llm(agent, Startable):
                 request_id=request_id,
                 timeout_seconds=timeout_seconds,
                 component_id=self.name,
-                component_type="agent"
+                component_type="agent",
             )
 
             log.debug(f"[Agent] Requesting user input: {question}")
@@ -149,15 +155,13 @@ class llm(agent, Startable):
         final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
         thought_match = re.search(r"Thought:\s*(.*?)(?=\s*Action:|\s*Final Answer:|$)", agent_output, re.DOTALL)
         action_match = re.search(
-            r"Action:\s*(\{.*?\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))",
-            agent_output,
-            re.DOTALL
+            r"Action:\s*(\{.*?\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))", agent_output, re.DOTALL
         )
 
         thought = ""
         if thought_match:
             thought = thought_match.group(1).strip()
-        
+
         # Final Answer takes precedence over thought and action
         if final_answer_match and not action_match:
             final_answer = final_answer_match.group(1).strip()
@@ -175,7 +179,7 @@ class llm(agent, Startable):
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
 
         return thought, action, False
-    
+
     def count_tokens(self, text: str, model: str = "gpt-5-mini"):
         if not isinstance(text, str):
             text = str(text)
@@ -187,7 +191,7 @@ class llm(agent, Startable):
             encoding = tiktoken.get_encoding("cl100k_base")
         return len(encoding.encode(text))
 
-    async def input(self, query: str, inputs: dict = None):
+    async def input(self, query: str, inputs: Optional[dict] = None):
         if inputs is None:
             inputs = {}
 
@@ -207,7 +211,7 @@ class llm(agent, Startable):
             log.debug(f"Initialized workflow variables with inputs: {list(inputs.keys())}")
 
         # Set component context for proper event attribution
-        EventSource.set_current(getattr(self, 'name', 'unknown_agent'), 'agent')
+        EventSource.set_current(getattr(self, "name", "unknown_agent"), "agent")
 
         # Substitute inputs
         prompt = query
@@ -218,17 +222,18 @@ class llm(agent, Startable):
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
         from woodwork.types.events import InputReceivedPayload
+
         input_payload = InputReceivedPayload(
             input=query,
             inputs=inputs,
             session_id=getattr(self, "_session", None),
             component_id=self.name,
-            component_type="agent"
+            component_type="agent",
         )
         transformed = await emit("input.received", input_payload)
 
         # Extract from typed payload (handle fallback to GenericPayload)
-        if hasattr(transformed, 'input'):
+        if hasattr(transformed, "input"):
             query = transformed.input
             inputs = transformed.inputs
         else:
@@ -243,7 +248,7 @@ class llm(agent, Startable):
 
         # Add dynamic tools from internal features (like workflows)
         for feature in self._internal_features:
-            if hasattr(feature, 'get_tools'):
+            if hasattr(feature, "get_tools"):
                 try:
                     dynamic_tools = feature.get_tools()
                     if dynamic_tools:
@@ -255,10 +260,7 @@ class llm(agent, Startable):
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
 
-        system_prompt = (
-            "Here are the available tools:\n"
-            "{tools}\n\n"
-        ).format(tools=tool_documentation) + self._prompt
+        system_prompt = ("Here are the available tools:\n{tools}\n\n").format(tools=tool_documentation) + self._prompt
 
         log.debug(f"[FULL_CONTEXT]:\n{system_prompt}")
         system_prompt_tokens = self.count_tokens(system_prompt)
@@ -292,7 +294,10 @@ class llm(agent, Startable):
                 summariser_prompt = ChatPromptTemplate.from_messages(
                     [
                         ("system", "You are a helpful assistant that summarises context for another agent."),
-                        ("human", "Summarise the following context into a concise form that retains all important facts, goals, decisions, and observations:\n\n{context}")
+                        (
+                            "human",
+                            "Summarise the following context into a concise form that retains all important facts, goals, decisions, and observations:\n\n{context}",
+                        ),
                     ]
                 )
 
@@ -322,7 +327,7 @@ class llm(agent, Startable):
                     log.debug(f"[Agent] Saved state to session {session.id}")
 
                 return thought
-            
+
             if action_dict is None:
                 print(f"Thought: {thought}")
                 current_prompt += f"\n\nThought: {thought}\n\nContinue with the next step:"
@@ -344,7 +349,9 @@ class llm(agent, Startable):
                 action = Action.from_dict(action_dict)
 
                 # Emit tool.call (pipes can transform, hooks can observe)
-                tool_call = await emit("tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")})
+                tool_call = await emit(
+                    "tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")}
+                )
 
                 # Update action if pipes modified it
                 if tool_call.tool != action_dict.get("tool") or tool_call.args != action_dict.get("inputs"):
@@ -363,12 +370,14 @@ class llm(agent, Startable):
 
                 observation_tokens = self.count_tokens(observation)
                 if observation_tokens > 15000:
-                    observation = f"The output from this tool was way too large, it contained {observation_tokens} tokens."
+                    observation = (
+                        f"The output from this tool was way too large, it contained {observation_tokens} tokens."
+                    )
 
             except KeyError as e:
                 log.warning(f"Action dict missing key {e}, feeding back as context.")
                 if e == "output":
-                    action["output"] = ""
+                    action_dict["output"] = ""  # type: ignore[index]
                 else:
                     observation = f"Received incomplete action from Agent: {json.dumps(action_dict)}. It is likely missing the key {e}."
             except Exception as e:
@@ -456,8 +465,8 @@ class llm(agent, Startable):
         try:
             # Special handling for ask_user (uses event-based communication)
             if action.tool == "ask_user":
-                question = action.inputs.get('question', 'Please provide input:')
-                timeout = action.inputs.get('timeout_seconds', 60)
+                question = action.inputs.get("question", "Please provide input:")
+                timeout = action.inputs.get("timeout_seconds", 60)
                 return await self._ask_user_via_events(question, timeout)
 
             # Special handling for workflow execution
@@ -468,10 +477,7 @@ class llm(agent, Startable):
             resolved_inputs = self._resolve_action_inputs(action.inputs)
 
             # Use the clean message API with resolved inputs
-            result = await self.request(action.tool, {
-                "action": action.action,
-                "inputs": resolved_inputs
-            })
+            result = await self.request(action.tool, {"action": action.action, "inputs": resolved_inputs})
 
             # Store output in workflow variables if action has output variable
             # NOTE: We store the raw result (could be dict, list, etc.) so subsequent
@@ -514,23 +520,20 @@ class llm(agent, Startable):
             is_optional = component_spec.get("optional", False)
 
             try:
-                self._internal_component_manager.get_or_create_component(
-                    component_id, component_type, component_config
-                )
+                self._internal_component_manager.get_or_create_component(component_id, component_type, component_config)
                 log.debug(f"[LLM Agent {self.name}] Created internal component: {component_id}")
             except Exception as e:
                 if not is_optional:
                     raise RuntimeError(f"Failed to create required internal component {component_id}: {e}")
                 log.warning(f"[LLM Agent {self.name}] Failed to create optional internal component {component_id}: {e}")
 
-
     def get_internal_component(self, component_id: str):
         """Get an internal component by ID."""
-        if hasattr(self, '_internal_component_manager'):
+        if hasattr(self, "_internal_component_manager"):
             return self._internal_component_manager.get_component(component_id)
         return None
 
-    def create_component(self, component_type: str, component_id: str = None, **config):
+    def create_component(self, component_type: str, component_id: Optional[str] = None, **config):
         """
         Direct API to create and attach internal components at runtime.
 
@@ -557,23 +560,26 @@ class llm(agent, Startable):
                 port=6379
             )
         """
-        if not hasattr(self, '_internal_component_manager'):
+        if not hasattr(self, "_internal_component_manager"):
             raise RuntimeError("Internal component manager not available")
 
         # Auto-generate component ID if not provided
         if component_id is None:
-            existing_count = len([k for k in self._internal_component_manager._components.keys()
-                                if k.startswith(f"{self.name}_{component_type}")])
+            existing_count = len(
+                [
+                    k
+                    for k in self._internal_component_manager._components.keys()
+                    if k.startswith(f"{self.name}_{component_type}")
+                ]
+            )
             component_id = f"{self.name}_{component_type}_{existing_count}"
 
         # Add API key from model if available and not provided
-        if 'api_key' not in config and hasattr(self, 'model') and hasattr(self.model, '_api_key'):
-            config['api_key'] = self.model._api_key
+        if "api_key" not in config and hasattr(self, "model") and hasattr(self.model, "_api_key"):
+            config["api_key"] = self.model._api_key
 
         # Create component through internal manager
-        component = self._internal_component_manager.get_or_create_component(
-            component_id, component_type, config
-        )
+        component = self._internal_component_manager.get_or_create_component(component_id, component_type, config)
 
         # Auto-attach to agent with clean attribute name
         attr_name = f"_{component_type}_{existing_count}" if existing_count > 0 else f"_{component_type}"
@@ -582,7 +588,7 @@ class llm(agent, Startable):
         log.info(f"[LLM Agent {self.name}] Created {component_type} component: {component_id}")
         return component
 
-    def add_hook(self, event_name: str, hook_function, description: str = None):
+    def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
         """
         Add a hook to this agent that listens for specific events.
 
@@ -599,6 +605,7 @@ class llm(agent, Startable):
         """
         try:
             from woodwork.core.unified_event_bus import get_global_event_bus
+
             event_bus = get_global_event_bus()
             event_bus.register_hook(event_name, hook_function)
 
@@ -607,7 +614,7 @@ class llm(agent, Startable):
         except Exception as e:
             log.error(f"[LLM Agent {self.name}] Failed to add hook for '{event_name}': {e}")
 
-    def add_pipe(self, event_name: str, pipe_function, description: str = None):
+    def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
         """
         Add a pipe to this agent that can transform event payloads.
 
@@ -625,6 +632,7 @@ class llm(agent, Startable):
         """
         try:
             from woodwork.core.unified_event_bus import get_global_event_bus
+
             event_bus = get_global_event_bus()
             event_bus.register_pipe(event_name, pipe_function)
 
@@ -637,7 +645,7 @@ class llm(agent, Startable):
         """Clean up internal features and components, then call parent close."""
         try:
             # Teardown features first
-            if hasattr(self, '_internal_features'):
+            if hasattr(self, "_internal_features"):
                 for feature in self._internal_features:
                     try:
                         feature.teardown(self, self._internal_component_manager)
@@ -645,7 +653,7 @@ class llm(agent, Startable):
                         log.warning(f"[LLM Agent {self.name}] Error during feature teardown: {e}")
 
             # Then cleanup all internal components
-            if hasattr(self, '_internal_component_manager'):
+            if hasattr(self, "_internal_component_manager"):
                 self._internal_component_manager.cleanup_components()
                 log.debug(f"[LLM Agent {self.name}] Internal features and components cleaned up")
         except Exception as e:

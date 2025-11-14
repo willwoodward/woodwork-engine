@@ -7,11 +7,13 @@ from woodwork.components.internal_features.workflow_variable_extraction import e
 
 class MockLLM:
     """Mock LLM that returns variable extraction results."""
+
     def invoke(self, prompt):
         response = Mock()
         # Extract the user prompt from the extraction prompt
         # The user prompt is in quotes after "User prompt: "
         import re
+
         match = re.search(r'User prompt: "(.*?)"(?:\n|$)', prompt, re.DOTALL)
         if match:
             user_prompt = match.group(1)
@@ -22,76 +24,76 @@ class MockLLM:
         # Check more specific patterns first
         if "Alice" in user_prompt and "Bob" in user_prompt:
             # Multiple names
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "send email from {sender} to {recipient}",
   "variables": {"sender": "Alice", "recipient": "Bob"},
   "schema": {"sender": "string", "recipient": "string"}
 }
-```'''
+```"""
         elif "Bob" in user_prompt and "5 days" in user_prompt:
             # Complex prompt
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "read all emails from {name} sent in the last {days} days",
   "variables": {"name": "Bob", "days": "5"},
   "schema": {"name": "string", "days": "number"}
 }
-```'''
+```"""
         elif "Bob" in user_prompt:
             # Simple name extraction
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "read all emails from {name}",
   "variables": {"name": "Bob"},
   "schema": {"name": "string"}
 }
-```'''
+```"""
         elif "10 emails" in user_prompt:
             # Count extraction
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "read {count} emails",
   "variables": {"count": "10"},
   "schema": {"count": "number"}
 }
-```'''
+```"""
         elif "machine learning" in user_prompt:
             # Quoted string
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "search for {query} in documents",
   "variables": {"query": "machine learning"},
   "schema": {"query": "string"}
 }
-```'''
+```"""
         elif "7 days" in user_prompt:
             # 7 days extraction
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "get the last {days} days of data",
   "variables": {"days": "7"},
   "schema": {"days": "number"}
 }
-```'''
+```"""
         elif "5 days" in user_prompt:
             # 5 days extraction
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "get emails from the last {days} days",
   "variables": {"days": "5"},
   "schema": {"days": "number"}
 }
-```'''
+```"""
         else:
             # No variables
-            response.content = '''```json
+            response.content = """```json
 {
   "parameterized": "list all files",
   "variables": {},
   "schema": {}
 }
-```'''
+```"""
         return response
 
 

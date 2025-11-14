@@ -3,8 +3,7 @@ Unit tests for WorkflowExecutor class with unified event bus integration.
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-import json
+from unittest.mock import Mock, AsyncMock, patch
 
 
 class TestWorkflowExecutor:
@@ -27,7 +26,7 @@ class TestWorkflowExecutor:
             responses = {
                 "file_tool": "Sample file content",
                 "text_tool": "Processed text output",
-                "analysis_tool": {"result": "analysis complete"}
+                "analysis_tool": {"result": "analysis complete"},
             }
             return responses.get(tool, "default response")
 
@@ -38,6 +37,7 @@ class TestWorkflowExecutor:
     def executor(self, mock_neo4j, mock_agent):
         """Create WorkflowExecutor instance."""
         from woodwork.components.internal_features.workflow_executor import WorkflowExecutor
+
         return WorkflowExecutor(mock_neo4j, mock_agent)
 
     def test_executor_initialization(self, mock_neo4j, mock_agent):
@@ -60,21 +60,19 @@ class TestWorkflowExecutor:
                 "action": "read",
                 "inputs": '{"path": "test.txt"}',
                 "output": "file_content",
-                "sequence": 0
+                "sequence": 0,
             }
         ]
 
         result = await executor.execute_workflow(
-            workflow_id="w1",
-            inputs={"path": "test.txt"},
-            session_id="test_session"
+            workflow_id="w1", inputs={"path": "test.txt"}, session_id="test_session"
         )
 
-        assert result['status'] == 'completed'
-        assert result['workflow_id'] == 'w1'
-        assert len(result['results']) == 1
-        assert 'execution_id' in result
-        assert 'file_content' in result['final_outputs']
+        assert result["status"] == "completed"
+        assert result["workflow_id"] == "w1"
+        assert len(result["results"]) == 1
+        assert "execution_id" in result
+        assert "file_content" in result["final_outputs"]
 
     @pytest.mark.asyncio
     async def test_execute_workflow_runs_action_sequence(self, executor, mock_neo4j):
@@ -87,7 +85,7 @@ class TestWorkflowExecutor:
                 "action": "read",
                 "inputs": '{"path": "input.txt"}',
                 "output": "file_content",
-                "sequence": 0
+                "sequence": 0,
             },
             {
                 "id": "a2",
@@ -95,23 +93,21 @@ class TestWorkflowExecutor:
                 "action": "process",
                 "inputs": '{"text": "file_content"}',
                 "output": "processed_text",
-                "sequence": 1
-            }
+                "sequence": 1,
+            },
         ]
 
         result = await executor.execute_workflow(
-            workflow_id="w1",
-            inputs={"path": "input.txt"},
-            session_id="test_session"
+            workflow_id="w1", inputs={"path": "input.txt"}, session_id="test_session"
         )
 
-        assert result['status'] == 'completed'
-        assert len(result['results']) == 2
-        assert 'file_content' in result['final_outputs']
-        assert 'processed_text' in result['final_outputs']
+        assert result["status"] == "completed"
+        assert len(result["results"]) == 2
+        assert "file_content" in result["final_outputs"]
+        assert "processed_text" in result["final_outputs"]
 
         # Verify second action received output from first
-        assert result['final_outputs']['processed_text'] == "Processed text output"
+        assert result["final_outputs"]["processed_text"] == "Processed text output"
 
     @pytest.mark.asyncio
     async def test_execute_workflow_resolves_variable_references(self, executor, mock_neo4j, mock_agent):
@@ -123,7 +119,7 @@ class TestWorkflowExecutor:
                 "action": "read",
                 "inputs": '{"path": "data.txt"}',
                 "output": "file_data",
-                "sequence": 0
+                "sequence": 0,
             },
             {
                 "id": "a2",
@@ -131,15 +127,11 @@ class TestWorkflowExecutor:
                 "action": "analyze",
                 "inputs": '{"data": "file_data", "limit": 100}',
                 "output": "analysis_result",
-                "sequence": 1
-            }
+                "sequence": 1,
+            },
         ]
 
-        result = await executor.execute_workflow(
-            workflow_id="w1",
-            inputs={},
-            session_id="test_session"
-        )
+        await executor.execute_workflow(workflow_id="w1", inputs={}, session_id="test_session")
 
         # Verify agent.request was called for analysis_tool
         # Check the second call (analysis_tool) received resolved variable
@@ -161,17 +153,13 @@ class TestWorkflowExecutor:
                 "action": "process",
                 "inputs": '{"text": "literal text", "count": 5}',
                 "output": "result",
-                "sequence": 0
+                "sequence": 0,
             }
         ]
 
-        result = await executor.execute_workflow(
-            workflow_id="w1",
-            inputs={},
-            session_id="test_session"
-        )
+        result = await executor.execute_workflow(workflow_id="w1", inputs={}, session_id="test_session")
 
-        assert result['status'] == 'completed'
+        assert result["status"] == "completed"
 
     @pytest.mark.asyncio
     async def test_execute_workflow_raises_on_no_actions(self, executor, mock_neo4j):
@@ -179,38 +167,23 @@ class TestWorkflowExecutor:
         mock_neo4j.run.return_value = []
 
         with pytest.raises(ValueError, match="has no actions"):
-            await executor.execute_workflow(
-                workflow_id="w1",
-                inputs={},
-                session_id="test_session"
-            )
+            await executor.execute_workflow(workflow_id="w1", inputs={}, session_id="test_session")
 
     @pytest.mark.asyncio
     async def test_execute_workflow_handles_tool_errors(self, executor, mock_neo4j, mock_agent):
         """Test that tool execution errors are handled gracefully."""
         mock_neo4j.run.return_value = [
-            {
-                "id": "a1",
-                "tool": "failing_tool",
-                "action": "test",
-                "inputs": '{}',
-                "output": "result",
-                "sequence": 0
-            }
+            {"id": "a1", "tool": "failing_tool", "action": "test", "inputs": "{}", "output": "result", "sequence": 0}
         ]
 
         # Make the agent.request raise an error
         mock_agent.request.side_effect = Exception("Component not found")
 
         # Should not raise, but return error in result
-        result = await executor.execute_workflow(
-            workflow_id="w1",
-            inputs={},
-            session_id="test_session"
-        )
+        result = await executor.execute_workflow(workflow_id="w1", inputs={}, session_id="test_session")
 
-        assert result['status'] == 'completed'
-        assert 'Error:' in str(result['results'][0]['output'])
+        assert result["status"] == "completed"
+        assert "Error:" in str(result["results"][0]["output"])
 
     @pytest.mark.asyncio
     async def test_execute_entrypoint_resolves_to_workflow(self, executor, mock_neo4j):
@@ -229,19 +202,17 @@ class TestWorkflowExecutor:
                     "action": "read",
                     "inputs": '{"path": "test.txt"}',
                     "output": "content",
-                    "sequence": 0
+                    "sequence": 0,
                 }
-            ]
+            ],
         ]
 
         result = await executor.execute_entrypoint(
-            entrypoint_name="process_data",
-            inputs={"path": "test.txt"},
-            session_id="test_session"
+            entrypoint_name="process_data", inputs={"path": "test.txt"}, session_id="test_session"
         )
 
-        assert result['status'] == 'completed'
-        assert result['workflow_id'] == 'w1'
+        assert result["status"] == "completed"
+        assert result["workflow_id"] == "w1"
 
     @pytest.mark.asyncio
     async def test_execute_entrypoint_raises_on_not_found(self, executor, mock_neo4j):
@@ -249,11 +220,7 @@ class TestWorkflowExecutor:
         mock_neo4j.run.return_value = []
 
         with pytest.raises(ValueError, match="Entrypoint 'nonexistent' not found"):
-            await executor.execute_entrypoint(
-                entrypoint_name="nonexistent",
-                inputs={},
-                session_id="test_session"
-            )
+            await executor.execute_entrypoint(entrypoint_name="nonexistent", inputs={}, session_id="test_session")
 
     @pytest.mark.asyncio
     async def test_execute_entrypoint_validates_required_inputs(self, executor, mock_neo4j):
@@ -269,37 +236,26 @@ class TestWorkflowExecutor:
             await executor.execute_entrypoint(
                 entrypoint_name="process_data",
                 inputs={},  # Missing required input
-                session_id="test_session"
+                session_id="test_session",
             )
 
     @pytest.mark.asyncio
     async def test_resolve_inputs_substitutes_variables(self, executor):
         """Test _resolve_inputs method substitutes variable references."""
-        inputs = {
-            "file": "file_content",
-            "limit": 100,
-            "format": "json"
-        }
+        inputs = {"file": "file_content", "limit": 100, "format": "json"}
 
-        variables = {
-            "file_content": "Sample content from file",
-            "other_var": "other value"
-        }
+        variables = {"file_content": "Sample content from file", "other_var": "other value"}
 
         resolved = executor._resolve_inputs(inputs, variables)
 
-        assert resolved['file'] == "Sample content from file"  # Variable resolved
-        assert resolved['limit'] == 100  # Literal preserved
-        assert resolved['format'] == "json"  # Literal preserved
+        assert resolved["file"] == "Sample content from file"  # Variable resolved
+        assert resolved["limit"] == 100  # Literal preserved
+        assert resolved["format"] == "json"  # Literal preserved
 
     @pytest.mark.asyncio
     async def test_resolve_inputs_preserves_non_variables(self, executor):
         """Test _resolve_inputs preserves values that aren't variable names."""
-        inputs = {
-            "text": "literal string",
-            "number": 42,
-            "boolean": True
-        }
+        inputs = {"text": "literal string", "number": 42, "boolean": True}
 
         variables = {}
 
@@ -315,21 +271,21 @@ class TestWorkflowExecutor:
                 "id": "a1",
                 "tool": "test_tool",
                 "action": "test_action",
-                "inputs": '{}',
+                "inputs": "{}",
                 "output": "result",
-                "sequence": 0
+                "sequence": 0,
             }
         ]
 
         actions = await executor._get_workflow_actions("w1")
 
         assert len(actions) == 1
-        assert actions[0]['tool'] == 'test_tool'
+        assert actions[0]["tool"] == "test_tool"
 
         # Verify query was called with workflow_id
         mock_neo4j.run.assert_called_once()
         call_args = mock_neo4j.run.call_args
-        assert call_args[0][1]['workflow_id'] == 'w1'
+        assert call_args[0][1]["workflow_id"] == "w1"
 
     @pytest.mark.asyncio
     async def test_resolve_entrypoint_returns_workflow_id(self, executor, mock_neo4j):
@@ -350,7 +306,7 @@ class TestWorkflowExecutor:
         assert workflow_id is None
 
     @pytest.mark.asyncio
-    @patch('woodwork.components.internal_features.workflow_executor.emit')
+    @patch("woodwork.components.internal_features.workflow_executor.emit")
     async def test_execute_action_emits_events(self, mock_emit, executor, mock_neo4j, mock_agent):
         """Test that _execute_action emits tool.call and tool.observation events."""
         from woodwork.components.internal_features.workflow_executor import WorkflowExecutionContext
@@ -373,18 +329,14 @@ class TestWorkflowExecutor:
             "tool": "file_tool",
             "action": "read",
             "inputs": {"path": "test.txt"},
-            "output": "content"
+            "output": "content",
         }
 
         context = WorkflowExecutionContext(
-            workflow_id="w1",
-            inputs={},
-            session_id="test",
-            execution_id="exec1",
-            variables={}
+            workflow_id="w1", inputs={}, session_id="test", execution_id="exec1", variables={}
         )
 
-        result = await executor._execute_action(action, context)
+        await executor._execute_action(action, context)
 
         # Verify tool.call event was emitted
         call_events = [call for call in mock_emit.call_args_list if call[0][0] == "tool.call"]
@@ -398,7 +350,4 @@ class TestWorkflowExecutor:
         assert obs_events[0][0][1]["tool"] == "file_tool"
 
         # Verify agent.request was called
-        mock_agent.request.assert_called_once_with(
-            "file_tool",
-            {"action": "read", "inputs": {"path": "test.txt"}}
-        )
+        mock_agent.request.assert_called_once_with("file_tool", {"action": "read", "inputs": {"path": "test.txt"}})

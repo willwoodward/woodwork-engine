@@ -1,7 +1,5 @@
 """Tests for streaming-enabled components."""
 
-import pytest
-from unittest.mock import Mock
 from woodwork.components.streaming_mixin import StreamingMixin
 
 
@@ -93,7 +91,7 @@ class TestStreamingComponents:
         components = [
             StreamingComponent("comp1", True),
             StreamingComponent("comp2", True),
-            StreamingComponent("comp3", False)
+            StreamingComponent("comp3", False),
         ]
 
         # Process items

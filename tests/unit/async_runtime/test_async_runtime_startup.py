@@ -15,6 +15,9 @@ import logging
 from woodwork.core.async_runtime import AsyncRuntime
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
+@pytest.mark.slow
 class TestAsyncRuntimeStartupComponents:
     """Test AsyncRuntime startup_async_components method."""
 
@@ -96,14 +99,15 @@ class TestAsyncRuntimeStartupComponents:
         assert mock_component_with_async_start._started
 
     @pytest.mark.asyncio
-    async def test_startup_async_components_mixed_components(self, runtime, mock_mcp_server_with_startup_task,
-                                                           mock_component_with_async_start, mock_sync_component):
+    async def test_startup_async_components_mixed_components(
+        self, runtime, mock_mcp_server_with_startup_task, mock_component_with_async_start, mock_sync_component
+    ):
         """Test startup_async_components with mix of async and sync components."""
         # Setup runtime with mixed components
         runtime.components = {
             "mcp": mock_mcp_server_with_startup_task,
             "async": mock_component_with_async_start,
-            "sync": mock_sync_component
+            "sync": mock_sync_component,
         }
 
         # Call startup_async_components
@@ -113,7 +117,7 @@ class TestAsyncRuntimeStartupComponents:
         assert mock_mcp_server_with_startup_task._startup_completed
         assert mock_component_with_async_start._started
         # Sync component should remain unchanged
-        assert hasattr(mock_sync_component, 'name')
+        assert hasattr(mock_sync_component, "name")
 
     @pytest.mark.asyncio
     async def test_startup_async_components_handles_exceptions(self, runtime):
@@ -138,10 +142,7 @@ class TestAsyncRuntimeStartupComponents:
         success_component._started = False
         success_component.start = success_start
 
-        runtime.components = {
-            "failing": failing_component,
-            "success": success_component
-        }
+        runtime.components = {"failing": failing_component, "success": success_component}
 
         # Should not raise exception, should handle gracefully
         await runtime.startup_async_components()
@@ -166,6 +167,7 @@ class TestAsyncRuntimeStartupComponents:
         runtime.components = {"slow": slow_component}
 
         import time
+
         start_time = time.time()
 
         # Should timeout and continue
@@ -222,10 +224,7 @@ class TestAsyncRuntimeStartupComponents:
 
         async_start_component.start = async_start
 
-        runtime.components = {
-            "sync": sync_start_component,
-            "async": async_start_component
-        }
+        runtime.components = {"sync": sync_start_component, "async": async_start_component}
 
         await runtime.startup_async_components()
 
@@ -257,16 +256,15 @@ class TestAsyncRuntimeStartupComponents:
         assert any("All async components started successfully" in msg for msg in log_messages)
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
 class TestAsyncRuntimeIntegrationWithStartup:
     """Test AsyncRuntime integration with startup sequence."""
 
     @pytest.fixture
     def mock_config(self):
         """Create mock configuration for testing."""
-        return {
-            "components": [],
-            "test_config": True
-        }
+        return {"components": [], "test_config": True}
 
     @pytest.mark.asyncio
     async def test_runtime_start_includes_async_component_startup(self, mock_config):
@@ -279,8 +277,8 @@ class TestAsyncRuntimeIntegrationWithStartup:
         runtime._main_loop = AsyncMock()
         runtime._cleanup = AsyncMock()
 
-        with patch.object(runtime.event_bus, 'configure_routing'):
-            with patch.object(runtime, 'has_api_component', return_value=False):
+        with patch.object(runtime.event_bus, "configure_routing"):
+            with patch.object(runtime, "has_api_component", return_value=False):
                 await runtime.start(mock_config)
 
         # Verify the startup sequence includes async component startup
@@ -308,8 +306,8 @@ class TestAsyncRuntimeIntegrationWithStartup:
         runtime._main_loop = mock_main_loop
         runtime._cleanup = AsyncMock()
 
-        with patch.object(runtime.event_bus, 'configure_routing'):
-            with patch.object(runtime, 'has_api_component', return_value=False):
+        with patch.object(runtime.event_bus, "configure_routing"):
+            with patch.object(runtime, "has_api_component", return_value=False):
                 await runtime.start(mock_config)
 
         # Verify correct order
@@ -328,7 +326,7 @@ class TestAsyncRuntimeIntegrationWithStartup:
 
         runtime.startup_async_components = failing_startup
 
-        with patch.object(runtime.event_bus, 'configure_routing'):
+        with patch.object(runtime.event_bus, "configure_routing"):
             # Should re-raise the exception from startup
             with pytest.raises(RuntimeError, match="Startup failed"):
                 await runtime.start(mock_config)
@@ -337,6 +335,8 @@ class TestAsyncRuntimeIntegrationWithStartup:
         runtime._cleanup.assert_called_once()
 
 
+@pytest.mark.asyncio
+@pytest.mark.slow
 class TestAsyncRuntimeComponentParsing:
     """Test AsyncRuntime component parsing with async startup requirements."""
 
@@ -358,8 +358,8 @@ class TestAsyncRuntimeComponentParsing:
         components = [component1, component2]
 
         # Mock the parsing to return our test components
-        with patch.object(runtime, '_parse_components', return_value=components):
-            with patch.object(runtime.event_bus, 'register_component') as mock_register:
+        with patch.object(runtime, "_parse_components", return_value=components):
+            with patch.object(runtime.event_bus, "register_component") as mock_register:
                 await runtime.initialize_components({"test": "config"})
 
         # Verify all components were registered
@@ -374,7 +374,7 @@ class TestAsyncRuntimeComponentParsing:
     async def test_initialize_components_handles_parsing_errors(self, runtime):
         """Test that initialize_components handles component parsing errors."""
         # Mock parsing to raise an exception
-        with patch.object(runtime, '_parse_components', side_effect=RuntimeError("Parse error")):
+        with patch.object(runtime, "_parse_components", side_effect=RuntimeError("Parse error")):
             await runtime.initialize_components({"test": "config"})
 
         # Should handle gracefully and have no components

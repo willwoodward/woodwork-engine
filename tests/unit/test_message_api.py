@@ -7,8 +7,6 @@ tests (TDD) and implementation tests.
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.core.message_bus.integration import (
@@ -18,10 +16,10 @@ from woodwork.core.message_bus.integration import (
     ComponentError,
     StreamingChunk,
     MessageBuilder,
-    RequestContext
 )
 
 
+@pytest.mark.slow
 class TestMessageAPIDesign:
     """Test-driven development tests for the message API design."""
 
@@ -31,7 +29,8 @@ class TestMessageAPIDesign:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         yield {"bus": bus, "router": router}
 
@@ -76,17 +75,12 @@ class TestMessageAPIDesign:
         tool = MockTool("test_tool")
 
         # Configure router
-        components = {
-            "test_tool": {"object": tool, "component": "tool"}
-        }
+        components = {"test_tool": {"object": tool, "component": "tool"}}
         router.configure_from_components(components)
 
         # TDD: This test drives us to implement the API
         with pytest.raises(NotImplementedError):
-            result = await agent.request("test_tool", {
-                "action": "test_action",
-                "inputs": {"param": "value"}
-            })
+            await agent.request("test_tool", {"action": "test_action", "inputs": {"param": "value"}})
 
     @pytest.mark.asyncio
     async def test_message_builder_pattern_design(self, message_setup):
@@ -98,7 +92,6 @@ class TestMessageAPIDesign:
 
         This provides a more expressive, chainable API.
         """
-        setup = message_setup
 
         # Mock builder that drives TDD
         class MockMessageBuilder:
@@ -129,10 +122,13 @@ class TestMessageAPIDesign:
 
         # TDD: This test drives us to implement the builder pattern
         with pytest.raises(NotImplementedError):
-            result = await component.message().to("test_tool").with_data({
-                "action": "test_action",
-                "inputs": {"param": "value"}
-            }).timeout(3.0).send_and_wait()
+            await (
+                component.message()
+                .to("test_tool")
+                .with_data({"action": "test_action", "inputs": {"param": "value"}})
+                .timeout(3.0)
+                .send_and_wait()
+            )
 
     @pytest.mark.asyncio
     async def test_error_handling_api_design(self, message_setup):
@@ -144,7 +140,6 @@ class TestMessageAPIDesign:
         - ResponseTimeoutError: Response not received in time
         - ComponentError: Target component threw an exception
         """
-        setup = message_setup
 
         # TDD: This test drives us to implement proper error handling
         # These exceptions should be available in the API
@@ -167,7 +162,6 @@ class TestMessageAPIDesign:
             response = await ctx.send({"action": "test", "inputs": {...}})
             # Context automatically handles cleanup
         """
-        setup = message_setup
 
         class MockRequestContext:
             def __init__(self, agent, target, timeout):
@@ -196,7 +190,7 @@ class TestMessageAPIDesign:
         # TDD: This will drive us to implement the context manager
         with pytest.raises(NotImplementedError):
             async with component.request_context("test_tool", timeout=3.0) as ctx:
-                response = await ctx.send({"action": "test"})
+                await ctx.send({"action": "test"})
 
     @pytest.mark.asyncio
     async def test_concurrent_requests_api_design(self, message_setup):
@@ -210,7 +204,6 @@ class TestMessageAPIDesign:
             ("tool3", {"action": "task3"})
         ])
         """
-        setup = message_setup
 
         class MockConcurrentComponent:
             def __init__(self, name):
@@ -223,11 +216,9 @@ class TestMessageAPIDesign:
 
         # TDD: This drives us to implement concurrent request handling
         with pytest.raises(NotImplementedError):
-            results = await component.request_multiple([
-                ("tool1", {"action": "task1"}),
-                ("tool2", {"action": "task2"}),
-                ("tool3", {"action": "task3"})
-            ])
+            await component.request_multiple(
+                [("tool1", {"action": "task1"}), ("tool2", {"action": "task2"}), ("tool3", {"action": "task3"})]
+            )
 
     @pytest.mark.asyncio
     async def test_streaming_response_api_design(self, message_setup):
@@ -238,7 +229,6 @@ class TestMessageAPIDesign:
         async for chunk in component.request_stream("llm_tool", {"prompt": "Generate text..."}):
             print(chunk.data)
         """
-        setup = message_setup
 
         class MockStreamingComponent:
             def __init__(self, name):
@@ -265,6 +255,7 @@ class TestMessageAPIDesign:
         assert chunk.is_final is True
 
 
+@pytest.mark.slow
 class TestMessageAPIImplementation:
     """Test the actual implementation of the message API."""
 
@@ -273,12 +264,12 @@ class TestMessageAPIImplementation:
         """Setup with real message API implementation."""
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
         from woodwork.core.unified_event_bus import UnifiedEventBus
-        from woodwork.core.message_bus.integration import MessageBusIntegration
 
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         # Create test component with the real message API
         class TestComponent(MessageBusIntegration):
@@ -301,9 +292,7 @@ class TestMessageAPIImplementation:
         tool = MockTool("test_tool")
 
         # Configure router
-        components = {
-            "test_tool": {"object": tool, "component": "tool"}
-        }
+        components = {"test_tool": {"object": tool, "component": "tool"}}
         router.configure_from_components(components)
 
         yield {"component": component, "tool": tool, "router": router, "bus": bus}
@@ -317,10 +306,7 @@ class TestMessageAPIImplementation:
         component = setup["component"]
 
         # Use the message API - should work!
-        result = await component.request("test_tool", {
-            "action": "test_action",
-            "inputs": {"param": "value"}
-        })
+        result = await component.request("test_tool", {"action": "test_action", "inputs": {"param": "value"}})
 
         assert "Tool test_tool processed: test_action with {'param': 'value'}" in result
 
@@ -331,10 +317,12 @@ class TestMessageAPIImplementation:
         component = setup["component"]
 
         # Use the fluent API
-        result = await component.message().to("test_tool").with_data({
-            "action": "builder_test",
-            "inputs": {"fluent": "api"}
-        }).send_and_wait()
+        result = (
+            await component.message()
+            .to("test_tool")
+            .with_data({"action": "builder_test", "inputs": {"fluent": "api"}})
+            .send_and_wait()
+        )
 
         assert "Tool test_tool processed: builder_test with {'fluent': 'api'}" in result
 
@@ -346,10 +334,7 @@ class TestMessageAPIImplementation:
 
         # Use the context manager
         async with component.request_context("test_tool", timeout=3.0) as ctx:
-            result = await ctx.send({
-                "action": "context_test",
-                "inputs": {"context": "manager"}
-            })
+            result = await ctx.send({"action": "context_test", "inputs": {"context": "manager"}})
 
         assert "Tool test_tool processed: context_test with {'context': 'manager'}" in result
 
@@ -381,9 +366,7 @@ class TestMessageAPIImplementation:
         component = setup["component"]
 
         # Test with a single request first
-        results = await component.request_multiple([
-            ("test_tool", {"action": "single_task", "inputs": {"id": 1}})
-        ])
+        results = await component.request_multiple([("test_tool", {"action": "single_task", "inputs": {"id": 1}})])
 
         assert len(results) == 1
         assert "single_task" in results[0]
@@ -396,10 +379,9 @@ class TestMessageAPIImplementation:
 
         # Test streaming (for now, converts regular response to stream)
         chunks = []
-        async for chunk in component.request_stream("test_tool", {
-            "action": "stream_test",
-            "inputs": {"stream": "data"}
-        }):
+        async for chunk in component.request_stream(
+            "test_tool", {"action": "stream_test", "inputs": {"stream": "data"}}
+        ):
             chunks.append(chunk)
 
         assert len(chunks) == 1
@@ -407,6 +389,7 @@ class TestMessageAPIImplementation:
         assert "stream_test" in chunks[0].data
 
 
+@pytest.mark.slow
 class TestMessageAPIErrorHandling:
     """Test error handling in the message API."""
 
@@ -415,12 +398,12 @@ class TestMessageAPIErrorHandling:
         """Setup for error testing."""
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
         from woodwork.core.unified_event_bus import UnifiedEventBus
-        from woodwork.core.message_bus.integration import MessageBusIntegration
 
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         class TestComponent(MessageBusIntegration):
             def __init__(self, name, router):
@@ -475,9 +458,7 @@ class TestMessageAPIErrorHandling:
                 raise ValueError("Tool internal error")
 
         tool = ErrorTool("error_tool")
-        router.configure_from_components({
-            "error_tool": {"object": tool, "component": "tool"}
-        })
+        router.configure_from_components({"error_tool": {"object": tool, "component": "tool"}})
 
         # Request should handle the error gracefully (might timeout or get error response)
         # The exact behavior depends on how the router handles component errors
@@ -509,9 +490,12 @@ class TestMessageAPIErrorHandling:
 
         # Test with invalid components (should timeout/error)
         with pytest.raises((ResponseTimeoutError, ComponentError)):
-            await component.request_multiple([
-                ("invalid_tool", {"action": "task1"}),  # This should fail
-            ], timeout=0.5)
+            await component.request_multiple(
+                [
+                    ("invalid_tool", {"action": "task1"}),  # This should fail
+                ],
+                timeout=0.5,
+            )
 
     @pytest.mark.asyncio
     async def test_request_context_error_handling(self, error_test_setup):
@@ -542,6 +526,7 @@ class TestMessageAPIErrorHandling:
         assert "Error:" in chunks[0].data
 
 
+@pytest.mark.slow
 class TestMessageAPIEdgeCases:
     """Test edge cases and validation in the message API."""
 
@@ -550,12 +535,12 @@ class TestMessageAPIEdgeCases:
         """Setup for edge case testing."""
         from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
         from woodwork.core.unified_event_bus import UnifiedEventBus
-        from woodwork.core.message_bus.integration import MessageBusIntegration
 
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         class TestComponent(MessageBusIntegration):
             def __init__(self, name, router):
@@ -587,12 +572,7 @@ class TestMessageAPIEdgeCases:
         assert chunk.chunk_index == 0
         assert chunk.metadata == {}
 
-        chunk_with_metadata = StreamingChunk(
-            "test data",
-            is_final=True,
-            chunk_index=5,
-            metadata={"type": "text"}
-        )
+        chunk_with_metadata = StreamingChunk("test data", is_final=True, chunk_index=5, metadata={"type": "text"})
         assert chunk_with_metadata.is_final is True
         assert chunk_with_metadata.chunk_index == 5
         assert chunk_with_metadata.metadata["type"] == "text"

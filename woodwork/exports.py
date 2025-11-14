@@ -10,8 +10,8 @@ from woodwork.config_parser import main_function
 main_function()
 registry = get_registry()
 
-model: openai = registry.get('model')
-input: push_to_talk = registry.get('input')
-output: voice = registry.get('output')
+model: openai = registry.get("model")
+input: push_to_talk = registry.get("input")
+output: voice = registry.get("output")
 
-__all__ = ['model', 'input', 'output']
+__all__ = ["model", "input", "output"]

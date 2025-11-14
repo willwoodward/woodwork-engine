@@ -2,7 +2,6 @@
 
 import pytest
 import json
-from dataclasses import dataclass
 from typing import List
 from tests.unit.fixtures.event_fixtures import MockPayload
 
@@ -72,7 +71,7 @@ class TestSpecificPayloadTypes:
             "thought": "I need to analyze this problem",
             "component_id": "test_agent",
             "component_type": "agent",
-            "timestamp": 1000.0
+            "timestamp": 1000.0,
         }
 
         payload = MockPayload(thought_data)
@@ -86,7 +85,7 @@ class TestSpecificPayloadTypes:
             "action": "write_todos",
             "inputs": {"todos": ["task1", "task2"]},
             "component_id": "test_agent",
-            "component_type": "agent"
+            "component_type": "agent",
         }
 
         payload = MockPayload(action_data)
@@ -100,7 +99,7 @@ class TestSpecificPayloadTypes:
             "tool_name": "github_api",
             "arguments": {"repo": "test/repo", "issue": 123},
             "component_id": "github_api",
-            "component_type": "functions"
+            "component_type": "functions",
         }
 
         payload = MockPayload(tool_data)
@@ -113,7 +112,7 @@ class TestSpecificPayloadTypes:
             "result": "GitHub API call successful",
             "tool_name": "github_api",
             "execution_time": 0.5,
-            "component_id": "github_api"
+            "component_id": "github_api",
         }
 
         payload = MockPayload(observation_data)
@@ -127,7 +126,7 @@ class TestSpecificPayloadTypes:
             "inputs": {"source": "command_line"},
             "session_id": "session_123",
             "component_id": "input",
-            "component_type": "command_line"
+            "component_type": "command_line",
         }
 
         payload = MockPayload(input_data)
@@ -140,7 +139,7 @@ class TestSpecificPayloadTypes:
             "step_number": 1,
             "status": "completed",
             "result": "Step completed successfully",
-            "component_id": "test_agent"
+            "component_id": "test_agent",
         }
 
         payload = MockPayload(step_data)
@@ -153,6 +152,7 @@ class TestPayloadValidation:
 
     def test_required_fields_validation(self):
         """Test validation of required fields."""
+
         # Mock payload that requires certain fields
         class RequiredFieldsPayload(MockPayload):
             def validate(self) -> List[str]:
@@ -169,10 +169,7 @@ class TestPayloadValidation:
                 return errors
 
         # Valid payload
-        valid_payload = RequiredFieldsPayload({
-            "component_id": "test",
-            "component_type": "agent"
-        })
+        valid_payload = RequiredFieldsPayload({"component_id": "test", "component_type": "agent"})
         assert len(valid_payload.validate()) == 0
 
         # Invalid payload
@@ -183,6 +180,7 @@ class TestPayloadValidation:
 
     def test_type_validation(self):
         """Test type validation in payloads."""
+
         class TypeValidatedPayload(MockPayload):
             def validate(self) -> List[str]:
                 errors = []
@@ -201,22 +199,17 @@ class TestPayloadValidation:
                 return errors
 
         # Valid types
-        valid_payload = TypeValidatedPayload({
-            "timestamp": 1000.0,
-            "step_number": 1
-        })
+        valid_payload = TypeValidatedPayload({"timestamp": 1000.0, "step_number": 1})
         assert len(valid_payload.validate()) == 0
 
         # Invalid types
-        invalid_payload = TypeValidatedPayload({
-            "timestamp": "not_a_number",
-            "step_number": "not_an_int"
-        })
+        invalid_payload = TypeValidatedPayload({"timestamp": "not_a_number", "step_number": "not_an_int"})
         errors = invalid_payload.validate()
         assert len(errors) == 2
 
     def test_value_range_validation(self):
         """Test value range validation."""
+
         class RangeValidatedPayload(MockPayload):
             def validate(self) -> List[str]:
                 errors = []
@@ -236,17 +229,11 @@ class TestPayloadValidation:
                 return errors
 
         # Valid ranges
-        valid_payload = RangeValidatedPayload({
-            "step_number": 1,
-            "execution_time": 0.5
-        })
+        valid_payload = RangeValidatedPayload({"step_number": 1, "execution_time": 0.5})
         assert len(valid_payload.validate()) == 0
 
         # Invalid ranges
-        invalid_payload = RangeValidatedPayload({
-            "step_number": -1,
-            "execution_time": -0.5
-        })
+        invalid_payload = RangeValidatedPayload({"step_number": -1, "execution_time": -0.5})
         errors = invalid_payload.validate()
         assert len(errors) == 2
 
@@ -257,13 +244,10 @@ class TestPayloadSerialization:
     def test_complex_data_serialization(self):
         """Test serialization of complex data structures."""
         complex_data = {
-            "nested": {
-                "list": [1, 2, 3],
-                "dict": {"key": "value"}
-            },
+            "nested": {"list": [1, 2, 3], "dict": {"key": "value"}},
             "array": ["item1", "item2"],
             "boolean": True,
-            "null_value": None
+            "null_value": None,
         }
 
         payload = MockPayload(complex_data)
@@ -281,7 +265,7 @@ class TestPayloadSerialization:
             "component_id": "test_agent",
             "thought": "Complex thought with unicode: 🤖",
             "numbers": [1, 2.5, -3],
-            "metadata": {"version": 1.0}
+            "metadata": {"version": 1.0},
         }
 
         # Create payload
@@ -298,13 +282,14 @@ class TestPayloadSerialization:
 
     def test_serialization_error_handling(self):
         """Test handling of serialization errors."""
+
         # Create payload with non-serializable data
         class NonSerializable:
             pass
 
         problematic_data = {
             "normal_data": "string",
-            "object": NonSerializable()  # Can't be serialized
+            "object": NonSerializable(),  # Can't be serialized
         }
 
         payload = MockPayload(problematic_data)
@@ -339,10 +324,7 @@ class TestPayloadSerialization:
     def test_large_payload_serialization(self):
         """Test serialization of large payloads."""
         # Create large payload
-        large_data = {
-            f"key_{i}": f"value_{i}" * 100
-            for i in range(100)
-        }
+        large_data = {f"key_{i}": f"value_{i}" * 100 for i in range(100)}
 
         payload = MockPayload(large_data)
         json_str = payload.to_json()

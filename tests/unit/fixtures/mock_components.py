@@ -9,6 +9,7 @@ import asyncio
 @dataclass
 class MockComponent:
     """Mock component that mimics real component behavior."""
+
     name: str
     type: str = "test"
     component: str = "test"
@@ -27,6 +28,7 @@ class MockComponent:
 @dataclass
 class MockAgent(MockComponent):
     """Mock agent component with tool execution capabilities."""
+
     type: str = "agent"
     component: str = "llm"
 
@@ -38,6 +40,7 @@ class MockAgent(MockComponent):
 @dataclass
 class MockTool(MockComponent):
     """Mock tool component."""
+
     type: str = "tool"
     component: str = "functions"
 
@@ -49,6 +52,7 @@ class MockTool(MockComponent):
 @dataclass
 class MockOutput(MockComponent):
     """Mock output component."""
+
     type: str = "output"
     component: str = "console"
 
@@ -116,49 +120,34 @@ class MockStream:
 def create_test_components() -> Dict[str, MockComponent]:
     """Create a set of test components."""
     return {
-        'test_agent': MockAgent('test_agent'),
-        'test_tool': MockTool('test_tool'),
-        'test_output': MockOutput('test_output'),
-        'planning_tools': MockTool('planning_tools', component='planning_tools'),
-        'github_api': MockTool('github_api', component='functions'),
+        "test_agent": MockAgent("test_agent"),
+        "test_tool": MockTool("test_tool"),
+        "test_output": MockOutput("test_output"),
+        "planning_tools": MockTool("planning_tools", component="planning_tools"),
+        "github_api": MockTool("github_api", component="functions"),
     }
 
 
 def create_test_component_configs() -> Dict[str, Dict[str, Any]]:
     """Create a set of test component configurations for router testing."""
     return {
-        'test_agent': {
-            'variable': 'test_agent',
-            'component': 'agent',
-            'type': 'llm',
-            'config': {},
-            'to': ['test_tool']
+        "test_agent": {
+            "variable": "test_agent",
+            "component": "agent",
+            "type": "llm",
+            "config": {},
+            "to": ["test_tool"],
         },
-        'test_tool': {
-            'variable': 'test_tool',
-            'component': 'tool',
-            'type': 'functions',
-            'config': {},
-            'to': ['test_output']
+        "test_tool": {
+            "variable": "test_tool",
+            "component": "tool",
+            "type": "functions",
+            "config": {},
+            "to": ["test_output"],
         },
-        'test_output': {
-            'variable': 'test_output',
-            'component': 'output',
-            'type': 'console',
-            'config': {}
-        },
-        'planning_tools': {
-            'variable': 'planning_tools',
-            'component': 'tool',
-            'type': 'planning_tools',
-            'config': {}
-        },
-        'github_api': {
-            'variable': 'github_api',
-            'component': 'tool',
-            'type': 'functions',
-            'config': {}
-        },
+        "test_output": {"variable": "test_output", "component": "output", "type": "console", "config": {}},
+        "planning_tools": {"variable": "planning_tools", "component": "tool", "type": "planning_tools", "config": {}},
+        "github_api": {"variable": "github_api", "component": "tool", "type": "functions", "config": {}},
     }
 
 
@@ -168,13 +157,12 @@ def create_workflow_inference_configs() -> Dict[str, Dict[str, Any]]:
         "input": {"component": "command_line", "type": "cli"},
         "agent": {"component": "llms", "type": "openai"},
         "output": {"component": "console", "type": "cli"},
-        "tool": {"component": "functions", "type": "api"}
+        "tool": {"component": "functions", "type": "api"},
     }
 
 
 def create_mock_router(message_bus=None, time_source=None):
     """Create a mock router with configurable dependencies."""
-    from unittest.mock import Mock
 
     router = Mock()
     router.message_bus = message_bus or MockMessageBus()

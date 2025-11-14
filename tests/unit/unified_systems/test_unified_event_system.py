@@ -9,15 +9,16 @@ import asyncio
 import pytest
 import time
 from unittest.mock import AsyncMock, Mock, patch
-from typing import Dict, Any, List
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from woodwork.types import InputReceivedPayload, AgentThoughtPayload, ToolCallPayload
 
 
+@pytest.mark.slow
 class TestUnifiedEventBus:
     """Test the UnifiedEventBus that replaces EventManager + DeclarativeRouter + MessageBus"""
 
@@ -25,6 +26,7 @@ class TestUnifiedEventBus:
     def event_bus(self):
         """Create a UnifiedEventBus instance for testing"""
         from woodwork.core.unified_event_bus import UnifiedEventBus
+
         return UnifiedEventBus()
 
     @pytest.fixture
@@ -38,9 +40,9 @@ class TestUnifiedEventBus:
     async def test_event_bus_creation(self, event_bus):
         """Test that UnifiedEventBus can be created"""
         assert event_bus is not None
-        assert hasattr(event_bus, 'emit')
-        assert hasattr(event_bus, 'register_component')
-        assert hasattr(event_bus, 'register_hook')
+        assert hasattr(event_bus, "emit")
+        assert hasattr(event_bus, "register_component")
+        assert hasattr(event_bus, "register_hook")
 
     async def test_component_registration(self, event_bus, mock_component):
         """Test that components can be registered with the event bus"""
@@ -102,7 +104,7 @@ class TestUnifiedEventBus:
             inputs={},
             session_id="test_session",
             component_id="test_component",
-            component_type="inputs"
+            component_type="inputs",
         )
         await event_bus.emit("input.received", payload)
 
@@ -172,7 +174,7 @@ class TestUnifiedEventBus:
 
         # Mock WebSocket handler
         async def websocket_handler(payload):
-            websocket_events.append((time.time(), payload.event_type if hasattr(payload, 'event_type') else 'unknown'))
+            websocket_events.append((time.time(), payload.event_type if hasattr(payload, "event_type") else "unknown"))
 
         # Register WebSocket as hook subscriber
         event_bus.register_hook("input.received", websocket_handler)
@@ -182,21 +184,25 @@ class TestUnifiedEventBus:
         # Emit sequence of events
         start_time = time.time()
 
-        await event_bus.emit("input.received", InputReceivedPayload(
-            input="test", inputs={}, session_id="test", component_id="input", component_type="inputs"
-        ))
+        await event_bus.emit(
+            "input.received",
+            InputReceivedPayload(
+                input="test", inputs={}, session_id="test", component_id="input", component_type="inputs"
+            ),
+        )
 
         await asyncio.sleep(0.001)  # Minimal delay
 
-        await event_bus.emit("agent.thought", AgentThoughtPayload(
-            thought="thinking", component_id="agent", component_type="agents"
-        ))
+        await event_bus.emit(
+            "agent.thought", AgentThoughtPayload(thought="thinking", component_id="agent", component_type="agents")
+        )
 
         await asyncio.sleep(0.001)  # Minimal delay
 
-        await event_bus.emit("tool.call", ToolCallPayload(
-            tool_name="test_tool", arguments={}, component_id="agent", component_type="agents"
-        ))
+        await event_bus.emit(
+            "tool.call",
+            ToolCallPayload(tool_name="test_tool", arguments={}, component_id="agent", component_type="agents"),
+        )
 
         # Verify all events received in real-time
         assert len(websocket_events) == 3
@@ -207,6 +213,7 @@ class TestUnifiedEventBus:
             assert delay_from_start < 0.1, f"Event {i} ({event_type}) delay: {delay_from_start:.4f}s"
 
 
+@pytest.mark.slow
 class TestAsyncRuntime:
     """Test the AsyncRuntime that replaces distributed startup threading"""
 
@@ -214,38 +221,28 @@ class TestAsyncRuntime:
     def runtime(self):
         """Create an AsyncRuntime instance for testing"""
         from woodwork.core.async_runtime import AsyncRuntime
+
         return AsyncRuntime()
 
     @pytest.fixture
     def sample_config(self):
         """Sample component configuration"""
         return {
-            "input_comp": {
-                "component": "api",
-                "type": "inputs",
-                "to": "agent_comp"
-            },
-            "agent_comp": {
-                "component": "openai",
-                "type": "llms",
-                "to": "output_comp"
-            },
-            "output_comp": {
-                "component": "console",
-                "type": "outputs"
-            }
+            "input_comp": {"component": "api", "type": "inputs", "to": "agent_comp"},
+            "agent_comp": {"component": "openai", "type": "llms", "to": "output_comp"},
+            "output_comp": {"component": "console", "type": "outputs"},
         }
 
     async def test_runtime_creation(self, runtime):
         """Test that AsyncRuntime can be created"""
         assert runtime is not None
-        assert hasattr(runtime, 'start')
-        assert hasattr(runtime, 'event_bus')
+        assert hasattr(runtime, "start")
+        assert hasattr(runtime, "event_bus")
 
     async def test_component_parsing_and_registration(self, runtime, sample_config):
         """Test that components are parsed and registered correctly"""
         # Start runtime with config
-        with patch('woodwork.core.async_runtime.parse_components') as mock_parse:
+        with patch("woodwork.core.async_runtime.parse_components") as mock_parse:
             mock_components = [Mock(name="input_comp"), Mock(name="agent_comp")]
             mock_parse.return_value = mock_components
 
@@ -303,11 +300,12 @@ class TestAsyncRuntime:
     async def test_no_cross_thread_communication(self, runtime):
         """Test that no cross-thread queues or processors are used"""
         # Verify runtime doesn't use threading constructs
-        assert not hasattr(runtime, '_cross_thread_queue')
-        assert not hasattr(runtime, '_message_bus_thread')
-        assert not hasattr(runtime.event_bus, '_cross_thread_event_queue')
+        assert not hasattr(runtime, "_cross_thread_queue")
+        assert not hasattr(runtime, "_message_bus_thread")
+        assert not hasattr(runtime.event_bus, "_cross_thread_event_queue")
 
 
+@pytest.mark.slow
 class TestUnifiedAPIInput:
     """Test the unified API input component without cross-thread processing"""
 
@@ -315,6 +313,7 @@ class TestUnifiedAPIInput:
     def api_input_component(self):
         """Create API input component for testing"""
         from woodwork.components.inputs.api_input import api_input
+
         return api_input()
 
     async def test_direct_websocket_event_subscription(self, api_input_component):
@@ -342,8 +341,8 @@ class TestUnifiedAPIInput:
     async def test_input_processing_without_queues(self, api_input_component):
         """Test that input processing is direct without cross-thread queues"""
         # Verify no queue attributes
-        assert not hasattr(api_input_component, '_cross_thread_event_queue')
-        assert not hasattr(api_input_component, '_priority_event_queue')
+        assert not hasattr(api_input_component, "_cross_thread_event_queue")
+        assert not hasattr(api_input_component, "_priority_event_queue")
 
         # Process input directly
         result = await api_input_component.handle_input("test input")
@@ -373,7 +372,7 @@ class TestUnifiedAPIInput:
         await asyncio.sleep(0.01)  # Small buffer for async processing
 
         # Verify input.received was delivered in real-time
-        input_events = [event for event in websocket_events if 'input.received' in str(event[1])]
+        input_events = [event for event in websocket_events if "input.received" in str(event[1])]
         assert len(input_events) > 0
 
         first_event_time = input_events[0][0]
@@ -381,6 +380,7 @@ class TestUnifiedAPIInput:
         assert delivery_delay < 0.05, f"Input event delivery took {delivery_delay:.4f}s"
 
 
+@pytest.mark.slow
 class TestIntegrationScenarios:
     """Integration tests for complete event flow scenarios"""
 
@@ -438,10 +438,17 @@ class TestIntegrationScenarios:
 
         # Mock WebSocket receiving all events
         async def websocket_handler(payload):
-            websocket_events.append((time.time(), getattr(payload, 'event_type', 'unknown')))
+            websocket_events.append((time.time(), getattr(payload, "event_type", "unknown")))
 
         # Subscribe to all relevant events
-        event_types = ["input.received", "agent.thought", "agent.action", "tool.call", "tool.observation", "agent.response"]
+        event_types = [
+            "input.received",
+            "agent.thought",
+            "agent.action",
+            "tool.call",
+            "tool.observation",
+            "agent.response",
+        ]
         for event_type in event_types:
             runtime.event_bus.register_hook(event_type, websocket_handler)
 
@@ -449,20 +456,24 @@ class TestIntegrationScenarios:
         start_time = time.time()
 
         # 1. Input received (should be immediate)
-        await runtime.event_bus.emit("input.received", InputReceivedPayload(
-            input="test message", inputs={}, session_id="test", component_id="input", component_type="inputs"
-        ))
+        await runtime.event_bus.emit(
+            "input.received",
+            InputReceivedPayload(
+                input="test message", inputs={}, session_id="test", component_id="input", component_type="inputs"
+            ),
+        )
 
         # 2. Simulate agent processing (with delays like OpenAI API calls)
         await asyncio.sleep(0.1)  # Simulate API delay
 
-        await runtime.event_bus.emit("agent.thought", AgentThoughtPayload(
-            thought="processing", component_id="agent", component_type="agents"
-        ))
+        await runtime.event_bus.emit(
+            "agent.thought", AgentThoughtPayload(thought="processing", component_id="agent", component_type="agents")
+        )
 
-        await runtime.event_bus.emit("tool.call", ToolCallPayload(
-            tool_name="search", arguments={}, component_id="agent", component_type="agents"
-        ))
+        await runtime.event_bus.emit(
+            "tool.call",
+            ToolCallPayload(tool_name="search", arguments={}, component_id="agent", component_type="agents"),
+        )
 
         # Verify input.received arrived first and immediately
         assert len(websocket_events) >= 3
@@ -475,4 +486,4 @@ class TestIntegrationScenarios:
         # Verify events are in correct order
         event_types_received = [event[1] for event in websocket_events]
         # input.received should be first
-        assert 'input.received' in str(event_types_received[0])
+        assert "input.received" in str(event_types_received[0])

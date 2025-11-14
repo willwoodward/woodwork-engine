@@ -12,12 +12,14 @@ import asyncio
 import json
 import time
 import threading
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock
 from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
 from woodwork.core.message_bus.interface import MessageEnvelope, create_component_message
 from woodwork.core.message_bus.integration import MessageBusIntegration
+from woodwork.events import emit
 
 
+@pytest.mark.slow
 class TestAPIInputComponentDesign:
     """TDD tests that drive the API input component design."""
 
@@ -42,8 +44,8 @@ class TestAPIInputComponentDesign:
         api_component = api_input(name="test_api", to=["test_agent"], local=False)
 
         # Should have unified event bus integration
-        assert hasattr(api_component, 'event_bus')
-        assert hasattr(api_component, '_handle_real_time_event')
+        assert hasattr(api_component, "event_bus")
+        assert hasattr(api_component, "_handle_real_time_event")
 
         # Should have configured output targets
         assert api_component._output == ["test_agent"]
@@ -83,8 +85,17 @@ class TestAPIInputComponentDesign:
         assert True  # Placeholder until we implement api_input
 
 
+@pytest.mark.slow
 class TestAPIInputWebSocketIntegration:
     """TDD tests for websocket integration with messaging system."""
+
+    @pytest.fixture
+    async def message_bus_setup(self):
+        """Setup mock message bus for testing."""
+        from woodwork.core.unified_event_bus import UnifiedEventBus
+
+        bus = UnifiedEventBus()
+        return bus
 
     @pytest.fixture
     async def mock_websocket_setup(self):
@@ -136,11 +147,7 @@ class TestAPIInputWebSocketIntegration:
         api_input = setup["api_input_class"](to=["test_agent"])
 
         # Mock incoming websocket message
-        user_message = {
-            "type": "user_input",
-            "content": "Hello, world!",
-            "session_id": "test_session_123"
-        }
+        user_message = {"type": "user_input", "content": "Hello, world!", "session_id": "test_session_123"}
 
         # TDD: This should route message to configured components
         with pytest.raises(NotImplementedError):
@@ -167,23 +174,23 @@ class TestAPIInputWebSocketIntegration:
         Internal system events should be filtered out.
         """
         setup = component_setup
-        api_input = setup["api_input_class"](to=["test_agent"])
+        setup["api_input_class"](to=["test_agent"])
 
         # Mock events
-        relevant_event = MessageEnvelope(
+        MessageEnvelope(
             message_id="msg_123",
             session_id="test_session",
             event_type="agent.response",
             payload={"response": "Hello!"},
-            sender_component="test_agent"
+            sender_component="test_agent",
         )
 
-        irrelevant_event = MessageEnvelope(
+        MessageEnvelope(
             message_id="msg_456",
             session_id="test_session",
             event_type="system.internal",
             payload={"debug": "internal"},
-            sender_component="system"
+            sender_component="system",
         )
 
         # TDD: Should filter events based on relevance
@@ -195,16 +202,15 @@ class TestAPIInputWebSocketIntegration:
         TDD: Different websocket connections should have isolated sessions.
         """
         setup = component_setup
-        websocket1 = mock_websocket_setup
-        websocket2 = mock_websocket_setup
 
-        api_input = setup["api_input_class"]()
+        setup["api_input_class"]()
 
         # TDD: Each connection should have its own session
         # Messages from session A should not go to session B websockets
         assert True  # Placeholder for session isolation logic
 
 
+@pytest.mark.slow
 class TestAPIInputMessageBusIntegration:
     """TDD tests for message bus integration."""
 
@@ -233,7 +239,7 @@ class TestAPIInputMessageBusIntegration:
                         event_type="agent.response",
                         payload={"response": f"Processed: {envelope.payload.get('input', '')}"},
                         target_component="api_input",
-                        sender_component=self.name
+                        sender_component=self.name,
                     )
 
                     # Send response back via message bus
@@ -260,13 +266,9 @@ class TestAPIInputMessageBusIntegration:
         input_envelope = create_component_message(
             session_id="test_session",
             event_type="input.received",
-            payload={
-                "input": "Hello from API",
-                "source": "websocket",
-                "_message_bus": bus
-            },
+            payload={"input": "Hello from API", "source": "websocket", "_message_bus": bus},
             target_component="test_agent",
-            sender_component="api_input"
+            sender_component="api_input",
         )
 
         # Send via message bus
@@ -305,7 +307,7 @@ class TestAPIInputMessageBusIntegration:
             event_type="agent.response",
             payload={"response": "Agent processed the input"},
             target_component="api_input",
-            sender_component="test_agent"
+            sender_component="test_agent",
         )
 
         success = await bus.send_to_component(response_envelope)
@@ -320,6 +322,7 @@ class TestAPIInputMessageBusIntegration:
         assert response.payload["response"] == "Agent processed the input"
 
 
+@pytest.mark.slow
 class TestAPIInputPerformance:
     """TDD tests for performance and efficiency."""
 
@@ -353,6 +356,7 @@ class TestAPIInputPerformance:
         assert True  # Placeholder for subscription efficiency testing
 
 
+@pytest.mark.slow
 class TestRealTimeEventStreaming:
     """TDD tests for real-time event streaming from LLM to WebSocket."""
 
@@ -360,7 +364,7 @@ class TestRealTimeEventStreaming:
     async def real_time_setup(self):
         """Setup for real-time streaming tests."""
         from woodwork.components.inputs.api_input import api_input, WebSocketSession
-        from woodwork.events import get_global_event_manager, emit
+        from woodwork.events import get_global_event_manager
 
         # Create API input component
         api_component = api_input(name="input", to=["coding_ag"], local=False)
@@ -368,10 +372,7 @@ class TestRealTimeEventStreaming:
         # Mock WebSocket session
         mock_websocket = AsyncMock()
         session = WebSocketSession(
-            websocket=mock_websocket,
-            session_id="test_session",
-            subscribed_components=["*"],
-            created_at=time.time()
+            websocket=mock_websocket, session_id="test_session", subscribed_components=["*"], created_at=time.time()
         )
         api_component._websocket_sessions["test_session"] = session
 
@@ -383,7 +384,7 @@ class TestRealTimeEventStreaming:
             "mock_websocket": mock_websocket,
             "session": session,
             "processor_task": processor_task,
-            "event_manager": get_global_event_manager()
+            "event_manager": get_global_event_manager(),
         }
 
         # Cleanup
@@ -406,6 +407,7 @@ class TestRealTimeEventStreaming:
 
         # Emit event in same thread
         from woodwork.events import emit
+
         emit("agent.thought", {"thought": "Immediate thought", "component_id": "coding_ag"})
 
         # Should be forwarded immediately (no delay)
@@ -425,7 +427,7 @@ class TestRealTimeEventStreaming:
         """
         setup = real_time_setup
         mock_websocket = setup["mock_websocket"]
-        api_component = setup["api_component"]
+        setup["api_component"]
 
         # Track timing of WebSocket sends
         send_times = []
@@ -447,11 +449,10 @@ class TestRealTimeEventStreaming:
                 emit_time = time.time()
                 emit_times.append(emit_time)
 
-                emit(event_type, {
-                    "data": f"Event {i} from {thread_name}",
-                    "component_id": "coding_ag",
-                    "emit_time": emit_time
-                })
+                emit(
+                    event_type,
+                    {"data": f"Event {i} from {thread_name}", "component_id": "coding_ag", "emit_time": emit_time},
+                )
 
                 # Small delay between emits
                 time.sleep(0.05)
@@ -471,7 +472,7 @@ class TestRealTimeEventStreaming:
         print(f"Send times: {send_times}")
 
         if len(send_times) > 1:
-            delays = [send_times[i] - send_times[i-1] for i in range(1, len(send_times))]
+            delays = [send_times[i] - send_times[i - 1] for i in range(1, len(send_times))]
             print(f"Delays between sends: {delays}")
 
         # Should have received multiple events
@@ -492,9 +493,13 @@ class TestRealTimeEventStreaming:
         original_handle_event = setup["api_component"]._handle_event
 
         def timed_handle_event(payload):
-            event_timeline.append(("handle_event_start", time.time(), getattr(payload, '__class__', type(payload)).__name__))
+            event_timeline.append(
+                ("handle_event_start", time.time(), getattr(payload, "__class__", type(payload)).__name__)
+            )
             result = original_handle_event(payload)
-            event_timeline.append(("handle_event_end", time.time(), getattr(payload, '__class__', type(payload)).__name__))
+            event_timeline.append(
+                ("handle_event_end", time.time(), getattr(payload, "__class__", type(payload)).__name__)
+            )
             return result
 
         setup["api_component"]._handle_event = timed_handle_event
@@ -508,16 +513,12 @@ class TestRealTimeEventStreaming:
 
         # Emit events from different thread
         def emit_test_events():
-            start_time = time.time()
+            time.time()
             for i, event_type in enumerate(["agent.thought", "agent.action", "tool.call"]):
                 emit_time = time.time()
                 event_timeline.append(("emit", emit_time, event_type))
 
-                emit(event_type, {
-                    "test_data": f"Event {i}",
-                    "component_id": "coding_ag",
-                    "emit_sequence": i
-                })
+                emit(event_type, {"test_data": f"Event {i}", "component_id": "coding_ag", "emit_sequence": i})
 
         thread = threading.Thread(target=emit_test_events, name="RealTimeTestThread")
         thread.start()
@@ -548,11 +549,11 @@ class TestRealTimeEventStreaming:
 
         # Test immediate forwarding method (to be implemented)
         event_data = {
-            'event_type': 'agent.thought',
-            'payload': {'thought': 'Real-time thought'},
-            'sender_component': 'coding_ag',
-            'session_id': 'test_session',
-            'created_at': time.time()
+            "event_type": "agent.thought",
+            "payload": {"thought": "Real-time thought"},
+            "sender_component": "coding_ag",
+            "session_id": "test_session",
+            "created_at": time.time(),
         }
 
         # Should forward immediately without queueing
@@ -582,11 +583,11 @@ class TestRealTimeEventStreaming:
         async def immediate_delivery_handler(payload):
             # Skip cross-thread queueing for real-time events
             event_data = {
-                'event_type': 'agent.thought',
-                'payload': payload.to_dict() if hasattr(payload, 'to_dict') else {'data': payload},
-                'sender_component': getattr(payload, 'component_id', 'coding_ag'),
-                'session_id': getattr(payload, 'session_id', 'test_session'),
-                'created_at': time.time()
+                "event_type": "agent.thought",
+                "payload": payload.to_dict() if hasattr(payload, "to_dict") else {"data": payload},
+                "sender_component": getattr(payload, "component_id", "coding_ag"),
+                "session_id": getattr(payload, "session_id", "test_session"),
+                "created_at": time.time(),
             }
 
             # Use threading to send from uvicorn-like thread context
@@ -604,11 +605,9 @@ class TestRealTimeEventStreaming:
 
         # Test the immediate delivery
         from woodwork.types.events import AgentThoughtPayload
+
         payload = AgentThoughtPayload(
-            timestamp=time.time(),
-            component_id="coding_ag",
-            component_type=None,
-            thought="Immediate real-time thought"
+            timestamp=time.time(), component_id="coding_ag", component_type=None, thought="Immediate real-time thought"
         )
 
         await immediate_delivery_handler(payload)
@@ -649,18 +648,17 @@ class TestRealTimeEventStreaming:
         mock_websocket.send_json = timed_send_json
 
         # Test 1: Simulate input.received from MainThread (should be immediate)
-        print(f"\n1️⃣ Testing input.received from MainThread...")
+        print("\n1️⃣ Testing input.received from MainThread...")
         mock_websocket.send_json.reset_mock()
         delivery_times.clear()
 
         from woodwork.events import emit
+
         emit_time = time.time()
-        emit("input.received", {
-            "input": "test message",
-            "inputs": {},
-            "session_id": "test_session",
-            "component_id": "input"
-        })
+        emit(
+            "input.received",
+            {"input": "test message", "inputs": {}, "session_id": "test_session", "component_id": "input"},
+        )
 
         await asyncio.sleep(0.01)  # Minimal delay
 
@@ -668,13 +666,13 @@ class TestRealTimeEventStreaming:
             delay = delivery_times[0] - emit_time
             print(f"   ⏱️ Delivery delay: {delay:.6f} seconds")
             assert delay < 0.01, f"input.received should be delivered immediately, got {delay:.6f}s delay"
-            print(f"   ✅ input.received delivered immediately")
+            print("   ✅ input.received delivered immediately")
         else:
-            print(f"   ❌ input.received not delivered at all")
+            print("   ❌ input.received not delivered at all")
             assert False, "input.received was not delivered"
 
         # Test 2: Simulate input.received from different thread (real scenario)
-        print(f"\n2️⃣ Testing input.received from different thread...")
+        print("\n2️⃣ Testing input.received from different thread...")
         mock_websocket.send_json.reset_mock()
         delivery_times.clear()
 
@@ -682,12 +680,15 @@ class TestRealTimeEventStreaming:
             emit_time = time.time()
             print(f"   📡 Emitting from thread: {threading.current_thread().name}")
 
-            emit("input.received", {
-                "input": "cross-thread test message",
-                "inputs": {},
-                "session_id": "test_session",
-                "component_id": "input"
-            })
+            emit(
+                "input.received",
+                {
+                    "input": "cross-thread test message",
+                    "inputs": {},
+                    "session_id": "test_session",
+                    "component_id": "input",
+                },
+            )
 
             return emit_time
 
@@ -699,21 +700,21 @@ class TestRealTimeEventStreaming:
         await asyncio.sleep(0.01)  # Minimal delay for immediate delivery
 
         if delivery_times:
-            print(f"   ✅ input.received delivered from cross-thread")
+            print("   ✅ input.received delivered from cross-thread")
         else:
-            print(f"   ❌ input.received not delivered immediately from cross-thread")
+            print("   ❌ input.received not delivered immediately from cross-thread")
 
             # Wait longer to see if it comes through queue
             await asyncio.sleep(0.5)
 
             if delivery_times:
-                print(f"   ⚠️ input.received delivered via queue (delayed)")
+                print("   ⚠️ input.received delivered via queue (delayed)")
             else:
-                print(f"   ❌ input.received never delivered")
+                print("   ❌ input.received never delivered")
                 assert False, "input.received was not delivered from cross-thread"
 
         # Test 3: Compare timing with other events
-        print(f"\n3️⃣ Testing timing comparison with other events...")
+        print("\n3️⃣ Testing timing comparison with other events...")
         mock_websocket.send_json.reset_mock()
         delivery_times.clear()
 
@@ -721,12 +722,10 @@ class TestRealTimeEventStreaming:
             base_time = time.time()
 
             # Emit input.received first
-            emit("input.received", {
-                "input": "timing test",
-                "inputs": {},
-                "session_id": "test_session",
-                "component_id": "input"
-            })
+            emit(
+                "input.received",
+                {"input": "timing test", "inputs": {}, "session_id": "test_session", "component_id": "input"},
+            )
 
             # Small delay to simulate processing
             time.sleep(0.1)
@@ -758,7 +757,7 @@ class TestRealTimeEventStreaming:
             print(f"   📏 Time gap: {time_gap:.6f} seconds")
 
             if time_gap > 0.05:  # 50ms gap
-                print(f"   ✅ input.received delivered well before other events")
+                print("   ✅ input.received delivered well before other events")
             else:
                 print(f"   ❌ input.received not delivered early enough (gap: {time_gap:.6f}s)")
                 assert False, f"input.received should be delivered much earlier, gap was only {time_gap:.6f}s"
@@ -770,7 +769,7 @@ class TestRealTimeEventStreaming:
         """
         setup = real_time_setup
         api_component = setup["api_component"]
-        mock_websocket = setup["mock_websocket"]
+        setup["mock_websocket"]
 
         print("\n🔍 Reproducing threading issue")
 
@@ -780,11 +779,13 @@ class TestRealTimeEventStreaming:
 
         def tracked_handle_event(payload):
             thread_name = threading.current_thread().name
-            thread_info.append({
-                'event': getattr(payload, '__class__', type(payload)).__name__,
-                'thread': thread_name,
-                'time': time.time()
-            })
+            thread_info.append(
+                {
+                    "event": getattr(payload, "__class__", type(payload)).__name__,
+                    "thread": thread_name,
+                    "time": time.time(),
+                }
+            )
             print(f"   🧵 Event {getattr(payload, '__class__', type(payload)).__name__} from thread {thread_name}")
             return original_handle_event(payload)
 
@@ -796,12 +797,10 @@ class TestRealTimeEventStreaming:
             from woodwork.events import emit
 
             # input.received comes from distributed startup thread
-            emit("input.received", {
-                "input": "real usage simulation",
-                "inputs": {},
-                "session_id": "real_session",
-                "component_id": "input"
-            })
+            emit(
+                "input.received",
+                {"input": "real usage simulation", "inputs": {}, "session_id": "real_session", "component_id": "input"},
+            )
 
             # Simulate OpenAI delay
             time.sleep(0.1)
@@ -816,13 +815,13 @@ class TestRealTimeEventStreaming:
 
         await asyncio.sleep(1.0)  # Wait for all processing
 
-        print(f"\n📊 Thread analysis:")
+        print("\n📊 Thread analysis:")
         for info in thread_info:
             print(f"   {info['event']:20} | {info['thread']:20} | {info['time']:.6f}")
 
         # Verify events came from expected threads
-        input_events = [info for info in thread_info if 'Input' in info['event']]
-        other_events = [info for info in thread_info if 'Input' not in info['event']]
+        input_events = [info for info in thread_info if "Input" in info["event"]]
+        other_events = [info for info in thread_info if "Input" not in info["event"]]
 
         assert len(input_events) > 0, "No input events received"
         assert len(other_events) > 0, "No other events received"
