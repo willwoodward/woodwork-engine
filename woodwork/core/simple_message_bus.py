@@ -8,7 +8,7 @@ before the full distributed message bus is implemented.
 
 import asyncio
 import logging
-from typing import Dict, List, Callable, Any, Optional
+from typing import Dict, List, Callable, Any, Optional, cast
 from collections import defaultdict
 import time
 import uuid
@@ -350,7 +350,7 @@ async def get_global_message_bus() -> SimpleMessageBus:
     if _global_message_bus is None:
         _global_message_bus = SimpleMessageBus()
         await _global_message_bus.start()
-    return _global_message_bus
+    return cast(SimpleMessageBus, _global_message_bus)
 
 
 def set_global_message_bus(message_bus: SimpleMessageBus):

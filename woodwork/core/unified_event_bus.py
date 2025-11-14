@@ -8,7 +8,7 @@ async event system that eliminates threading issues and provides real-time deliv
 import asyncio
 import logging
 import time
-from typing import Dict, List, Any, Callable, Optional, TYPE_CHECKING
+from typing import Dict, List, Any, Callable, Optional, TYPE_CHECKING, cast
 from collections import defaultdict
 
 from woodwork.types.events import BasePayload, PayloadRegistry
@@ -362,13 +362,17 @@ class UnifiedEventBus:
                 log.debug("[UnifiedEventBus] Component '%s' not in registry, trying message bus delivery", target_name)
                 try:
                     from woodwork.core.message_bus.interface import MessageEnvelope
+                    from dataclasses import asdict
                     import uuid
+
+                    # Convert payload to dict if it's a dataclass
+                    payload_dict = asdict(payload) if hasattr(payload, "__dataclass_fields__") else payload
 
                     envelope = MessageEnvelope(
                         message_id=f"msg-{uuid.uuid4().hex[:12]}",
                         session_id=getattr(payload, "session_id", "default"),
                         event_type=event_type,
-                        payload=payload,
+                        payload=payload_dict,
                         sender_component=source_component,
                         target_component=target_name,
                     )
@@ -417,7 +421,8 @@ class UnifiedEventBus:
             elif event_type == "agent.response":
                 # For agent.response events, extract response from data
                 if hasattr(payload, "data") and isinstance(payload.data, dict):
-                    input_data = payload.data.get("response", str(payload))
+                    data_dict = cast(Dict[str, Any], payload.data)
+                    input_data = data_dict.get("response", str(payload))
                 else:
                     input_data = str(payload)
                 inputs_dict = {}
@@ -764,7 +769,7 @@ def get_global_event_bus() -> UnifiedEventBus:
     if _global_event_bus is None:
         _global_event_bus = UnifiedEventBus()
 
-    return _global_event_bus
+    return cast(UnifiedEventBus, _global_event_bus)
 
 
 def set_global_event_bus(event_bus: UnifiedEventBus) -> None:

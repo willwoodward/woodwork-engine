@@ -26,7 +26,7 @@ class StreamingChunk:
     data: Any
     is_final: bool = False
     chunk_index: int = 0
-    metadata: Dict[str, Any] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -331,7 +331,7 @@ class MessageBusIntegration:
                             self._received_responses[request_id] = {
                                 "result": result,
                                 "source_component": source_component,
-                                "received_at": __import__("time").time(),
+                                "received_at": time.time(),
                             }
 
                             log.debug(

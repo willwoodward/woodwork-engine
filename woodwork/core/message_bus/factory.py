@@ -7,7 +7,7 @@ environment and optional advanced configuration for power users.
 
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 
 from .interface import MessageBusInterface
 from .in_memory_bus import InMemoryMessageBus
@@ -188,7 +188,7 @@ async def get_global_message_bus() -> MessageBusInterface:
 
         log.info("[MessageBusFactory] Global message bus started: %s", type(_global_message_bus).__name__)
 
-    return _global_message_bus
+    return cast(MessageBusInterface, _global_message_bus)
 
 
 def set_global_message_bus(message_bus: MessageBusInterface) -> None:
@@ -222,7 +222,8 @@ async def shutdown_global_message_bus() -> None:
 
     if _global_message_bus is not None:
         log.info("[MessageBusFactory] Shutting down global message bus")
-        await _global_message_bus.stop()
+        # Type checker doesn't recognize the None check above, but we've verified it's not None
+        await _global_message_bus.stop()  # type: ignore[union-attr]
         _global_message_bus = None
     else:
         log.debug("[MessageBusFactory] No global message bus to shutdown")

@@ -269,7 +269,8 @@ class component(StreamingMixin, MessageBusIntegration):
                 return None
 
             module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            # Type checker doesn't recognize the None check above, but we've verified it's not None
+            spec.loader.exec_module(module)  # type: ignore[union-attr]
 
             # Get the function
             if hasattr(module, function_name):
@@ -282,7 +283,7 @@ class component(StreamingMixin, MessageBusIntegration):
             log.error(f"Error loading function {function_name} from {script_path}: {e}")
             return None
 
-    def add_hook(self, event_name: str, hook_function, description: str = None):
+    def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
         """
         Add a hook to this component that listens for specific events.
 
@@ -311,7 +312,7 @@ class component(StreamingMixin, MessageBusIntegration):
         except Exception as e:
             log.error(f"[{self.__class__.__name__} {self.name}] Failed to add hook for '{event_name}': {e}")
 
-    def add_pipe(self, event_name: str, pipe_function, description: str = None):
+    def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
         """
         Add a pipe to this component that can transform event payloads.
 

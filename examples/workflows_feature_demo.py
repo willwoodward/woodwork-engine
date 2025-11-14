@@ -14,7 +14,6 @@ from woodwork.components.internal_features.workflows import WorkflowsFeature
 from woodwork.components.internal_features.base import InternalComponentManager
 from woodwork.types.events import InputReceivedPayload, AgentActionPayload, AgentStepCompletePayload
 from unittest.mock import Mock
-import json
 import logging
 
 # Setup logging to see what's happening
@@ -75,9 +74,7 @@ def demo_workflows_feature():
     # First action: Create file
     action_1 = {"tool": "file_tool", "action": "create", "inputs": {"filename": "demo.py"}, "output": "file_created"}
 
-    action_payload_1 = AgentActionPayload(
-        action=json.dumps(action_1), component_id="demo_agent", component_type="agent"
-    )
+    action_payload_1 = AgentActionPayload(action=action_1, component_id="demo_agent", component_type="agent")
 
     feature._sync_action_hook(action_payload_1)
     print(f"✅ Action 1 synced: {len(feature._workflow_actions)} actions tracked")
@@ -90,9 +87,7 @@ def demo_workflows_feature():
         "output": "function_added",
     }
 
-    action_payload_2 = AgentActionPayload(
-        action=json.dumps(action_2), component_id="demo_agent", component_type="agent"
-    )
+    action_payload_2 = AgentActionPayload(action=action_2, component_id="demo_agent", component_type="agent")
 
     feature._sync_action_hook(action_payload_2)
     print(f"✅ Action 2 synced: {len(feature._workflow_actions)} actions tracked")

@@ -12,7 +12,7 @@ Usage in .ww config:
 """
 
 import logging
-from typing import Dict, List, Tuple, Callable, Any, TYPE_CHECKING
+from typing import Dict, List, Tuple, Callable, Any, TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from woodwork.components.component import component
@@ -91,8 +91,8 @@ class KnowledgeGraphFeature(InternalFeature):
             log.debug(f"Knowledge graph schema initialization: {e}")
 
         # Attach to component for access
-        component._knowledge_graph = self._neo4j_component
-        component._knowledge_mode = True
+        component._knowledge_graph = self._neo4j_component  # type: ignore[attr-defined]
+        component._knowledge_mode = True  # type: ignore[attr-defined]
         log.info(f"Knowledge graph feature setup complete for component: {component.name}")
 
     def _initialize_knowledge_schema(self):
@@ -138,7 +138,7 @@ class KnowledgeGraphFeature(InternalFeature):
         """Return knowledge graph pipes."""
         return [("input.received", self._enhance_with_knowledge_pipe)]
 
-    def _extract_api_key(self, component) -> str:
+    def _extract_api_key(self, component) -> Optional[str]:
         """Extract API key from component's model."""
         if hasattr(component, "model") and hasattr(component.model, "_api_key"):
             return component.model._api_key
@@ -223,7 +223,8 @@ class KnowledgeGraphFeature(InternalFeature):
             return
 
         try:
-            log.debug(f"Capturing action in knowledge graph: {payload.action[:50]}...")
+            action_str = str(payload.action)
+            log.debug(f"Capturing action in knowledge graph: {action_str[:50]}...")
 
             # Store action with context
             action_data = {

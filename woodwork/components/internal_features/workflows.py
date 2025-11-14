@@ -108,9 +108,9 @@ class WorkflowsFeature(InternalFeature):
         log.debug("Workflow executor created with agent component")
 
         # Attach to component for access
-        component._workflows_db = self._neo4j_component
-        component._workflows_mode = True
-        component._workflow_executor = self._workflow_executor  # For access from API inputs
+        component._workflows_db = self._neo4j_component  # type: ignore[attr-defined]
+        component._workflows_mode = True  # type: ignore[attr-defined]
+        component._workflow_executor = self._workflow_executor  # type: ignore[attr-defined]
         log.info(f"Workflows feature setup complete for component: {component.name}")
 
     def _initialize_graph_schema(self):
@@ -266,7 +266,7 @@ class WorkflowsFeature(InternalFeature):
 
         return await self._workflow_executor.execute_workflow(workflow_id, inputs, session_id)
 
-    def _extract_api_key(self, component) -> str:
+    def _extract_api_key(self, component) -> Optional[str]:
         """Extract API key from component's model."""
         if hasattr(component, "model") and hasattr(component.model, "_api_key"):
             return component.model._api_key
@@ -288,9 +288,9 @@ class WorkflowsFeature(InternalFeature):
 
             # Store variable information in payload for later use
             if hasattr(payload, "__dict__"):
-                payload.parameterized_prompt = parameterized_prompt
-                payload.workflow_variables = variables
-                payload.variable_schema = schema
+                payload.parameterized_prompt = parameterized_prompt  # type: ignore[attr-defined]
+                payload.workflow_variables = variables  # type: ignore[attr-defined]
+                payload.variable_schema = schema  # type: ignore[attr-defined]
 
             log.debug(f"Checking for similar workflows for input: {payload.input[:50]}...")
 
@@ -509,7 +509,11 @@ class WorkflowsFeature(InternalFeature):
         return ""
 
     def _start_new_workflow(
-        self, input_text: str, parameterized_prompt: str = None, variables: Dict = None, variable_schema: Dict = None
+        self,
+        input_text: str,
+        parameterized_prompt: Optional[str] = None,
+        variables: Optional[Dict] = None,
+        variable_schema: Optional[Dict] = None,
     ):
         """Start tracking a new workflow with optional variable information."""
         import uuid
@@ -572,7 +576,7 @@ class WorkflowsFeature(InternalFeature):
             # Parse action if it's a string
             if isinstance(payload.action, str):
                 try:
-                    action_data = json.loads(payload.action)
+                    action_data = json.loads(payload.action)  # type: ignore[arg-type]
                 except json.JSONDecodeError:
                     log.warning(f"Could not parse action as JSON: {payload.action}")
                     return

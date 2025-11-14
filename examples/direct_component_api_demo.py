@@ -6,6 +6,8 @@ This demonstrates two approaches to adding components to agents:
 2. Feature System: my_feature: true in config
 """
 
+from typing import Optional
+
 from woodwork.components.internal_features import InternalComponentManager
 from woodwork.components.agents.llm import llm as Agent
 
@@ -17,7 +19,7 @@ class DirectComponentAgent:
     def __init__(self, **config):
         self._internal_component_manager = InternalComponentManager()
 
-    def create_component(self, component_type: str, component_id: str = None, **config):
+    def create_component(self, component_type: str, component_id: Optional[str] = None, **config):
         """Direct API to create and attach internal components."""
         component_id = (
             component_id or f"{self.name}_{component_type}_{len(self._internal_component_manager._components)}"

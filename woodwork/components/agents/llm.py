@@ -191,7 +191,7 @@ class llm(agent, Startable):
             encoding = tiktoken.get_encoding("cl100k_base")
         return len(encoding.encode(text))
 
-    async def input(self, query: str, inputs: dict = None):
+    async def input(self, query: str, inputs: Optional[dict] = None):
         if inputs is None:
             inputs = {}
 
@@ -377,7 +377,7 @@ class llm(agent, Startable):
             except KeyError as e:
                 log.warning(f"Action dict missing key {e}, feeding back as context.")
                 if e == "output":
-                    action["output"] = ""
+                    action_dict["output"] = ""  # type: ignore[index]
                 else:
                     observation = f"Received incomplete action from Agent: {json.dumps(action_dict)}. It is likely missing the key {e}."
             except Exception as e:
@@ -533,7 +533,7 @@ class llm(agent, Startable):
             return self._internal_component_manager.get_component(component_id)
         return None
 
-    def create_component(self, component_type: str, component_id: str = None, **config):
+    def create_component(self, component_type: str, component_id: Optional[str] = None, **config):
         """
         Direct API to create and attach internal components at runtime.
 
@@ -588,7 +588,7 @@ class llm(agent, Startable):
         log.info(f"[LLM Agent {self.name}] Created {component_type} component: {component_id}")
         return component
 
-    def add_hook(self, event_name: str, hook_function, description: str = None):
+    def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
         """
         Add a hook to this agent that listens for specific events.
 
@@ -614,7 +614,7 @@ class llm(agent, Startable):
         except Exception as e:
             log.error(f"[LLM Agent {self.name}] Failed to add hook for '{event_name}': {e}")
 
-    def add_pipe(self, event_name: str, pipe_function, description: str = None):
+    def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
         """
         Add a pipe to this agent that can transform event payloads.
 

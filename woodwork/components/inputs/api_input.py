@@ -9,7 +9,7 @@ import logging
 import json
 import time
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 
@@ -215,7 +215,7 @@ class api_input(inputs):
         }
         return mapping.get(class_name, class_name.lower())
 
-    async def handle_input(self, user_input: str, request_id: str = None) -> None:
+    async def handle_input(self, user_input: str, request_id: Optional[str] = None) -> None:
         """Handle user input and emit through unified event system."""
         try:
             log.debug("[api_input] Processing user input: %s", user_input[:100])
@@ -619,7 +619,9 @@ class api_input(inputs):
                 return JSONResponse(status_code=500, content={"error": str(e)})
 
         @self.app.get("/api/workflows")
-        async def get_workflows(status: str = None, category: str = None, search: str = None, limit: int = 50):
+        async def get_workflows(
+            status: Optional[str] = None, category: Optional[str] = None, search: Optional[str] = None, limit: int = 50
+        ):
             """Get workflows from Neo4j database with optional filters."""
             try:
                 # Use Neo4j driver directly (not the woodwork component which tries to create a new container)
@@ -663,7 +665,7 @@ class api_input(inputs):
 
                 # Execute query using raw driver
                 with driver.session() as session:
-                    results = session.run(query, params)
+                    results = session.run(query, params)  # type: ignore[arg-type]
                     workflows = []
 
                     for record in results:

@@ -319,12 +319,11 @@ class TestRealWorldStreamingScenarios:
                 return stream_id
 
         with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
-            stream_counter = 0
+            stream_counter = [0]  # Use list to avoid nonlocal issues
 
             def create_stream_id(*args, **kwargs):
-                nonlocal stream_counter
-                stream_counter += 1
-                return f"workflow_stream_{stream_counter}"
+                stream_counter[0] += 1
+                return f"workflow_stream_{stream_counter[0]}"
 
             mock_manager = Mock()
             mock_manager.create_stream = AsyncMock(side_effect=create_stream_id)

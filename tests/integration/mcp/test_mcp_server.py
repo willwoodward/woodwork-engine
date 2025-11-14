@@ -478,6 +478,7 @@ class TestMCPServerComponent:
         notification = MCPMessage(method="tool/progress", params={"progress": 50, "message": "Processing..."})
 
         # This would normally emit a framework event
+        assert notification.method is not None  # Type narrowing
         event_type = mcp_server._get_framework_event_type(notification.method)
         assert event_type == "tool.progress"
 

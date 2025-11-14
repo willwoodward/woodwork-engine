@@ -41,13 +41,12 @@ def mock_time():
 @pytest.fixture
 def deterministic_uuid():
     """Mock UUID generation for deterministic tests."""
-    counter = 0
+    counter = [0]  # Use list to avoid nonlocal issues
 
     def mock_uuid():
-        nonlocal counter
-        counter += 1
+        counter[0] += 1
         mock_obj = Mock()
-        mock_obj.hex = f"test_uuid_{counter:04d}"
+        mock_obj.hex = f"test_uuid_{counter[0]:04d}"
         return mock_obj
 
     with patch("uuid.uuid4", side_effect=mock_uuid):
@@ -118,7 +117,9 @@ def real_router(real_message_bus):
     try:
         from woodwork.core.unified_event_bus import UnifiedEventBus
 
-        return UnifiedEventBus(real_message_bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(real_message_bus)
+        return router
     except ImportError:
         return create_mock_router(real_message_bus)
 
@@ -238,16 +239,16 @@ async def full_system():
         message_bus = InMemoryMessageBus()
         message_bus.start()
 
-        router = UnifiedEventBus(message_bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(message_bus)
 
         # Create components
         components = create_test_components()
 
         # Configure routing
-        component_configs = {
-            name: {"object": component, "component": component.component} for name, component in components.items()
-        }
-        router.configure_from_components(component_configs)
+        for name, component in components.items():
+            router.register_component(component)
+        router.configure_routing()
 
         yield {"message_bus": message_bus, "router": router, "components": components, "event_manager": Mock()}
 

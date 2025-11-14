@@ -29,7 +29,8 @@ class TestMessageAPIDesign:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         yield {"bus": bus, "router": router}
 
@@ -267,7 +268,8 @@ class TestMessageAPIImplementation:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         # Create test component with the real message API
         class TestComponent(MessageBusIntegration):
@@ -400,7 +402,8 @@ class TestMessageAPIErrorHandling:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         class TestComponent(MessageBusIntegration):
             def __init__(self, name, router):
@@ -536,7 +539,8 @@ class TestMessageAPIEdgeCases:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         class TestComponent(MessageBusIntegration):
             def __init__(self, name, router):

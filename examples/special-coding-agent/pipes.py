@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from woodwork.types import InputReceivedPayload
 
@@ -54,7 +55,7 @@ def add_claude_md_to_input(payload: InputReceivedPayload) -> InputReceivedPayloa
     return payload
 
 
-def find_claude_md(start_dir: str = None) -> str | None:
+def find_claude_md(start_dir: Optional[str] = None) -> Optional[str]:
     """Find CLAUDE.md file by searching up the directory tree."""
     if start_dir is None:
         start_dir = os.getcwd()

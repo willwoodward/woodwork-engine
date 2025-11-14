@@ -12,7 +12,7 @@ def start_component(c: component, q: queue.Queue):
     """Start a component (called in parallel via threading)"""
     # If component implements Startable interface, call start() method
     if isinstance(c, Startable):
-        c.start(queue=q, config={})
+        c.start(queue=q, config={})  # type: ignore[call-arg]
         if q:
             q.put(Update(progress=50, component_name=c.name))
     else:

@@ -31,7 +31,8 @@ class TestStreamingMessageAPIDesign:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         yield {"bus": bus, "router": router}
 
@@ -221,7 +222,8 @@ class TestStreamingMessageAPIIntegration:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         # Mock StreamManager for testing
         mock_stream_manager = Mock()
@@ -353,7 +355,8 @@ class TestStreamingRouterIntegration:
         bus = InMemoryMessageBus()
         await bus.start()
 
-        router = UnifiedEventBus(bus)
+        router = UnifiedEventBus()
+        router.set_message_bus(bus)
 
         yield {"bus": bus, "router": router}
 

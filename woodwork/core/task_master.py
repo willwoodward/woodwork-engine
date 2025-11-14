@@ -178,7 +178,8 @@ class task_master(component):
             component = input_object
             if hasattr(component, "_output") and component._output is not None:
                 while hasattr(component, "_output") and component._output is not None:
-                    deployment = router.get(component._output.name)
+                    # Type checker doesn't recognize the None check in while condition, but we've verified it's not None
+                    deployment = router.get(component._output.name)  # type: ignore[union-attr]
                     x = await deployment.input(x)
                     component = component._output
 

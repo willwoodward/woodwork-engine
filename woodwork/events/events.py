@@ -4,7 +4,7 @@ import logging
 import importlib.util
 import os
 from collections import defaultdict
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, cast
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +106,8 @@ class EventManager:
                 raise ImportError(f"Cannot load module from {script_path}")
 
             module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            # Type checker doesn't recognize the None check above, but we've verified it's not None
+            spec.loader.exec_module(module)  # type: ignore[union-attr]
 
             if not hasattr(module, function_name):
                 raise AttributeError(f"Function '{function_name}' not found in {script_path}")
@@ -189,7 +190,7 @@ def get_global_event_manager() -> EventManager:
     global _global_event_manager
     if _global_event_manager is None:
         _global_event_manager = EventManager()
-    return _global_event_manager
+    return cast(EventManager, _global_event_manager)
 
 
 def set_global_event_manager(manager: EventManager) -> None:

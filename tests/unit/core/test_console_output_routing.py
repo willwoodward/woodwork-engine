@@ -6,6 +6,7 @@ _console_output but the handler is never invoked, resulting in {} output.
 
 import pytest
 import asyncio
+from dataclasses import asdict
 from unittest.mock import Mock, patch, AsyncMock
 from woodwork.core.unified_event_bus import UnifiedEventBus
 from woodwork.types.events import GenericPayload
@@ -46,7 +47,7 @@ class TestConsoleOutputRouting:
         assert envelope.target_component == "_console_output"
         assert envelope.event_type == "agent.response"
         assert envelope.sender_component == "coding_ag"
-        assert envelope.payload == payload
+        assert envelope.payload == asdict(payload)
 
     @pytest.mark.asyncio
     async def test_deliver_to_virtual_component_without_message_bus(self):
@@ -147,7 +148,7 @@ class TestConsoleOutputRouting:
         assert received_envelope is not None
         assert received_envelope.target_component == "_console_output"
         assert received_envelope.event_type == "agent.response"
-        assert received_envelope.payload == payload
+        assert received_envelope.payload == asdict(payload)
 
         # Cleanup
         await message_bus.stop()

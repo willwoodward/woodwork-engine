@@ -229,7 +229,7 @@ def app_entrypoint(args):
             config_parser.main_function()
             from woodwork.gui.gui import GUI
 
-            gui = GUI(config_parser.task_m)
+            gui = GUI(config_parser.task_m)  # type: ignore[arg-type]
             gui.run()
             return
         elif args.gui == "fastapi":

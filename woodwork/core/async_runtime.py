@@ -7,7 +7,7 @@ that eliminates cross-thread communication and provides real-time event delivery
 
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 
 from woodwork.core.unified_event_bus import get_global_event_bus
 from woodwork.core.session import ConversationSession
@@ -439,7 +439,7 @@ def get_global_runtime() -> AsyncRuntime:
         _global_runtime = AsyncRuntime()
         log.info("[AsyncRuntime] Created global runtime instance")
 
-    return _global_runtime
+    return cast(AsyncRuntime, _global_runtime)
 
 
 def set_global_runtime(runtime: AsyncRuntime) -> None:
@@ -459,5 +459,6 @@ async def stop_runtime() -> None:
     """Stop the global runtime"""
     global _global_runtime
     if _global_runtime:
-        await _global_runtime.stop()
+        # Type checker doesn't recognize the truthiness check above, but we've verified it's not None
+        await _global_runtime.stop()  # type: ignore[union-attr]
         _global_runtime = None

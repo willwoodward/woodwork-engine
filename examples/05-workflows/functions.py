@@ -1,4 +1,4 @@
-def read_messages(sender: str) -> str:
+def read_messages(sender: str) -> list:
     """Return all messages sent by the sender."""
 
     messages = [

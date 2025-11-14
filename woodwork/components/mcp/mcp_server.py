@@ -843,7 +843,7 @@ class MCPServer(component, tool_interface):
         try:
             if message.error:
                 # Response contains error
-                error = MCPError(message.error)
+                error = MCPError(message.error)  # type: ignore[arg-type]
                 future.set_exception(error)
                 log.debug(f"[MCPServer] Request {message.id} failed: {error.message}")
             else:

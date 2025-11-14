@@ -83,6 +83,11 @@ ignore = ["E722"]
 unknown-argument = "ignore"
 unresolved-import = "ignore"
 
+# NOTE: To check types without test/example noise, run: ty check woodwork/
+# Tests and examples have intentional mocking patterns (e.g., obj.method = Mock())
+# that cause invalid-assignment warnings. These should be fixed in the future with
+# proper mock typing, but for now just exclude tests/ and examples/ when type checking.
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

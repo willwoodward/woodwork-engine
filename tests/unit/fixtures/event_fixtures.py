@@ -1,6 +1,6 @@
 """Event system fixtures for testing."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Callable
 from unittest.mock import Mock
 from woodwork.types.events import BasePayload
 
@@ -8,7 +8,7 @@ from woodwork.types.events import BasePayload
 class MockPayload(BasePayload):
     """Mock event payload for testing."""
 
-    def __init__(self, data: Dict[str, Any] = None, **kwargs):
+    def __init__(self, data: Optional[Dict[str, Any]] = None, **kwargs):
         super().__init__(**kwargs)
         self.data = data
 
@@ -68,7 +68,7 @@ def create_test_event_data() -> Dict[str, Any]:
     }
 
 
-def create_mock_hooks() -> Dict[str, callable]:
+def create_mock_hooks() -> Dict[str, Callable]:
     """Create mock hook functions."""
     return {
         "debug_hook": Mock(return_value=None),

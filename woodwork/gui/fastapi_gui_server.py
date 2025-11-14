@@ -211,8 +211,9 @@ class FastAPIGUIServer:
             # Check if this is a response to an ask_user request
             if request.request_id:
                 # This is a response to an ask_user request, handle via inbox response
+                assert request.request_id is not None  # Type checker hint
                 response = HumanInputResponse(
-                    request_id=request.request_id,
+                    request_id=request.request_id,  # type: ignore[arg-type]
                     action="responded",
                     data=message_content,
                     user_id="current_user",  # TODO: Get from auth context
@@ -415,7 +416,7 @@ class FastAPIGUIServer:
             """
 
             with driver.session() as session:
-                results = session.run(query, params)
+                results = session.run(query, params)  # type: ignore[arg-type]
                 workflows = []
 
                 for record in results:
@@ -806,7 +807,7 @@ class FastAPIGUIServer:
         if message_type == "human_input_response":
             # Handle human input response
             payload = message["payload"]
-            response = HumanInputResponse(**payload)
+            response = HumanInputResponse(**payload)  # type: ignore[arg-type]
             await self._handle_human_input_response(response)
 
         elif message_type == "agent_message":

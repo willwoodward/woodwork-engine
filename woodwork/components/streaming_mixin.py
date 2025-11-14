@@ -31,6 +31,8 @@ class StreamingMixin:
 
         # Parse streaming configuration from component config
         config = getattr(self, "config", kwargs.get("config", {}))
+        if config is None:
+            config = {}
         self.streaming_enabled = config.get("streaming", False)
 
         # Let components define their own streaming capabilities
@@ -219,9 +221,9 @@ class StreamingMixin:
             # Start streaming generation in background - don't await it!
             # This allows the consumer to start receiving chunks immediately
             # Add a small delay to ensure event loop is stable
-            async def _delayed_generation():
+            async def _delayed_generation(sid: str = stream_id):  # Capture stream_id as default
                 await asyncio.sleep(0.01)  # Small delay to let event loop stabilize
-                await self._generate_and_stream_output(input_data, stream_id)
+                await self._generate_and_stream_output(input_data, sid)
 
             task = asyncio.create_task(_delayed_generation())
             # Set task name for debugging

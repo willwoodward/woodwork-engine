@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional
 
 from abc import ABC, abstractmethod
 
@@ -115,7 +116,7 @@ class agent(component, tool_interface, ABC):
         return {"prompt": best_prompt, "inputs": best_inputs, "actions": actions, "score": score}
 
     @abstractmethod
-    def input(self, query: str, inputs: dict = None):
+    def input(self, query: str, inputs: Optional[dict] = None):
         """Given a query, will use the provided tools and memory to perform actions to solve the query."""
         pass
 

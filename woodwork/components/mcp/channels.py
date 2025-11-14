@@ -6,9 +6,10 @@ Implements transport abstraction as specified in the technical design.
 """
 
 import asyncio
+import asyncio.subprocess
 import logging
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Dict, Optional, Any
+from typing import AsyncIterator, Dict, Optional, Any, cast
 import json
 
 from .messages import MCPMessage, MCPError
@@ -101,7 +102,7 @@ class StdioChannel(MCPChannel):
             log.debug(f"[StdioChannel] Docker command: {' '.join(docker_cmd)}")
 
             # Start process
-            self.process = await asyncio.create_subprocess_exec(
+            self.process = await asyncio.create_subprocess_exec(  # type: ignore[misc]
                 *docker_cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
@@ -126,7 +127,7 @@ class StdioChannel(MCPChannel):
             await self.process.stdin.drain()
 
             log.debug(f"[StdioChannel] Sent message: {message.method} (id: {message.id})")
-            return message.id
+            return cast(str, message.id)
 
         except Exception as e:
             log.error(f"[StdioChannel] Failed to send message: {e}")

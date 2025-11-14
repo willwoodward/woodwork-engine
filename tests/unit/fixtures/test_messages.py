@@ -1,7 +1,7 @@
 """Test message fixtures and utilities."""
 
-from dataclasses import dataclass
-from typing import Dict, Any
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional
 
 
 @dataclass
@@ -11,16 +11,12 @@ class MockMessageEnvelope:
     message_id: str = "test_message_123"
     session_id: str = "test_session"
     event_type: str = "test_event"
-    payload: Dict[str, Any] = None
+    payload: Dict[str, Any] = field(default_factory=dict)
     target_component: str = "test_target"
     sender_component: str = "test_sender"
     timestamp: float = 1000.0
     retry_count: int = 0
     max_retries: int = 3
-
-    def __post_init__(self):
-        if self.payload is None:
-            self.payload = {}
 
     def can_retry(self) -> bool:
         """Check if message can be retried."""
@@ -30,9 +26,9 @@ class MockMessageEnvelope:
 def create_component_message(
     source: str = "test_source",
     target: str = "test_target",
-    data: Dict[str, Any] = None,
+    data: Optional[Dict[str, Any]] = None,
     response_required: bool = False,
-    request_id: str = None,
+    request_id: Optional[str] = None,
 ) -> MockMessageEnvelope:
     """Create a test component message."""
     payload = {"data": data or {}, "source_component": source, "routed_at": 1000.0}
@@ -76,7 +72,7 @@ def create_response_message(
 
 
 def create_hook_message(
-    event_type: str = "agent.thought", data: Dict[str, Any] = None, source: str = "test_agent"
+    event_type: str = "agent.thought", data: Optional[Dict[str, Any]] = None, source: str = "test_agent"
 ) -> MockMessageEnvelope:
     """Create a test hook message."""
     return MockMessageEnvelope(

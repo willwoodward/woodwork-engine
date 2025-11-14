@@ -8,7 +8,7 @@ that eliminates threading issues and provides real-time event delivery.
 import asyncio
 import logging
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from woodwork.core.async_runtime import AsyncRuntime
 from woodwork.parser.config_parser import parse_config_file, parse_config_dict
@@ -16,7 +16,7 @@ from woodwork.parser.config_parser import parse_config_file, parse_config_dict
 log = logging.getLogger(__name__)
 
 
-async def start_woodwork(config_path: str = None, config_dict: Dict[str, Any] = None) -> None:
+async def start_woodwork(config_path: Optional[str] = None, config_dict: Optional[Dict[str, Any]] = None) -> None:
     """
     Start Woodwork engine with unified async runtime.
 
