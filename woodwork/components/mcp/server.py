@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 from woodwork.components.mcp.mcp_base import mcp
-from woodwork.deployments.docker import Docker
+from woodwork.deploy.docker import Docker
 from woodwork.utils import format_kwargs
 from woodwork.interfaces.startable import Startable
 

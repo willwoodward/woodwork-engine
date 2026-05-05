@@ -3,8 +3,8 @@
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput
 
 
@@ -131,7 +131,7 @@ class TestFullWorkflow:
                 return result
 
         # Mock streaming infrastructure
-        with patch("woodwork.core.stream_manager.StreamManager") as mock_manager_class:
+        with patch("woodwork.runtime.stream_manager.StreamManager") as mock_manager_class:
             mock_manager = Mock()
             mock_manager.create_stream = AsyncMock(return_value="agent_thoughts")
             mock_manager.send_chunk = AsyncMock(return_value=True)

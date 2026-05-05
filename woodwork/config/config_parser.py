@@ -6,14 +6,14 @@ import re
 from dotenv import load_dotenv
 from typing import Any
 
-from woodwork.core.task_master import task_master
+from woodwork.runtime.task_master import task_master
 from woodwork.utils.errors.errors import (
     ForbiddenVariableNameError,
     MissingConfigKeyError,
 )
-from woodwork.deployments.registry import get_registry
+from woodwork.deploy.registry import get_registry
 from woodwork.components.component import component
-from woodwork.deployments.router import get_router, Deployment
+from woodwork.deploy.router import get_router, Deployment
 
 log = logging.getLogger(__name__)
 
@@ -268,11 +268,11 @@ def create_object(command):
 
     if component == "core":
         if type == "command_line":
-            from woodwork.components.core.command_line import command_line
+            from woodwork.components.tools.command_line import command_line
 
             return init_object(command_line, **config)
         if type == "code":
-            from woodwork.components.core.code import code
+            from woodwork.components.tools.code import code
 
             return init_object(code, **config)
 
@@ -297,7 +297,7 @@ def create_object(command):
     # Deployment components
     if component == "vm":
         if type == "server":
-            from woodwork.deployments.router import ServerDeployment
+            from woodwork.deploy.router import ServerDeployment
 
             return init_object(ServerDeployment, **config)
 
@@ -712,11 +712,11 @@ def parse(config: str, registry=None) -> dict:
 def _initialize_message_bus_integration(commands: dict) -> None:
     """Synchronously initialize message bus integration with component configurations"""
     try:
-        from woodwork.core.message_bus.integration import (
+        from woodwork.runtime.message_bus.integration import (
             initialize_global_message_bus_integration_sync,
             get_global_message_bus_manager,
         )
-        from woodwork.core.message_bus.factory import configure_global_message_bus
+        from woodwork.runtime.message_bus.factory import configure_global_message_bus
 
         log.info("[ConfigParser] Initializing message bus integration...")
 
@@ -809,13 +809,13 @@ def _initialize_message_bus_integration(commands: dict) -> None:
 async def _async_initialize_message_bus(component_configs: dict) -> None:
     """Async helper for message bus initialization"""
     try:
-        from woodwork.core.message_bus.integration import initialize_global_message_bus_integration
+        from woodwork.runtime.message_bus.integration import initialize_global_message_bus_integration
 
         await initialize_global_message_bus_integration(component_configs)
         log.info("[ConfigParser] Message bus integration initialized with %d components", len(component_configs))
 
         # Log routing configuration for debugging
-        from woodwork.core.message_bus.integration import get_global_message_bus_manager
+        from woodwork.runtime.message_bus.integration import get_global_message_bus_manager
 
         manager = get_global_message_bus_manager()
         stats = manager.get_manager_stats()

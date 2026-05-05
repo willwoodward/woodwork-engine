@@ -20,7 +20,7 @@ from woodwork.types.streaming_data import (
     generate_stream_id,
     create_stream_chunk,
 )
-from woodwork.core.simple_message_bus import SimpleMessageBus
+from woodwork.runtime.simple_message_bus import SimpleMessageBus
 
 log = logging.getLogger(__name__)
 

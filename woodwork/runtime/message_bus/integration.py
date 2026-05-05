@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from woodwork.events import get_global_event_manager
 from .factory import get_global_message_bus
-from woodwork.core.unified_event_bus import get_global_event_bus
+from woodwork.runtime.unified_event_bus import get_global_event_bus
 
 log = logging.getLogger(__name__)
 
@@ -573,7 +573,7 @@ class MessageBusIntegration:
         """Route component response to console output by calling its input() method"""
         try:
             # Get the console output component and call its input method directly
-            from woodwork.core.message_bus.integration import get_global_message_bus_manager
+            from woodwork.runtime.message_bus.integration import get_global_message_bus_manager
 
             manager = get_global_message_bus_manager()
 
@@ -1019,7 +1019,7 @@ class GlobalMessageBusManager:
         """Handle streaming output to console (adapted from task_master)"""
         try:
             # Import stream manager at runtime to avoid circular imports
-            from woodwork.core.stream_manager import get_global_stream_manager
+            from woodwork.runtime.stream_manager import get_global_stream_manager
 
             # Get global stream manager
             stream_manager = get_global_stream_manager()

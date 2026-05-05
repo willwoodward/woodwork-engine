@@ -30,7 +30,7 @@ class InternalFeature(ABC):
     def _register_hooks_and_pipes(self):
         """Register this feature's hooks and pipes with the UnifiedEventBus."""
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
 
@@ -88,7 +88,7 @@ class InternalComponentManager:
             self._async_runtime = async_runtime
         else:
             try:
-                from woodwork.core.async_runtime import get_global_runtime
+                from woodwork.runtime.async_runtime import get_global_runtime
 
                 self._async_runtime = get_global_runtime()
                 log.debug("InternalComponentManager using global AsyncRuntime")

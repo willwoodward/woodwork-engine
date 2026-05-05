@@ -10,8 +10,8 @@ import logging
 import sys
 from typing import Dict, Any, Optional
 
-from woodwork.core.async_runtime import AsyncRuntime
-from woodwork.parser.config_parser import parse_config_file, parse_config_dict
+from woodwork.runtime.async_runtime import AsyncRuntime
+from woodwork.config.config_parser import parse_config_file, parse_config_dict
 
 log = logging.getLogger(__name__)
 

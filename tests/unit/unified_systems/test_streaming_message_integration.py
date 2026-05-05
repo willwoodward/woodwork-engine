@@ -7,9 +7,9 @@ the new message API with the existing StreamManager infrastructure.
 
 import pytest
 from unittest.mock import Mock, AsyncMock
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.core.message_bus.integration import MessageBusIntegration, StreamingChunk
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.message_bus.integration import MessageBusIntegration, StreamingChunk
 
 
 class MockRequestingComponent(MessageBusIntegration):
@@ -134,7 +134,7 @@ class TestStreamingMessageAPIDesign:
         """
 
         # TDD: We need a message bus aware StreamManager
-        from woodwork.core.stream_manager import StreamManager
+        from woodwork.runtime.stream_manager import StreamManager
 
         # Current StreamManager doesn't know about message bus
         stream_manager = StreamManager()

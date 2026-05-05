@@ -61,14 +61,14 @@ class TestDirectAPIVsFeatures:
 
             def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
                 """Direct hook addition."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_hook(event_name, hook_function)
 
             def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
                 """Direct pipe addition."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_pipe(event_name, pipe_function)
@@ -112,7 +112,7 @@ class TestDirectAPIVsFeatures:
         )
 
         # Hooks are registered with event bus
-        from woodwork.core.unified_event_bus import get_global_event_bus
+        from woodwork.runtime.unified_event_bus import get_global_event_bus
 
         get_global_event_bus()
 
@@ -195,14 +195,14 @@ class TestDirectAPIVsFeatures:
 
             def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
                 """Components can add hooks to themselves."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_hook(event_name, hook_function)
 
             def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
                 """Components can add pipes to themselves."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_pipe(event_name, pipe_function)

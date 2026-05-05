@@ -35,14 +35,14 @@ class DirectComponentAgent:
 
     def add_hook(self, event_name: str, hook_function):
         """Add hook to this agent."""
-        from woodwork.core.unified_event_bus import get_global_event_bus
+        from woodwork.runtime.unified_event_bus import get_global_event_bus
 
         event_bus = get_global_event_bus()
         event_bus.register_hook(event_name, hook_function)
 
     def add_pipe(self, event_name: str, pipe_function):
         """Add pipe to this agent."""
-        from woodwork.core.unified_event_bus import get_global_event_bus
+        from woodwork.runtime.unified_event_bus import get_global_event_bus
 
         event_bus = get_global_event_bus()
         event_bus.register_pipe(event_name, pipe_function)

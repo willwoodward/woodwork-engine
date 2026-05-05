@@ -2,8 +2,8 @@ import logging
 import os
 import re
 
-from woodwork.components.core.core import core
-from woodwork.deployments import Docker
+from woodwork.components.tools.core import core
+from woodwork.deploy import Docker
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)

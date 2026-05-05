@@ -10,7 +10,7 @@ import asyncio
 import pytest
 from unittest.mock import patch
 from woodwork.components.inputs.command_line import command_line
-from woodwork.core.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
 
 

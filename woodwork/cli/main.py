@@ -4,15 +4,15 @@ import logging.config
 import pathlib
 import sys
 
-from woodwork.parser import dependencies
+from woodwork.config import dependencies
 from woodwork.utils import helper_functions
 from woodwork.cli import argument_parser
-from woodwork.parser import config_parser
+from woodwork.config import config_parser
 from woodwork.utils.errors.errors import ParseError
 from woodwork.utils.helper_functions import set_globals
-from woodwork.deployments.registry import get_registry
-from woodwork.deployments import Deployer
-from woodwork.deployments.generate_exports import generate_exported_objects_file
+from woodwork.deploy.registry import get_registry
+from woodwork.deploy import Deployer
+from woodwork.deploy.generate_exports import generate_exported_objects_file
 from .progress.progress import parallel_func_apply
 from .progress.lifecycles import start_component
 from rich.console import Console
@@ -88,7 +88,7 @@ def start_runtime(components):
 
 def _start_async_runtime(components):
     """Start async runtime with distributed message bus orchestration."""
-    from woodwork.core.async_runtime import AsyncRuntime
+    from woodwork.runtime.async_runtime import AsyncRuntime
     import asyncio
     from rich.spinner import Spinner
     from rich.live import Live
@@ -340,5 +340,5 @@ def cli_entrypoint() -> None:
 
 
 # Note: start_message_bus_loop and message_bus_main_loop functions have been
-# replaced by the DistributedStartupCoordinator class in woodwork.core.distributed_startup
+# replaced by the DistributedStartupCoordinator class in woodwork.runtime.distributed_startup
 # The new implementation provides proper event loop ownership and clean shutdown

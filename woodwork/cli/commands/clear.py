@@ -14,7 +14,7 @@ def clear_cmd(component):
         start_components,
     )
     from woodwork.cli.setup_defaults import copy_prompts
-    from woodwork.parser import config_parser
+    from woodwork.config import config_parser
 
     copy_prompts()
     components = parse_and_validate_config()

@@ -9,8 +9,8 @@ import asyncio
 import logging
 from typing import Dict, Any, List, Optional, cast
 
-from woodwork.core.unified_event_bus import get_global_event_bus
-from woodwork.core.session import ConversationSession
+from woodwork.runtime.unified_event_bus import get_global_event_bus
+from woodwork.runtime.session import ConversationSession
 from woodwork.types import InputReceivedPayload
 
 log = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ class AsyncRuntime:
                 return components
 
             # Use existing config parser for dictionary configs
-            from woodwork.parser.config_parser import parse_config_dict
+            from woodwork.config.config_parser import parse_config_dict
 
             parsed = parse_config_dict(config)
             return parsed.get("components", [])
@@ -393,8 +393,8 @@ class AsyncRuntime:
         """Initialize message bus integration and set reference on unified event bus"""
 
         try:
-            from woodwork.core.message_bus.integration import get_global_message_bus_manager
-            from woodwork.core.message_bus.factory import get_global_message_bus
+            from woodwork.runtime.message_bus.integration import get_global_message_bus_manager
+            from woodwork.runtime.message_bus.factory import get_global_message_bus
 
             # Get the message bus
             message_bus = await get_global_message_bus()

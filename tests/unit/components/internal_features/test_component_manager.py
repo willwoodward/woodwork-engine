@@ -25,7 +25,7 @@ class TestInternalComponentManager:
 
     def test_init_with_async_runtime(self):
         """Test component manager initializes properly with AsyncRuntime."""
-        from woodwork.core.async_runtime import AsyncRuntime
+        from woodwork.runtime.async_runtime import AsyncRuntime
 
         mock_runtime = Mock(spec=AsyncRuntime)
         manager = InternalComponentManager(async_runtime=mock_runtime)
@@ -114,7 +114,7 @@ class TestInternalComponentManager:
         assert len(component_manager._components) == 0
 
     @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
-    @patch("woodwork.core.async_runtime.get_global_runtime")
+    @patch("woodwork.runtime.async_runtime.get_global_runtime")
     def test_no_registration_when_no_runtime(self, mock_get_runtime, mock_neo4j_factory):
         """Test that components are created but not registered when no AsyncRuntime is available."""
         # Mock global runtime to return None
@@ -133,7 +133,7 @@ class TestInternalComponentManager:
     @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
     def test_register_with_async_runtime(self, mock_neo4j_factory):
         """Test that components are registered with AsyncRuntime by default."""
-        from woodwork.core.async_runtime import AsyncRuntime
+        from woodwork.runtime.async_runtime import AsyncRuntime
 
         mock_runtime = Mock(spec=AsyncRuntime)
         manager = InternalComponentManager(async_runtime=mock_runtime)

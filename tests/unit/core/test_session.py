@@ -3,7 +3,7 @@ Test ConversationSession for persistent context across inputs.
 """
 
 import time
-from woodwork.core.session import ConversationSession
+from woodwork.runtime.session import ConversationSession
 
 
 def test_create_session():

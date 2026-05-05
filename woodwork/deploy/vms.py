@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from uvicorn import Config, Server
 
 from woodwork.components.component import component
-from woodwork.deployments.deployment import Deployment
+from woodwork.deploy.deployment import Deployment
 from woodwork.utils import format_kwargs
 
 

@@ -5,7 +5,7 @@ from typing import List, Optional, Any, Dict
 from woodwork.types.workflows import Hook, Pipe
 from woodwork.events import EventManager, get_global_event_manager
 from woodwork.components.streaming_mixin import StreamingMixin
-from woodwork.core.message_bus.integration import MessageBusIntegration, register_component_with_message_bus
+from woodwork.runtime.message_bus.integration import MessageBusIntegration, register_component_with_message_bus
 
 log = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ class component(StreamingMixin, MessageBusIntegration):
         global_manager = get_global_event_manager()
 
         # Also register with unified event bus
-        from woodwork.core.unified_event_bus import get_global_event_bus
+        from woodwork.runtime.unified_event_bus import get_global_event_bus
 
         unified_bus = get_global_event_bus()
 
@@ -213,7 +213,7 @@ class component(StreamingMixin, MessageBusIntegration):
         global_manager = get_global_event_manager()
 
         # Also register with unified event bus
-        from woodwork.core.unified_event_bus import get_global_event_bus
+        from woodwork.runtime.unified_event_bus import get_global_event_bus
 
         unified_bus = get_global_event_bus()
 
@@ -302,7 +302,7 @@ class component(StreamingMixin, MessageBusIntegration):
             self.add_hook("tool.call", log_tool_calls, "Log all tool calls")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_hook(event_name, hook_function)
@@ -332,7 +332,7 @@ class component(StreamingMixin, MessageBusIntegration):
             self.add_pipe("input.received", add_component_context, "Add component context to input")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_pipe(event_name, pipe_function)

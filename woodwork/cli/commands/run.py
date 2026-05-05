@@ -23,7 +23,7 @@ def run_cmd(ctx, config, gui):
     if gui == "fastapi":
         import asyncio
 
-        from woodwork.parser import dependencies
+        from woodwork.config import dependencies
 
         dependencies.activate_virtual_environment()
         from woodwork.gui.fastapi_gui_server import start_gui_server

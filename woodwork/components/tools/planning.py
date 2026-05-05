@@ -1,7 +1,7 @@
 import logging
 import os
 
-from woodwork.components.core.core import core
+from woodwork.components.tools.core import core
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)

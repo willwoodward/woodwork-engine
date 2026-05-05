@@ -7,7 +7,7 @@ from agents and register them with the unified event bus.
 
 import logging
 from typing import List
-from woodwork.core.unified_event_bus import get_global_event_bus
+from woodwork.runtime.unified_event_bus import get_global_event_bus
 from woodwork.types.tool_schema import ToolSchema
 
 log = logging.getLogger(__name__)

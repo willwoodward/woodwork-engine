@@ -3,8 +3,8 @@ from typing import Optional
 import logging
 
 from woodwork.components.component import component
-from woodwork.deployments.deployment import Deployment
-from woodwork.deployments.vms import LocalDeployment, ServerDeployment
+from woodwork.deploy.deployment import Deployment
+from woodwork.deploy.vms import LocalDeployment, ServerDeployment
 
 log = logging.getLogger(__name__)
 
@@ -53,8 +53,8 @@ class Router:
 
     async def setup_streaming(self):
         """Set up stream managers for all streaming-enabled components"""
-        from woodwork.core.simple_message_bus import get_global_message_bus
-        from woodwork.core.stream_manager import StreamManager
+        from woodwork.runtime.simple_message_bus import get_global_message_bus
+        from woodwork.runtime.stream_manager import StreamManager
 
         try:
             # Get global message bus and stream manager

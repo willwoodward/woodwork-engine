@@ -1,7 +1,7 @@
 """Tests for MessageBusIntegration component."""
 
 from unittest.mock import Mock, patch
-from woodwork.core.message_bus.integration import MessageBusIntegration
+from woodwork.runtime.message_bus.integration import MessageBusIntegration
 
 
 class MockBaseComponent:
@@ -104,8 +104,8 @@ class TestMessageBusIntegration:
         assert component.output_targets == ["target1"]
         assert component.session_id == "test"
 
-    @patch("woodwork.core.message_bus.integration.get_global_message_bus")
-    @patch("woodwork.core.message_bus.integration.get_global_event_manager")
+    @patch("woodwork.runtime.message_bus.integration.get_global_message_bus")
+    @patch("woodwork.runtime.message_bus.integration.get_global_event_manager")
     def test_global_manager_integration(self, mock_event_manager, mock_message_bus):
         """Test integration with global managers."""
         # Mock the global managers

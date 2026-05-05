@@ -6,7 +6,7 @@ and that sessions preserve context so the user's response continues the conversa
 """
 
 import pytest
-from woodwork.core.session import ConversationSession
+from woodwork.runtime.session import ConversationSession
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
 

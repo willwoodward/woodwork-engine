@@ -5,7 +5,7 @@ import base64
 from typing import Optional
 
 from woodwork.components.environments.environment import environment
-from woodwork.deployments import Docker
+from woodwork.deploy import Docker
 from woodwork.utils import format_kwargs
 from woodwork.interfaces.startable import Startable
 

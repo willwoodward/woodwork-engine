@@ -361,7 +361,7 @@ class UnifiedEventBus:
             if self._message_bus:
                 log.debug("[UnifiedEventBus] Component '%s' not in registry, trying message bus delivery", target_name)
                 try:
-                    from woodwork.core.message_bus.interface import MessageEnvelope
+                    from woodwork.runtime.message_bus.interface import MessageEnvelope
                     from dataclasses import asdict
                     import uuid
 

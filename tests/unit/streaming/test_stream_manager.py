@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import Mock
-from woodwork.core.stream_manager import StreamManager
-from woodwork.core.simple_message_bus import SimpleMessageBus
+from woodwork.runtime.stream_manager import StreamManager
+from woodwork.runtime.simple_message_bus import SimpleMessageBus
 from woodwork.types.streaming_data import StreamDataType
 
 

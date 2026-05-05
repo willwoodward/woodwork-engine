@@ -8,7 +8,7 @@ import click
 @click.option("--all", "install_all", is_flag=True, help="Install all optional component dependencies.")
 def init_cmd(isolated, install_all):
     """Install component dependencies for .ww config files."""
-    from woodwork.parser import dependencies
+    from woodwork.config import dependencies
 
     options = {
         "isolated": isolated or install_all,

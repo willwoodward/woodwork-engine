@@ -7,8 +7,8 @@ from abc import ABC, abstractmethod
 from woodwork.components.component import component
 from woodwork.interfaces import tool_interface
 from woodwork.utils import format_kwargs, get_optional
-from woodwork.core.task_master import task_master
-from woodwork.components.core.planning import planning_tools
+from woodwork.runtime.task_master import task_master
+from woodwork.components.tools.planning import planning_tools
 
 # EventManager factory
 from woodwork.events import create_default_emitter
@@ -56,7 +56,7 @@ class agent(component, tool_interface, ABC):
 
         # Auto-discover and register tool schemas with event bus
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             schemas = event_bus.discover_tools_from_agent(self)

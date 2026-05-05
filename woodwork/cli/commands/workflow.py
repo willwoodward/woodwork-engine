@@ -21,7 +21,7 @@ def workflow_remove(workflow_id):
     """Remove a cached workflow by ID."""
     from woodwork.cli.main import parse_and_validate_config
     from woodwork.cli.setup_defaults import copy_prompts
-    from woodwork.parser import config_parser
+    from woodwork.config import config_parser
 
     copy_prompts()
     parse_and_validate_config()
@@ -35,7 +35,7 @@ def workflow_find(query):
     """Find workflows matching a query."""
     from woodwork.cli.main import parse_and_validate_config
     from woodwork.cli.setup_defaults import copy_prompts
-    from woodwork.parser import config_parser
+    from woodwork.config import config_parser
 
     copy_prompts()
     parse_and_validate_config()

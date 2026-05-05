@@ -11,7 +11,7 @@ import tiktoken
 from woodwork.components.agents.agent import agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
-from woodwork.core.unified_event_bus import emit, get_global_event_bus
+from woodwork.runtime.unified_event_bus import emit, get_global_event_bus
 from woodwork.types.event_source import EventSource
 from woodwork.components.llms.llm import llm
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
@@ -603,7 +603,7 @@ class llm(agent, Startable):
             agent.add_hook("agent.thought", log_thoughts, "Log all agent thoughts")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_hook(event_name, hook_function)
@@ -630,7 +630,7 @@ class llm(agent, Startable):
             agent.add_pipe("input.received", enhance_input, "Add enhancement prefix")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_pipe(event_name, pipe_function)

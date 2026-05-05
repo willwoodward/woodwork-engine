@@ -16,8 +16,8 @@ from pathlib import Path
 # Add woodwork to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from woodwork.core.message_bus import get_global_message_bus
-from woodwork.core.message_bus.integration import initialize_global_message_bus_integration
+from woodwork.runtime.message_bus import get_global_message_bus
+from woodwork.runtime.message_bus.integration import initialize_global_message_bus_integration
 from woodwork.components.component import component
 
 # Setup debug logging
@@ -236,7 +236,7 @@ async def test_performance():
     start_time = time.time()
     message_count = 100
 
-    from woodwork.core.message_bus.interface import create_hook_message
+    from woodwork.runtime.message_bus.interface import create_hook_message
 
     for i in range(message_count):
         envelope = create_hook_message(

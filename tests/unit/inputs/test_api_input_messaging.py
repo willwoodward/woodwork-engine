@@ -13,9 +13,9 @@ import json
 import time
 import threading
 from unittest.mock import AsyncMock
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.message_bus.interface import MessageEnvelope, create_component_message
-from woodwork.core.message_bus.integration import MessageBusIntegration
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.message_bus.interface import MessageEnvelope, create_component_message
+from woodwork.runtime.message_bus.integration import MessageBusIntegration
 from woodwork.events import emit
 
 
@@ -92,7 +92,7 @@ class TestAPIInputWebSocketIntegration:
     @pytest.fixture
     async def message_bus_setup(self):
         """Setup mock message bus for testing."""
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         bus = UnifiedEventBus()
         return bus

@@ -10,7 +10,7 @@ import asyncio
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
-from woodwork.core.async_runtime import AsyncRuntime
+from woodwork.runtime.async_runtime import AsyncRuntime
 from woodwork.components.mcp.mcp_server import MCPServer
 
 

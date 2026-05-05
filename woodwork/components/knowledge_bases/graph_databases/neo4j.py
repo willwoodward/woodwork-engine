@@ -8,7 +8,7 @@ from woodwork.components.knowledge_bases.graph_databases.graph_database import (
     graph_database,
 )
 from woodwork import defaults
-from woodwork.deployments import Docker
+from woodwork.deploy import Docker
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.interfaces.startable import Startable
 

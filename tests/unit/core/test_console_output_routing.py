@@ -8,9 +8,9 @@ import pytest
 import asyncio
 from dataclasses import asdict
 from unittest.mock import Mock, patch, AsyncMock
-from woodwork.core.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
 from woodwork.types.events import GenericPayload
-from woodwork.core.message_bus.interface import MessageEnvelope
+from woodwork.runtime.message_bus.interface import MessageEnvelope
 
 
 class TestConsoleOutputRouting:
@@ -103,7 +103,7 @@ class TestConsoleOutputRouting:
     async def test_console_handler_receives_message(self):
         """Integration test: console handler should be invoked when message is delivered"""
         # This tests the full flow from unified event bus through message bus to handler
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 
         # Setup
         event_bus = UnifiedEventBus()
@@ -156,7 +156,7 @@ class TestConsoleOutputRouting:
     @pytest.mark.asyncio
     async def test_console_handler_processes_response_data(self):
         """Test that console handler correctly processes response data from payload"""
-        from woodwork.core.message_bus.integration import GlobalMessageBusManager
+        from woodwork.runtime.message_bus.integration import GlobalMessageBusManager
 
         # Setup
         manager = GlobalMessageBusManager()
@@ -200,7 +200,7 @@ class TestMessageBusComponentHandlerInvocation:
     @pytest.mark.asyncio
     async def test_send_to_component_invokes_handler(self):
         """Test that send_to_component calls the registered handler"""
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 
         # Setup
         message_bus = InMemoryMessageBus()

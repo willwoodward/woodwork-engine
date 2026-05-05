@@ -10,8 +10,8 @@ This test reproduces the exact scenario from the user's logs where:
 import pytest
 import asyncio
 from unittest.mock import Mock
-from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 from woodwork.types.events import GenericPayload
 
 

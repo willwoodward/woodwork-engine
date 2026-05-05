@@ -2,7 +2,7 @@ import asyncio
 import threading
 import time
 
-from woodwork.deployments.router import get_router
+from woodwork.deploy.router import get_router
 
 
 class Deployer:

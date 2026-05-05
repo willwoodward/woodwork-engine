@@ -8,7 +8,7 @@ from woodwork.components.component import component
 from woodwork.utils import format_kwargs
 from woodwork.components.inputs.inputs import inputs
 from woodwork.components.outputs.outputs import outputs
-from woodwork.deployments.router import get_router
+from woodwork.deploy.router import get_router
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.types import Action, Workflow
 from woodwork.defaults import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
