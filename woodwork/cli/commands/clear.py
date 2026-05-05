@@ -14,11 +14,11 @@ def clear_cmd(component):
         start_components,
     )
     from woodwork.cli.setup_defaults import copy_prompts
-    from woodwork.config import config_parser
+    from woodwork.config.operations import clear_all
 
     copy_prompts()
     components = parse_and_validate_config()
     deploy_containers()
     start_components(components)
-    config_parser.clear_all()
+    clear_all()
     click.echo("Knowledge base data cleared.")

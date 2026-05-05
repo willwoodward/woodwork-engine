@@ -36,7 +36,6 @@ class component(StreamingMixin, MessageBusIntegration):
             hasattr(self, "output_targets"),
         )
 
-        self._emitter = None
         self._hooks: List[Hook] = []
         self._pipes: List[Pipe] = []
 
@@ -332,7 +331,3 @@ class component(StreamingMixin, MessageBusIntegration):
         # Internal features cleanup is handled by specific component types
         pass
 
-    @property
-    def emitter(self):
-        """Get the event emitter for this component."""
-        return self._emitter

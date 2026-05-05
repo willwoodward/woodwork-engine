@@ -818,8 +818,13 @@ def set_global_event_bus(event_bus: UnifiedEventBus) -> None:
 
 
 async def emit(event_type: str, payload: Any) -> Any:
-    """Global emit function"""
+    """Global async emit function."""
     return await get_global_event_bus().emit(event_type, payload)
+
+
+def emit_sync(event_type: str, payload: Any) -> Any:
+    """Global synchronous emit function."""
+    return get_global_event_bus().emit_sync(event_type, payload)
 
 
 def register_hook(event_type: str, hook: Callable) -> None:

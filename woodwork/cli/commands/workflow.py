@@ -21,11 +21,11 @@ def workflow_remove(workflow_id):
     """Remove a cached workflow by ID."""
     from woodwork.cli.main import parse_and_validate_config
     from woodwork.cli.setup_defaults import copy_prompts
-    from woodwork.config import config_parser
+    from woodwork.config.operations import delete_action_plan
 
     copy_prompts()
     parse_and_validate_config()
-    config_parser.delete_action_plan(workflow_id)
+    delete_action_plan(workflow_id)
     click.echo(f"Workflow {workflow_id} removed.")
 
 
@@ -35,8 +35,8 @@ def workflow_find(query):
     """Find workflows matching a query."""
     from woodwork.cli.main import parse_and_validate_config
     from woodwork.cli.setup_defaults import copy_prompts
-    from woodwork.config import config_parser
+    from woodwork.config.operations import find_action_plan
 
     copy_prompts()
     parse_and_validate_config()
-    config_parser.find_action_plan(query)
+    find_action_plan(query)

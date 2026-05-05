@@ -146,7 +146,7 @@ class AsyncRuntime:
                 return components
 
             # Use existing config parser for dictionary configs
-            from woodwork.config.config_parser import parse_config_dict
+            from woodwork.config.parser import parse_config_dict
 
             parsed = parse_config_dict(config)
             return parsed.get("components", [])

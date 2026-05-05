@@ -92,7 +92,7 @@ def get_components() -> list[tuple[str, str]]:
     Returns:
         List of (component, type) tuples. Example: [('llm', 'openai'), ('input', 'keyword_voice')]
     """
-    from woodwork.config.config_parser import get_declarations, parse_component_declaration
+    from woodwork.config.tokenizer import get_declarations, parse_component_declaration
 
     components = set()
     with open(os.getcwd() + "/main.ww", "r") as f:

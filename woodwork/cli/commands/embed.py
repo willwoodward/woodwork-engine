@@ -13,11 +13,11 @@ def embed_cmd(component):
         start_components,
     )
     from woodwork.cli.setup_defaults import copy_prompts
-    from woodwork.config import config_parser
+    from woodwork.config.operations import embed_all
 
     copy_prompts()
     components = parse_and_validate_config()
     deploy_containers()
     start_components(components)
-    config_parser.embed_all()
+    embed_all()
     click.echo("Embedding complete.")

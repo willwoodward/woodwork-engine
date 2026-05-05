@@ -10,8 +10,6 @@ from woodwork.utils import format_kwargs, get_optional
 from woodwork.runtime.task_master import task_master
 from woodwork.components.tools.planning import planning_tools
 
-# EventManager factory
-from woodwork.events import create_default_emitter
 
 log = logging.getLogger(__name__)
 
@@ -81,13 +79,6 @@ class agent(component, tool_interface, ABC):
         else:
             self._cache_mode = False
 
-        # Event manager: use component's manager if available, or accept via config, or create default
-        if hasattr(self, "_emitter") and self._emitter is not None:
-            # Component already created an event manager with hooks/pipes
-            pass
-        else:
-            provided_emitter = config.get("events") if isinstance(config, dict) else None
-            self._emitter = provided_emitter if provided_emitter is not None else create_default_emitter()
 
     def close(self):
         if self._cache_mode:

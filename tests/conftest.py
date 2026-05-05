@@ -218,11 +218,11 @@ def mock_pipes():
 
 @pytest.fixture
 def real_event_manager():
-    """Create a real event manager if available."""
+    """Create a real event bus if available."""
     try:
-        from woodwork.events import create_default_emitter
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
-        return create_default_emitter()
+        return UnifiedEventBus()
     except ImportError:
         return Mock()
 

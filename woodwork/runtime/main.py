@@ -11,7 +11,7 @@ import sys
 from typing import Dict, Any, Optional
 
 from woodwork.runtime.async_runtime import AsyncRuntime
-from woodwork.config.config_parser import parse_config_file, parse_config_dict
+from woodwork.config.parser import parse, parse_config_dict
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +28,8 @@ async def start_woodwork(config_path: Optional[str] = None, config_dict: Optiona
         # Parse configuration
         if config_path:
             log.info("[Woodwork] Starting with config file: %s", config_path)
-            config = parse_config_file(config_path)
+            with open(config_path) as f:
+                config = parse(f.read())
         elif config_dict:
             log.info("[Woodwork] Starting with config dictionary")
             config = parse_config_dict(config_dict)

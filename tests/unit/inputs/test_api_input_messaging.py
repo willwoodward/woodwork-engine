@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock
 from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 from woodwork.runtime.message_bus.interface import MessageEnvelope, create_component_message
 from woodwork.runtime.message_bus.integration import MessageBusIntegration
-from woodwork.events import emit
+from woodwork.events import emit_sync as emit
 
 
 @pytest.mark.slow
@@ -364,7 +364,7 @@ class TestRealTimeEventStreaming:
     async def real_time_setup(self):
         """Setup for real-time streaming tests."""
         from woodwork.components.inputs.api_input import api_input, WebSocketSession
-        from woodwork.events import get_global_event_manager
+        from woodwork.events import get_global_event_bus
 
         # Create API input component
         api_component = api_input(name="input", to=["coding_ag"], local=False)
@@ -384,7 +384,7 @@ class TestRealTimeEventStreaming:
             "mock_websocket": mock_websocket,
             "session": session,
             "processor_task": processor_task,
-            "event_manager": get_global_event_manager(),
+            "event_manager": get_global_event_bus(),
         }
 
         # Cleanup
@@ -406,7 +406,7 @@ class TestRealTimeEventStreaming:
         mock_websocket.send_json.reset_mock()
 
         # Emit event in same thread
-        from woodwork.events import emit
+        from woodwork.events import emit_sync as emit
 
         emit("agent.thought", {"thought": "Immediate thought", "component_id": "coding_ag"})
 
@@ -652,7 +652,7 @@ class TestRealTimeEventStreaming:
         mock_websocket.send_json.reset_mock()
         delivery_times.clear()
 
-        from woodwork.events import emit
+        from woodwork.events import emit_sync as emit
 
         emit_time = time.time()
         emit(
@@ -794,7 +794,7 @@ class TestRealTimeEventStreaming:
         # Test the actual emission pattern
         def simulate_real_usage():
             # This simulates what happens in real usage
-            from woodwork.events import emit
+            from woodwork.events import emit_sync as emit
 
             # input.received comes from distributed startup thread
             emit(
