@@ -81,9 +81,9 @@ class chroma(vector_database):
 
         try:
             self._db.delete(ids=ids)
-            print(f"Deleted {len(ids)} vectors from Chroma.")
+            log.info(f"Deleted {len(ids)} vectors from Chroma.")
         except Exception as e:
-            print(f"Error deleting vectors from Chroma: {e}")
+            log.error(f"Error deleting vectors from Chroma: {e}")
 
     @property
     def retriever(self):

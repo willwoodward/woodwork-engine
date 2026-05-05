@@ -286,7 +286,7 @@ class llm(agent, Startable):
             log.debug(f"\n--- Iteration {iteration + 1} ---")
 
             current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
-            print(f"tokens: {current_tokens}")
+            log.debug(f"tokens: {current_tokens}")
 
             if current_tokens > 90000:
                 log.debug("Token limit reached, summarising context...")
@@ -329,13 +329,12 @@ class llm(agent, Startable):
                 return thought
 
             if action_dict is None:
-                print(f"Thought: {thought}")
+                log.debug(f"Thought (no action): {thought}")
                 current_prompt += f"\n\nThought: {thought}\n\nContinue with the next step:"
                 continue
 
             log.debug(f"Thought: {thought}")
             log.debug(f"Action: {action_dict}")
-            print(f"Thought: {thought}")
 
             # Emit agent.thought (non-blocking hook)
             await emit("agent.thought", {"thought": thought})

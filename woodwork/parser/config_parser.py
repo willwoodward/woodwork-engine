@@ -310,8 +310,7 @@ def command_checker(commands):
             if terminals_remaining == 1:
                 terminals_remaining = 0
             else:
-                print("[ERROR] only one command line input can be initialised.")
-                exit()
+                raise ValueError("Only one command_line input can be initialised.")
 
 
 def get_declarations(file: str) -> list[str]:
@@ -986,21 +985,3 @@ def create_component_object(component_type: str, type_name: str, config: dict):
     except Exception as e:
         log.error("[ConfigParser] Error creating %s/%s: %s", component_type, type_name, e)
         return None
-
-
-def parse_config_file(file_path: str) -> dict:
-    """Parse .ww configuration file."""
-    # This is a wrapper around existing parse functionality
-    # but returns format compatible with AsyncRuntime
-
-    # Read and parse the file (use existing logic)
-    with open(file_path, "r") as f:
-        f.read()
-
-    # Use existing parsing logic but adapt output format
-    # This is a simplified version - you may need to adapt based on your existing parse logic
-
-    # For now, return a basic structure
-    # You would adapt your existing parse logic here
-    log.warning("[ConfigParser] File parsing not fully implemented - returning empty config")
-    return {"components": [], "component_configs": {}}

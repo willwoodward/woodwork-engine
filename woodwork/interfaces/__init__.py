@@ -1,4 +1,4 @@
-from woodwork.interfaces.intializable import Initializable
+from woodwork.interfaces.initializable import Initializable
 from woodwork.interfaces.startable import ParallelStartable, Startable
 from woodwork.interfaces.tool_interface import tool_interface
 

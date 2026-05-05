@@ -96,7 +96,7 @@ class keyword_voice(inputs):
         # Initialize the audio stream (for some reason it sometimes doesn't work the first time)
         try:
             sd.RawInputStream(samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=callback_wrapper)
-        except:
+        except Exception:
             pass
 
         with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=callback_wrapper):

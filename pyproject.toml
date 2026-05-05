@@ -10,6 +10,7 @@ readme = "README.md"
 authors = [{ name = "Will Woodward" }]
 requires-python = ">=3.10"
 dependencies = [
+    "click>=8.0.0",
     "colorama>=0.4.6",
     "deprecated>=1.2.18",
     "distro>=1.9.0",
@@ -63,7 +64,7 @@ all = [
 ]
 
 [project.scripts]
-woodwork = "woodwork.__main__:run_as_standalone_app"
+woodwork = "woodwork.cli.app:cli"
 
 [tool.setuptools]
 include-package-data = true

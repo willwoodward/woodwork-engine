@@ -120,16 +120,16 @@ class planning_tools(core):
                         current[line.strip()] = "pending"
 
         if state is None:
-            print("STATE NONE")
+            log.debug("No state provided, defaulting to 'pending'")
             state = "pending"
 
-        # Check if todos exist and print
+        # Check if todos exist
         for todo in todos:
             todo = todo.strip()
             if todo in current:
-                print(f"Todo exists: '{todo}' (current state: {current[todo]})")
+                log.debug(f"Todo exists: '{todo}' (current state: {current[todo]})")
             else:
-                print(f"Todo NOT found in current list: '{todo}'")
+                log.debug(f"Todo NOT found in current list: '{todo}'")
 
             # Update state
             current[todo] = state
@@ -139,10 +139,10 @@ class planning_tools(core):
             for todo, st in current.items():
                 f.write(f"[{st}] {todo}\n")
 
-        print("DEBUG written todos:")
+        log.debug("Written todos:")
         with open(abs_path, "r", encoding="utf-8") as f:
             for line in f:
-                print(repr(line.strip()))
+                log.debug(repr(line.strip()))
 
         # Return updated todos
         return f"Updated todo list to {[(todo.strip(), current[todo.strip()]) for todo in todos]}"

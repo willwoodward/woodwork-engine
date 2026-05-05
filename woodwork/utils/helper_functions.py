@@ -29,7 +29,7 @@ def import_all_classes(package_name: str) -> bool:
             if file.endswith(".py") and file != "__init__.py":
                 # Derive the full module path
                 relative_path = os.path.relpath(root, package_path)
-                print("RELPATH =", relative_path)
+                log.debug(f"RELPATH = {relative_path}")
                 module_name = os.path.splitext(file)[0]
 
                 if relative_path == ".":
@@ -41,7 +41,7 @@ def import_all_classes(package_name: str) -> bool:
                 try:
                     importlib.import_module(full_module_name)
                 except ImportError as e:
-                    print(f"Could not import {full_module_name}: {e}")
+                    log.debug(f"Could not import {full_module_name}: {e}")
                     imported_all = False
 
     return imported_all

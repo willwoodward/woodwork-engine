@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 import os
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
@@ -6,10 +7,11 @@ import pathspec
 import json
 import hashlib
 
-
 from woodwork.components.component import component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.utils import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 class knowledge_base(component, tool_interface, ABC):
@@ -54,7 +56,7 @@ class knowledge_base(component, tool_interface, ABC):
             }
             return True, content
         except Exception as e:
-            print(f"Failed to check file {file_path}: {e}")
+            log.warning(f"Failed to check file {file_path}: {e}")
             return False, None
 
     def embed_file(self, file_path: str, base_dir: str):
@@ -63,10 +65,10 @@ class knowledge_base(component, tool_interface, ABC):
         # Read content and check if embedding needed
         should_embed, content = self.should_embed(file_path, rel_path)
         if not should_embed:
-            print(f"Skipping embed for {rel_path}, no changes detected")
+            log.debug(f"Skipping embed for {rel_path}, no changes detected")
             return
 
-        print(f"Embedding file: {rel_path}")
+        log.info(f"Embedding file: {rel_path}")
         if file_path.endswith(".pdf"):
             loader = PyPDFLoader(file_path)
             documents = loader.load()

@@ -1,5 +1,9 @@
+import logging
+
 from woodwork.components.core.core import core
 from woodwork.utils import format_kwargs
+
+log = logging.getLogger(__name__)
 
 
 class code(core):
@@ -22,11 +26,11 @@ class code(core):
         if result.exit_code != 0:
             clone_command = f"git clone https://github.com/{self.repo_url}.git {self.local_path}"
             out = container.exec_run(f"/bin/sh -c '{clone_command}'")
-            print("Repo cloned: " + out.output.decode("utf-8"))
+            log.info("Repo cloned: " + out.output.decode("utf-8"))
 
     def sync_to_vector_db(self):
         if not self.vector_db or not self.embedding_model:
-            print("Vector DB or embedding model not configured. Skipping sync.")
+            log.warning("Vector DB or embedding model not configured. Skipping sync.")
             return
 
         container = self.docker.get_container()

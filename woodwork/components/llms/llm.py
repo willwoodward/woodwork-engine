@@ -61,7 +61,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
 
         try:
             response = response.content
-        except:
+        except AttributeError:
             pass
         return response
 
@@ -103,7 +103,7 @@ class llm(component, tool_interface, knowledge_base_interface, ABC):
 
         try:
             response = response.content
-        except:
+        except AttributeError:
             pass
 
         return response

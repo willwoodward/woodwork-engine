@@ -130,7 +130,7 @@ class openai(llm, ParallelStartable, Startable):
                     asyncio.run_coroutine_threadsafe(
                         self.stream_output(stream_id, f"Error: {e}", is_final=True), self._original_loop
                     ).result()
-                except:
+                except Exception:
                     log.error(f"Failed to send error message to stream {stream_id}")
             finally:
                 new_loop.close()
@@ -147,5 +147,5 @@ class openai(llm, ParallelStartable, Startable):
             log.error(f"OpenAI LLM streaming setup error: {e}")
             try:
                 await self.stream_output(stream_id, f"Error: {e}", is_final=True)
-            except:
+            except Exception:
                 log.error(f"Failed to send error message to stream {stream_id}")

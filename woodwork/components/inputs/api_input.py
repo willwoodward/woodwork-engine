@@ -17,6 +17,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
 
 from woodwork.components.inputs.inputs import inputs
+from woodwork import defaults
 from woodwork.utils import format_kwargs
 from woodwork.core.unified_event_bus import get_global_event_bus
 from woodwork.types import InputReceivedPayload
@@ -542,7 +543,7 @@ class api_input(inputs):
             try:
                 from neo4j import GraphDatabase
 
-                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+                driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
                 with driver.session() as session:
                     # Get workflow with all actions
@@ -627,7 +628,7 @@ class api_input(inputs):
                 # Use Neo4j driver directly (not the woodwork component which tries to create a new container)
                 from neo4j import GraphDatabase
 
-                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+                driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
                 # Build query with optional filters
                 where_clauses = []
@@ -743,7 +744,7 @@ class api_input(inputs):
                 workflow_id = str(uuid.uuid4())
 
                 # Store in Neo4j
-                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+                driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
                 with driver.session() as session:
                     # Create Workflow node
@@ -802,7 +803,7 @@ class api_input(inputs):
 
                 data = await request.json()
 
-                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+                driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
                 with driver.session() as session:
                     # Update workflow metadata
@@ -859,7 +860,7 @@ class api_input(inputs):
             try:
                 from neo4j import GraphDatabase
 
-                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+                driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
                 with driver.session() as session:
                     session.run("MATCH (w:Workflow {id: $id}) DETACH DELETE w", {"id": workflow_id})
@@ -882,7 +883,7 @@ class api_input(inputs):
                 data = await request.json()
                 entrypoint_name = data["name"]
 
-                driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+                driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
                 with driver.session() as session:
                     query = """

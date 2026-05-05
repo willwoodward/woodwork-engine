@@ -26,7 +26,7 @@ class push_to_talk(inputs):
             sd.RawInputStream(
                 samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=self._handle_voice_command
             )
-        except:
+        except Exception:
             pass
 
     def input_function(self):

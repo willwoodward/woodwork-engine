@@ -39,7 +39,7 @@ class Docker:
 
         try:
             self.docker_client = docker.from_env()
-        except:
+        except Exception:
             raise WoodworkError("Docker client not found.")
 
     def _ensure_data_directory(self):

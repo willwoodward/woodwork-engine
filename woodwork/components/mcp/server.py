@@ -129,5 +129,5 @@ class mcp_server(mcp, Startable):
     @property
     def description(self):
         res = asyncio.run(self.list_tools())
-        print(res)
+        log.debug(f"MCP server tools: {res}")
         return res

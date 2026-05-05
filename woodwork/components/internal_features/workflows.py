@@ -19,6 +19,7 @@ from typing import Dict, List, Tuple, Callable, Any, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from woodwork.components.component import component
 
+from woodwork import defaults
 from woodwork.types.events import AgentActionPayload, AgentStepCompletePayload, InputReceivedPayload
 from .base import InternalFeature
 from .workflow_executor import WorkflowExecutor
@@ -47,9 +48,9 @@ class WorkflowsFeature(InternalFeature):
                 "component_type": "neo4j",
                 "component_id": "workflows_neo4j",
                 "config": {
-                    "uri": "bolt://localhost:7687",
-                    "user": "neo4j",
-                    "password": "testpassword",
+                    "uri": defaults.NEO4J_URI,
+                    "user": defaults.NEO4J_USER,
+                    "password": defaults.NEO4J_PASSWORD,
                     "name": "workflows_db",
                 },
                 "optional": False,
@@ -73,9 +74,9 @@ class WorkflowsFeature(InternalFeature):
 
         # Get or create Neo4j component through component manager
         neo4j_config = {
-            "uri": config.get("workflows_uri", "bolt://localhost:7687"),
-            "user": config.get("workflows_user", "neo4j"),
-            "password": config.get("workflows_password", "testpassword"),
+            "uri": config.get("workflows_uri", defaults.NEO4J_URI),
+            "user": config.get("workflows_user", defaults.NEO4J_USER),
+            "password": config.get("workflows_password", defaults.NEO4J_PASSWORD),
             "name": f"{component.name}_workflows",
             "api_key": api_key,
         }

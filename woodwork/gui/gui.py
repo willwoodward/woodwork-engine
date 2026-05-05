@@ -68,7 +68,7 @@ class GUI:
                 return
         try:
             webbrowser.open(f"http://localhost:{self.port}")
-        except:
+        except Exception:
             pass
 
     def run(self):

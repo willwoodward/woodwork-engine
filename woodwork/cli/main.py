@@ -135,7 +135,7 @@ def _start_async_runtime(components):
 
 def _start_task_master_runtime():
     """Start traditional task master orchestration."""
-    print("🔧 DEBUG: Traditional mode - using TaskMaster orchestration")
+    log.debug("Traditional mode - using TaskMaster orchestration")
     config_parser.task_m.start()
 
 

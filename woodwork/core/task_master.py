@@ -11,6 +11,7 @@ from woodwork.components.outputs.outputs import outputs
 from woodwork.deployments.router import get_router
 from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
 from woodwork.types import Action, Workflow
+from woodwork.defaults import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 
 log = logging.getLogger(__name__)
 
@@ -36,9 +37,9 @@ class task_master(component):
         """Lazy initialization of Neo4j workflow cache"""
         if self._cache is None:
             self._cache = neo4j(
-                uri="bolt://localhost:7687",
-                user="neo4j",
-                password="testpassword",
+                uri=NEO4J_URI,
+                user=NEO4J_USER,
+                password=NEO4J_PASSWORD,
                 name="agent_cache",
             )
         return self._cache
@@ -59,7 +60,7 @@ class task_master(component):
         Triggers a clean-up of unhelpful actions.
         """
         # logic to clean actions
-        print(self.workflow_actions)
+        log.debug(f"Ending workflow, actions: {self.workflow_actions}")
         self.workflow_actions = {}
         self.workflow_variables = {}
 
