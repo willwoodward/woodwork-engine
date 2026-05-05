@@ -15,7 +15,7 @@ import logging
 from typing import Dict, List, Tuple, Callable, Any, TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from woodwork.components.component import component
+    from woodwork.components.component import Component
 from woodwork import defaults
 from woodwork.types.events import (
     AgentThoughtPayload,
@@ -60,7 +60,7 @@ class KnowledgeGraphFeature(InternalFeature):
             }
         ]
 
-    def _setup_feature(self, component: "component", config: Dict, component_manager) -> None:
+    def _setup_feature(self, component: "Component", config: Dict, component_manager) -> None:
         """Initialize knowledge graph with auto-created Neo4j component."""
         log.debug(f"Setting up KnowledgeGraphFeature for component: {component.name}")
         self._component_ref = component
@@ -113,7 +113,7 @@ class KnowledgeGraphFeature(InternalFeature):
             except Exception as e:
                 log.debug(f"Schema query failed (may already exist): {e}")
 
-    def teardown(self, component: "component", component_manager) -> None:
+    def teardown(self, component: "Component", component_manager) -> None:
         """Clean up knowledge graph (component manager handles Neo4j cleanup)."""
         log.debug(f"Tearing down KnowledgeGraphFeature for component: {component.name}")
 

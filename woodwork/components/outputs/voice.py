@@ -2,11 +2,11 @@ import openai
 import os
 import tempfile
 
-from woodwork.components.outputs.outputs import outputs
+from woodwork.components.outputs.outputs import Output
 from woodwork.utils import format_kwargs
 
 
-class voice(outputs):
+class Voice(Output):
     def __init__(self, **config):
         format_kwargs(config, type="voice")
         super().__init__(**config)

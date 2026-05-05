@@ -9,7 +9,7 @@ must listen for these requests and respond appropriately.
 import asyncio
 import pytest
 from unittest.mock import patch
-from woodwork.components.inputs.command_line import command_line
+from woodwork.components.inputs.command_line import CommandLineInput
 from woodwork.runtime.unified_event_bus import UnifiedEventBus
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
 
@@ -24,7 +24,7 @@ def event_bus():
 @pytest.fixture
 def command_line_input(event_bus):
     """Create command_line input with event bus."""
-    cmd = command_line(name="test_cmd", component="input")
+    cmd = CommandLineInput(name="test_cmd", component="input")
     # Manually set the event bus for testing
     cmd._event_bus = event_bus
     return cmd

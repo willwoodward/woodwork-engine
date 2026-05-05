@@ -5,7 +5,7 @@ from openai import OpenAI
 from typing import Callable
 
 from woodwork.components.knowledge_bases.graph_databases.graph_database import (
-    graph_database,
+    GraphDatabase as GraphDatabaseBase,
 )
 from woodwork import defaults
 from woodwork.deploy import Docker
@@ -15,7 +15,7 @@ from woodwork.interfaces.startable import Startable
 log = logging.getLogger(__name__)
 
 
-class neo4j(graph_database, Startable):
+class Neo4j(GraphDatabaseBase, Startable):
     def __init__(self, uri, user, password, **config):
         format_kwargs(config, uri=uri, user=user, password=password, type="neo4j")
         super().__init__(**config)

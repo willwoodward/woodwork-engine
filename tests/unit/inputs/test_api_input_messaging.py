@@ -38,10 +38,10 @@ class TestAPIInputComponentDesign:
 
         The new implementation should use UnifiedEventBus for direct component communication.
         """
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
         # Should be able to create without task_master
-        api_component = api_input(name="test_api", to=["test_agent"], local=False)
+        api_component = APIInput(name="test_api", to=["test_agent"], local=False)
 
         # Should have unified event bus integration
         assert hasattr(api_component, "event_bus")
@@ -363,11 +363,11 @@ class TestRealTimeEventStreaming:
     @pytest.fixture
     async def real_time_setup(self):
         """Setup for real-time streaming tests."""
-        from woodwork.components.inputs.api_input import api_input, WebSocketSession
+        from woodwork.components.inputs.api_input import APIInput, WebSocketSession
         from woodwork.events import get_global_event_bus
 
         # Create API input component
-        api_component = api_input(name="input", to=["coding_ag"], local=False)
+        api_component = APIInput(name="input", to=["coding_ag"], local=False)
 
         # Mock WebSocket session
         mock_websocket = AsyncMock()

@@ -8,11 +8,11 @@ class TestFindFilesPatternParsing:
 
     def test_simple_pattern(self):
         """Test simple filename pattern like '*.py'."""
-        from woodwork.components.environments.coding import coding
+        from woodwork.components.environments.coding import Coding
 
         # Mock Docker to avoid actual initialization
         with patch("woodwork.components.environments.coding.Docker"):
-            env = coding(name="test_env", local_path="/workspace")
+            env = Coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
             container = Mock()
@@ -35,11 +35,11 @@ class TestFindFilesPatternParsing:
 
     def test_directory_with_glob_pattern(self):
         """Test pattern with directory path like 'woodwork/components/llms/*'."""
-        from woodwork.components.environments.coding import coding
+        from woodwork.components.environments.coding import Coding
 
         # Mock Docker to avoid actual initialization
         with patch("woodwork.components.environments.coding.Docker"):
-            env = coding(name="test_env", local_path="/workspace")
+            env = Coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
             container = Mock()
@@ -64,11 +64,11 @@ class TestFindFilesPatternParsing:
 
     def test_directory_with_specific_extension(self):
         """Test pattern like 'woodwork/components/llms/*.py'."""
-        from woodwork.components.environments.coding import coding
+        from woodwork.components.environments.coding import Coding
 
         # Mock Docker to avoid actual initialization
         with patch("woodwork.components.environments.coding.Docker"):
-            env = coding(name="test_env", local_path="/workspace")
+            env = Coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
             container = Mock()
@@ -93,11 +93,11 @@ class TestFindFilesPatternParsing:
 
     def test_recursive_pattern(self):
         """Test recursive pattern like '**/*.py'."""
-        from woodwork.components.environments.coding import coding
+        from woodwork.components.environments.coding import Coding
 
         # Mock Docker to avoid actual initialization
         with patch("woodwork.components.environments.coding.Docker"):
-            env = coding(name="test_env", local_path="/workspace")
+            env = Coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
             container = Mock()
@@ -121,11 +121,11 @@ class TestFindFilesPatternParsing:
 
     def test_empty_result(self):
         """Test when no files match the pattern."""
-        from woodwork.components.environments.coding import coding
+        from woodwork.components.environments.coding import Coding
 
         # Mock Docker to avoid actual initialization
         with patch("woodwork.components.environments.coding.Docker"):
-            env = coding(name="test_env", local_path="/workspace")
+            env = Coding(name="test_env", local_path="/workspace")
 
             # Mock the docker container
             container = Mock()

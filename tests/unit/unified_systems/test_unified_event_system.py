@@ -312,9 +312,9 @@ class TestUnifiedAPIInput:
     @pytest.fixture
     def api_input_component(self):
         """Create API input component for testing"""
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
-        return api_input()
+        return APIInput()
 
     async def test_direct_websocket_event_subscription(self, api_input_component):
         """Test that WebSocket subscribes directly to events without queues"""

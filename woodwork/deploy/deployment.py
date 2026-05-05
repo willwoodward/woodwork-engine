@@ -1,9 +1,10 @@
-from typing import List
+from typing import List, TYPE_CHECKING
 
-from woodwork.components.component import component
+if TYPE_CHECKING:
+    from woodwork.components.component import Component
 
 
 class Deployment:
-    def __init__(self, name: str, components: List[component], **config):
+    def __init__(self, name: str, components: "List[Component]", **config):
         self.name = name
         self.components = components

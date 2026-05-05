@@ -1,6 +1,6 @@
-from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
+from woodwork.components.knowledge_bases.knowledge_base import KnowledgeBase
 
 
-class vector_database(knowledge_base):
+class VectorDatabase(KnowledgeBase):
     def __init__(self, **config):
         super().__init__(**config)

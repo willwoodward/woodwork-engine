@@ -969,10 +969,10 @@ class GlobalMessageBusManager:
     async def _setup_console_output_handler(self):
         """Setup built-in console output handler for automatic console routing"""
         try:
-            from woodwork.components.outputs.console import console
+            from woodwork.components.outputs.console import Console
 
             # Create console output component
-            console_output = console(name="_console_output")
+            console_output = Console(name="_console_output")
 
             # Store reference for direct access
             self._console_output_component = console_output

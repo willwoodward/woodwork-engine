@@ -1,4 +1,4 @@
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.interfaces.knowledge_base_interface import knowledge_base_interface
 from woodwork.types import Prompt
@@ -12,7 +12,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class llm(component, tool_interface, knowledge_base_interface, ABC):
+class LLM(Component, tool_interface, knowledge_base_interface, ABC):
     def __init__(self, **config):
         format_kwargs(config, component="llm")
         super().__init__(**config)

@@ -8,12 +8,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from typing import Any, Tuple, Optional
 import tiktoken
 
-from woodwork.components.agents.agent import agent
+from woodwork.components.agents.agent import Agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
 from woodwork.runtime.unified_event_bus import emit, get_global_event_bus
 from woodwork.types.event_source import EventSource
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
 from woodwork.interfaces.startable import Startable
@@ -22,8 +22,8 @@ from typing import Dict
 log = logging.getLogger(__name__)
 
 
-class llm(agent, Startable):
-    def __init__(self, model: llm, **config):
+class LLMAgent(Agent, Startable):
+    def __init__(self, model: LLM, **config):
         # Require a model (an LLM component instance or a ChatOpenAI instance) be provided.
         format_kwargs(config, model=model, type="llm")
         super().__init__(**config)

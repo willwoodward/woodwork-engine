@@ -7,13 +7,13 @@ import openai
 import sounddevice as sd
 import webrtcvad
 
-from woodwork.components.inputs.inputs import inputs
+from woodwork.components.inputs.inputs import Input
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class push_to_talk(inputs):
+class PushToTalk(Input):
     def __init__(self, api_key, **config):
         format_kwargs(config, type="push_to_talk")
         super().__init__(**config)

@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
 
-from woodwork.components.inputs.inputs import inputs
+from woodwork.components.inputs.inputs import Input
 from woodwork import defaults
 from woodwork.utils import format_kwargs
 from woodwork.runtime.unified_event_bus import get_global_event_bus
@@ -35,7 +35,7 @@ class WebSocketSession:
     created_at: float
 
 
-class api_input(inputs):
+class APIInput(Input):
     """
     API input component with unified async event system.
 

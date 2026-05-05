@@ -10,7 +10,7 @@ from woodwork.runtime.message_bus.integration import MessageBusIntegration, regi
 log = logging.getLogger(__name__)
 
 
-class component(StreamingMixin, MessageBusIntegration):
+class Component(StreamingMixin, MessageBusIntegration):
     def __init__(self, name, component, type, **config):
         log.debug(
             "[component] Initializing component '%s' (type: %s, component: %s) with config keys: %s",
@@ -330,4 +330,3 @@ class component(StreamingMixin, MessageBusIntegration):
         # Base implementation for cleanup
         # Internal features cleanup is handled by specific component types
         pass
-

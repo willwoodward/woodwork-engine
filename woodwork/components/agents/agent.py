@@ -4,7 +4,7 @@ from typing import Optional
 
 from abc import ABC, abstractmethod
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.interfaces import tool_interface
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.components.tools.planning import planning_tools
@@ -12,7 +12,7 @@ from woodwork.components.tools.planning import planning_tools
 log = logging.getLogger(__name__)
 
 
-class agent(component, tool_interface, ABC):
+class Agent(Component, tool_interface, ABC):
     def __init__(self, tools, **config):
         log.debug(f"[Agent] Received config keys: {list(config.keys())}")
         # Remove task_m from config if passed (legacy support)
@@ -57,10 +57,10 @@ class agent(component, tool_interface, ABC):
 
         if config.get("cache", False):
             try:
-                from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+                from woodwork.components.knowledge_bases.graph_databases.neo4j import Neo4j
                 from woodwork.defaults import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 
-                self._cache = neo4j(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PASSWORD, name="agent_cache")
+                self._cache = Neo4j(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PASSWORD, name="agent_cache")
                 self._cache_mode = True
 
                 if api_key is None:
@@ -71,7 +71,6 @@ class agent(component, tool_interface, ABC):
             except Exception as e:
                 log.warning(f"[Agent] Cache requested but unavailable: {e}. Continuing without cache.")
                 self._cache_mode = False
-
 
     def close(self):
         if self._cache_mode:

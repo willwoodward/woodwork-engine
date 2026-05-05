@@ -208,7 +208,15 @@ class TestIntegration:
     @patch("woodwork.cli.main.parallel_func_apply")
     @patch("woodwork.cli.main.Console")
     def test_full_workflow_build_deploy_start(
-        self, mock_console, mock_parallel, mock_deployer_class, mock_gen, mock_get_reg, mock_parser, mock_deps, mock_get_tm
+        self,
+        mock_console,
+        mock_parallel,
+        mock_deployer_class,
+        mock_gen,
+        mock_get_reg,
+        mock_parser,
+        mock_deps,
+        mock_get_tm,
     ):
         """Test the complete workflow: build -> deploy -> start."""
         # Setup

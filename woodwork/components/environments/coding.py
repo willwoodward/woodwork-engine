@@ -4,7 +4,7 @@ import re
 import base64
 from typing import Optional
 
-from woodwork.components.environments.environment import environment
+from woodwork.components.environments.environment import Environment
 from woodwork.deploy import Docker
 from woodwork.utils import format_kwargs
 from woodwork.interfaces.startable import Startable
@@ -12,7 +12,7 @@ from woodwork.interfaces.startable import Startable
 log = logging.getLogger(__name__)
 
 
-class coding(environment, Startable):
+class Coding(Environment, Startable):
     def __init__(
         self,
         repo_url: Optional[str] = None,

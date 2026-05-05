@@ -13,7 +13,7 @@ from woodwork.config.resolver import dependency_resolver, command_checker
 from woodwork.config.factory import _get_task_master, create_component_object
 from woodwork.utils.errors.errors import ForbiddenVariableNameError
 from woodwork.deploy.registry import get_registry
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.deploy.router import get_router, Deployment
 
 log = logging.getLogger(__name__)
@@ -61,12 +61,12 @@ def parse(config: str, registry=None) -> dict:
 
     command_checker(commands)
 
-    tools: list[component] = []
+    tools: list[Component] = []
     router = get_router()
     for name in commands:
         dependency_resolver(commands, commands[name])
         obj = commands[name]["object"]
-        if isinstance(obj, component):
+        if isinstance(obj, Component):
             tools.append(commands[name]["object"])
             registry.register(name, commands[name]["object"])
         if isinstance(obj, Deployment):

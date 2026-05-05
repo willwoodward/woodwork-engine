@@ -4,19 +4,19 @@ import asyncio
 
 from typing import Any, Optional
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.utils import format_kwargs
-from woodwork.components.inputs.inputs import inputs
-from woodwork.components.outputs.outputs import outputs
+from woodwork.components.inputs.inputs import Input
+from woodwork.components.outputs.outputs import Output
 from woodwork.deploy.router import get_router
-from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+from woodwork.components.knowledge_bases.graph_databases.neo4j import Neo4j
 from woodwork.types import Action, Workflow
 from woodwork.defaults import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 
 log = logging.getLogger(__name__)
 
 
-class task_master(component):
+class TaskMaster(Component):
     def __init__(self, **config):
         format_kwargs(config, component="task_master", type="default")
         super().__init__(**config)
@@ -36,7 +36,7 @@ class task_master(component):
     def cache(self):
         """Lazy initialization of Neo4j workflow cache"""
         if self._cache is None:
-            self._cache = neo4j(
+            self._cache = Neo4j(
                 uri=NEO4J_URI,
                 user=NEO4J_USER,
                 password=NEO4J_PASSWORD,
@@ -46,8 +46,8 @@ class task_master(component):
 
     def add_tools(self, tools):
         self._tools = self._tools + tools
-        self._inputs = self._inputs + [component for component in tools if isinstance(component, inputs)]
-        self._outputs = self._outputs + [component for component in tools if isinstance(component, outputs)]
+        self._inputs = self._inputs + [component for component in tools if isinstance(component, Input)]
+        self._outputs = self._outputs + [component for component in tools if isinstance(component, Output)]
 
     def start_workflow(self, workflow_name: str):
         """
@@ -166,7 +166,7 @@ class task_master(component):
             # Fallback to regular output
             print(stream_data)
 
-    async def _loop(self, input_object: inputs):
+    async def _loop(self, input_object: Input):
         router = get_router()
         while True:
             x = input_object.input_function()
@@ -185,7 +185,7 @@ class task_master(component):
                     component = component._output
 
                 # If the last object is not an output, handle console output
-                if not isinstance(component, outputs):
+                if not isinstance(component, Output):
                     await self._handle_console_output(x)
 
     def start(self):

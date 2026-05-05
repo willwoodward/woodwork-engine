@@ -9,28 +9,28 @@ log = logging.getLogger(__name__)
 
 def embed_all():
     """Trigger embedding initialization on all knowledge base components."""
-    from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
+    from woodwork.components.knowledge_bases.knowledge_base import KnowledgeBase
 
     for tool in _get_task_master()._tools:
-        if isinstance(tool, knowledge_base):
+        if isinstance(tool, KnowledgeBase):
             tool.embed_init()
 
 
 def clear_all():
     """Clear all data from knowledge base components."""
-    from woodwork.components.knowledge_bases.knowledge_base import knowledge_base
+    from woodwork.components.knowledge_bases.knowledge_base import KnowledgeBase
 
     for tool in _get_task_master()._tools:
-        if isinstance(tool, knowledge_base):
+        if isinstance(tool, KnowledgeBase):
             tool.clear_all()
 
 
 def delete_action_plan(id: str):
     """Delete a cached action plan by ID from all agents."""
-    from woodwork.components.agents.agent import agent
+    from woodwork.components.agents.agent import Agent
 
     for tool in _get_task_master()._tools:
-        if isinstance(tool, agent):
+        if isinstance(tool, Agent):
             tool._cache.run(f"""MATCH (n)-[:NEXT*]->(m)
                 WHERE elementId(n) = "{id}"
                 DETACH DELETE n
@@ -41,10 +41,10 @@ def delete_action_plan(id: str):
 
 def find_action_plan(query: str):
     """Find cached action plans similar to a query string."""
-    from woodwork.components.agents.agent import agent
+    from woodwork.components.agents.agent import Agent
 
     for tool in _get_task_master()._tools:
-        if isinstance(tool, agent):
+        if isinstance(tool, Agent):
             similar_prompts = tool._cache.similarity_search(query, "Prompt", "value")
             num_results = min(len(similar_prompts), 10)
 

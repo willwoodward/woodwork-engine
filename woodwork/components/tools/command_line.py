@@ -2,14 +2,14 @@ import logging
 import os
 import re
 
-from woodwork.components.tools.core import core
+from woodwork.components.tools.core import Core
 from woodwork.deploy import Docker
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class command_line(core):
+class CommandLineTool(Core):
     def __init__(self, **config):
         format_kwargs(config, type="command_line")
         super().__init__(**config)

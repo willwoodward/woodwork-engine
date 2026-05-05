@@ -18,8 +18,8 @@ from .manager import MCPServerManager
 from .messages import MCPMessage, MCPError
 
 # Legacy compatibility with existing mcp_base and server modules
-from .mcp_base import mcp
-from .server import mcp_server as LegacyMCPServer
+from .mcp_base import MCP
+from .server import MCPServerImpl
 
 __all__ = [
     # New architecture components
@@ -33,7 +33,7 @@ __all__ = [
     "MCPServerManager",
     "MCPMessage",
     "MCPError",
-    # Legacy components (for backward compatibility)
-    "mcp",
-    "LegacyMCPServer",
+    # Base components
+    "MCP",
+    "MCPServerImpl",
 ]

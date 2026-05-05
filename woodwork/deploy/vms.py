@@ -1,15 +1,17 @@
-from typing import List
+from typing import List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from woodwork.components.component import Component
 import inspect
 from fastapi import FastAPI, Request
 from uvicorn import Config, Server
 
-from woodwork.components.component import component
 from woodwork.deploy.deployment import Deployment
 from woodwork.utils import format_kwargs
 
 
 class LocalDeployment(Deployment):
-    def __init__(self, components: List[component], **config):
+    def __init__(self, components: "List[Component]", **config):
         format_kwargs(config, components=components)
         super().__init__(**config)
 
@@ -18,7 +20,7 @@ class LocalDeployment(Deployment):
 
 
 class ServerDeployment(Deployment):
-    def __init__(self, components: List[component], port=43001, **config):
+    def __init__(self, components: "List[Component]", port=43001, **config):
         format_kwargs(config, components=components, port=port)
         super().__init__(**config)
         self.app = FastAPI()

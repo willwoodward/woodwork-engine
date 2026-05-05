@@ -1,4 +1,4 @@
-from woodwork.components.component import component
+from woodwork.components.component import Component
 
 
 class Registry:
@@ -10,11 +10,11 @@ class Registry:
     def __init__(self):
         self._registry = {}
 
-    def register(self, name: str, component: component):
+    def register(self, name: str, component: Component):
         """Register a component with a given name."""
         self._registry[name] = component
 
-    def get(self, name: str) -> component | None:
+    def get(self, name: str) -> Component | None:
         """Retrieve a component by its name."""
         return self._registry.get(name)
 

@@ -1,13 +1,13 @@
 from abc import abstractmethod
 import logging
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class inputs(component):
+class Input(Component):
     def __init__(self, to=None, **config):
         # Remove task_master from config if passed (legacy support)
         config.pop("task_master", None)

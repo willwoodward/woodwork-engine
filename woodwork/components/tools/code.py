@@ -1,12 +1,12 @@
 import logging
 
-from woodwork.components.tools.core import core
+from woodwork.components.tools.core import Core
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class code(core):
+class CodeTool(Core):
     def __init__(self, container, repo_url: str, **config):
         format_kwargs(config, container=container, repo_url=repo_url, type="code")
         super().__init__(**config)

@@ -31,7 +31,7 @@ class TestInternalComponentManager:
         manager = InternalComponentManager(async_runtime=mock_runtime)
         assert manager._async_runtime is mock_runtime
 
-    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.Neo4j")
     def test_create_neo4j_component(self, mock_neo4j_factory, component_manager):
         """Test creating Neo4j component."""
         mock_neo4j_instance = Mock()
@@ -65,7 +65,7 @@ class TestInternalComponentManager:
         result = component_manager.get_component("nonexistent")
         assert result is None
 
-    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.Neo4j")
     def test_get_or_create_returns_existing(self, mock_neo4j_factory, component_manager):
         """Test that get_or_create returns existing component without creating new one."""
         mock_component = Mock()
@@ -113,7 +113,7 @@ class TestInternalComponentManager:
         component_manager.cleanup_components()
         assert len(component_manager._components) == 0
 
-    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.Neo4j")
     @patch("woodwork.runtime.async_runtime.get_global_runtime")
     def test_no_registration_when_no_runtime(self, mock_get_runtime, mock_neo4j_factory):
         """Test that components are created but not registered when no AsyncRuntime is available."""
@@ -130,7 +130,7 @@ class TestInternalComponentManager:
         assert component is mock_neo4j_instance
         assert "test_neo4j" in manager._components
 
-    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.neo4j")
+    @patch("woodwork.components.knowledge_bases.graph_databases.neo4j.Neo4j")
     def test_register_with_async_runtime(self, mock_neo4j_factory):
         """Test that components are registered with AsyncRuntime by default."""
         from woodwork.runtime.async_runtime import AsyncRuntime

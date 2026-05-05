@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from woodwork.components.agents.llm import llm
+from woodwork.components.agents.llm import LLMAgent
 from woodwork.types import Action
 
 
@@ -31,7 +31,7 @@ class TestAgentVariableResolution:
             mock_registry.create_features.return_value = []
 
             with patch("woodwork.components.agents.llm.get_prompt", return_value="Test prompt"):
-                agent = llm(model=mock_model, task_m=mock_task_master, name="test_agent", tools=[])
+                agent = LLMAgent(model=mock_model, task_m=mock_task_master, name="test_agent", tools=[])
                 return agent
 
     def test_resolve_action_inputs_no_variables(self, agent):

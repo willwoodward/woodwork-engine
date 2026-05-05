@@ -7,6 +7,7 @@ This shows both ways to add components and hooks/pipes to agents.
 import pytest
 from typing import Optional
 from unittest.mock import Mock, patch
+from woodwork.components.component import Component
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
@@ -219,14 +220,13 @@ class TestDirectAPIVsFeatures:
         """Test that base component class provides hook/pipe methods."""
 
         # Test that our base component class has the methods
-        from woodwork.components.component import component
 
         # Check methods exist
-        assert hasattr(component, "add_hook")
-        assert hasattr(component, "add_pipe")
+        assert hasattr(Component, "add_hook")
+        assert hasattr(Component, "add_pipe")
 
         # Mock component instance
-        mock_comp = Mock(spec=component)
+        mock_comp = Mock(spec=Component)
         mock_comp.name = "test_component"
         mock_comp.__class__.__name__ = "TestComponent"
 

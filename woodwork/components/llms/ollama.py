@@ -3,7 +3,7 @@ from langchain_ollama import OllamaLLM as Ollama
 import subprocess
 import shutil
 
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.utils.errors.errors import RuntimeError
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.interfaces import Initializable, Startable
@@ -11,7 +11,7 @@ from woodwork.interfaces import Initializable, Startable
 log = logging.getLogger(__name__)
 
 
-class ollama(llm, Initializable, Startable):
+class OllamaLLM(LLM, Initializable, Startable):
     def __init__(self, model, **config):
         format_kwargs(config, model=model, type="ollama")
         self._model = model

@@ -1,5 +1,5 @@
 from typing import Literal, Optional
-from woodwork.components.mcp.mcp_base import mcp
+from woodwork.components.mcp.mcp_base import MCP
 from woodwork.deploy.docker import Docker
 from woodwork.utils import format_kwargs
 from woodwork.interfaces.startable import Startable
@@ -14,7 +14,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class mcp_server(mcp, Startable):
+class MCPServerImpl(MCP, Startable):
     def __init__(
         self,
         transport: Literal["stdio", "sse"],

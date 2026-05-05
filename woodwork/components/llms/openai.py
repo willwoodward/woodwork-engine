@@ -7,14 +7,14 @@ from langchain_core.prompts import ChatPromptTemplate
 import time
 from typing import Any
 
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.interfaces import ParallelStartable, Startable
 from woodwork.utils import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
 
-class openai(llm, ParallelStartable, Startable):
+class OpenAILLM(LLM, ParallelStartable, Startable):
     def __init__(self, api_key: str, model="gpt-4o-mini", **config):
         format_kwargs(config, api_key=api_key, model=model, type="openai")
         log.debug("Establishing connection with model...")

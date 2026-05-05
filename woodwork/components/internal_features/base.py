@@ -5,7 +5,7 @@ from typing import Dict, List, Callable, Type, Optional, Any, Tuple, TYPE_CHECKI
 from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
-    from woodwork.components.component import component
+    from woodwork.components.component import Component
 
 log = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 class InternalFeature(ABC):
     """Base class for internal features that can be auto-wired to components."""
 
-    def setup(self, component: "component", config: Dict, component_manager: "InternalComponentManager") -> None:
+    def setup(self, component: "Component", config: Dict, component_manager: "InternalComponentManager") -> None:
         """Setup the feature for the given component."""
         # Call feature-specific setup
         self._setup_feature(component, config, component_manager)
@@ -22,7 +22,7 @@ class InternalFeature(ABC):
 
     @abstractmethod
     def _setup_feature(
-        self, component: "component", config: Dict, component_manager: "InternalComponentManager"
+        self, component: "Component", config: Dict, component_manager: "InternalComponentManager"
     ) -> None:
         """Setup the specific feature implementation. Override this instead of setup()."""
         pass
@@ -50,7 +50,7 @@ class InternalFeature(ABC):
             log.warning(f"Failed to register hooks/pipes for feature {self.__class__.__name__}: {e}")
 
     @abstractmethod
-    def teardown(self, component: "component", component_manager: "InternalComponentManager") -> None:
+    def teardown(self, component: "Component", component_manager: "InternalComponentManager") -> None:
         """Clean up the feature when component closes."""
         pass
 
@@ -125,18 +125,18 @@ class InternalComponentManager:
 
         # Try to import and register Neo4j factory
         try:
-            from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+            from woodwork.components.knowledge_bases.graph_databases.neo4j import Neo4j
 
-            component_factories["neo4j"] = neo4j
+            component_factories["neo4j"] = Neo4j
             log.debug("Neo4j component factory registered")
         except ImportError as e:
             log.debug(f"Neo4j component factory not available: {e}")
 
         # Try to import and register Chroma factory
         try:
-            from woodwork.components.knowledge_bases.vector_databases.chroma import chroma
+            from woodwork.components.knowledge_bases.vector_databases.chroma import ChromaDB
 
-            component_factories["chroma"] = chroma
+            component_factories["chroma"] = ChromaDB
             log.debug("Chroma component factory registered")
         except ImportError as e:
             log.debug(f"Chroma component factory not available: {e}")

@@ -1,14 +1,14 @@
 import queue
 import logging
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.interfaces.startable import Startable
 from woodwork.types import Update
 
 log = logging.getLogger(__name__)
 
 
-def start_component(c: component, q: queue.Queue):
+def start_component(c: Component, q: queue.Queue):
     """Start a component (called in parallel via threading)"""
     # If component implements Startable interface, call start() method
     if isinstance(c, Startable):

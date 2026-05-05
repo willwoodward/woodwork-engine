@@ -1,13 +1,13 @@
 import logging
 import os
 
-from woodwork.components.tools.core import core
+from woodwork.components.tools.core import Core
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class planning_tools(core):
+class planning_tools(Core):
     def __init__(self, **config):
         format_kwargs(config, type="planning_tools")
         super().__init__(**config)

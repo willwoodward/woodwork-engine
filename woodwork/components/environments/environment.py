@@ -1,14 +1,14 @@
 import logging
 from abc import ABC, abstractmethod
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class environment(component, tool_interface, ABC):
+class Environment(Component, tool_interface, ABC):
     def __init__(self, **config):
         format_kwargs(config, component="environment")
         super().__init__(**config)

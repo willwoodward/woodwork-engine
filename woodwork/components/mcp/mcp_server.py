@@ -10,7 +10,7 @@ import logging
 import uuid
 from typing import Dict, Any, Optional, List
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.utils import format_kwargs
 
@@ -22,7 +22,7 @@ from .messages import MCPMessage, MCPError
 log = logging.getLogger(__name__)
 
 
-class MCPServer(component, tool_interface):
+class MCPServer(Component, tool_interface):
     """Framework component for MCP servers with registry integration."""
 
     def __init__(

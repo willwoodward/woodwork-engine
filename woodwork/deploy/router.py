@@ -2,7 +2,7 @@ import aiohttp
 from typing import Optional
 import logging
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.deploy.deployment import Deployment
 from woodwork.deploy.vms import LocalDeployment, ServerDeployment
 
@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 class DeploymentWrapper:
-    def __init__(self, deployment: Deployment, component: component):
+    def __init__(self, deployment: Deployment, component: Component):
         self.deployment = deployment
         self.component = component
 
@@ -43,7 +43,7 @@ class Router:
     def get(self, name) -> Optional[DeploymentWrapper]:
         return self.components.get(name)
 
-    def add(self, component: component, deployment=None):
+    def add(self, component: Component, deployment=None):
         if deployment is None:
             deployment = LocalDeployment([component], name=str(hash(component)))
 

@@ -17,7 +17,7 @@ import json
 from typing import Dict, List, Tuple, Callable, Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from woodwork.components.component import component
+    from woodwork.components.component import Component
 
 from woodwork import defaults
 from woodwork.types.events import AgentActionPayload, AgentStepCompletePayload, InputReceivedPayload
@@ -57,7 +57,7 @@ class WorkflowsFeature(InternalFeature):
             }
         ]
 
-    def _setup_feature(self, component: "component", config: Dict, component_manager) -> None:
+    def _setup_feature(self, component: "Component", config: Dict, component_manager) -> None:
         """Initialize workflows with auto-created Neo4j component."""
         log.debug(f"Setting up WorkflowsFeature for component: {component.name}")
         self._component_ref = component
@@ -141,7 +141,7 @@ class WorkflowsFeature(InternalFeature):
         except Exception as e:
             log.warning(f"Failed to initialize graph schema: {e}")
 
-    def teardown(self, component: "component", component_manager) -> None:
+    def teardown(self, component: "Component", component_manager) -> None:
         """Clean up workflows (component manager handles Neo4j cleanup)."""
         log.debug(f"Tearing down WorkflowsFeature for component: {component.name}")
 

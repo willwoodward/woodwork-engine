@@ -2,13 +2,13 @@ import logging
 
 from langchain_community.llms import HuggingFaceEndpoint
 
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class hugging_face(llm):
+class HuggingFaceLLM(LLM):
     def __init__(self, api_key: str, model="mistralai/Mixtral-8x7B-Instruct-v0.1", **config):
         format_kwargs(config, api_key=api_key, model=model, type="hugging_face")
         super().__init__(**config)
