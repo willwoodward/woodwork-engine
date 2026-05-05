@@ -240,6 +240,44 @@ class UnifiedEventBus:
 
         return transformed_payload
 
+    def emit_sync(self, event_type: str, payload: Any) -> Any:
+        """Synchronous emit for contexts without an event loop (e.g., legacy sync callers)."""
+        # Create typed payload
+        if not isinstance(payload, BasePayload):
+            typed_payload = self._create_typed_payload(event_type, payload)
+        else:
+            typed_payload = payload
+
+        # Process pipes synchronously (skip async hooks/pipes)
+        current_payload = typed_payload
+        for pipe in self._pipes.get(event_type, []):
+            if not asyncio.iscoroutinefunction(pipe):
+                try:
+                    result = pipe(current_payload)
+                    if result is not None:
+                        current_payload = result
+                except Exception as e:
+                    log.error("[UnifiedEventBus] Sync pipe error for '%s': %s", event_type, e)
+
+        # Fire sync event listeners
+        for listener in self._events.get(event_type, []):
+            if not asyncio.iscoroutinefunction(listener):
+                try:
+                    listener(current_payload)
+                except Exception as e:
+                    log.error("[UnifiedEventBus] Sync event listener error for '%s': %s", event_type, e)
+
+        # Run sync hooks
+        for hook in self._hooks.get(event_type, []):
+            if not asyncio.iscoroutinefunction(hook):
+                try:
+                    hook(current_payload)
+                except Exception as e:
+                    log.error("[UnifiedEventBus] Sync hook error for '%s': %s", event_type, e)
+
+        self._stats["events_emitted"] += 1
+        return current_payload
+
     async def emit_from_component(self, source_component: str, event_type: str, payload: Any) -> Any:
         """
         Emit event from specific component and route to its targets

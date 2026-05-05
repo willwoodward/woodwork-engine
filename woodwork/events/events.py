@@ -199,10 +199,13 @@ def set_global_event_manager(manager: EventManager) -> None:
     _global_event_manager = manager
 
 
-# Global emit function
+# Global emit function - delegates to UnifiedEventBus
 def emit(event: str, data: Any = None) -> Any:
-    """Emit an event through the global event manager"""
-    return get_global_event_manager().emit_sync(event, data)
+    """Emit an event through the unified event bus (sync wrapper)."""
+    from woodwork.runtime.unified_event_bus import get_global_event_bus
+
+    bus = get_global_event_bus()
+    return bus.emit_sync(event, data)
 
 
 def register_hook(event: str, script_path: str, function_name: str) -> None:

@@ -105,14 +105,14 @@ class TestMessageBusIntegration:
         assert component.session_id == "test"
 
     @patch("woodwork.runtime.message_bus.integration.get_global_message_bus")
-    @patch("woodwork.runtime.message_bus.integration.get_global_event_manager")
-    def test_global_manager_integration(self, mock_event_manager, mock_message_bus):
+    @patch("woodwork.runtime.message_bus.integration.get_global_event_bus")
+    def test_global_manager_integration(self, mock_event_bus, mock_message_bus):
         """Test integration with global managers."""
         # Mock the global managers
         mock_bus = Mock()
-        mock_event_mgr = Mock()
+        mock_event = Mock()
         mock_message_bus.return_value = mock_bus
-        mock_event_manager.return_value = mock_event_mgr
+        mock_event_bus.return_value = mock_event
 
         component = MockIntegrationComponent()
 

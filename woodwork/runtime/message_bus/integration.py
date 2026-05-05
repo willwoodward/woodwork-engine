@@ -12,7 +12,6 @@ import time
 from typing import Any, Dict, Optional, List, Tuple, AsyncGenerator
 from dataclasses import dataclass
 
-from woodwork.events import get_global_event_manager
 from .factory import get_global_message_bus
 from woodwork.runtime.unified_event_bus import get_global_event_bus
 
@@ -462,13 +461,10 @@ class MessageBusIntegration:
             return result
 
     async def _process_local_event(self, event: str, data: Any) -> Any:
-        """Process event through existing local event system"""
+        """Process event through the unified event bus."""
         try:
-            # Get existing event manager
-            event_manager = get_global_event_manager()
-
-            # Process through existing hooks and pipes
-            result = await event_manager.emit(event, data)
+            event_bus = get_global_event_bus()
+            result = await event_bus.emit(event, data)
 
             log.debug(
                 "[MessageBusIntegration] Processed local event '%s' for %s", event, getattr(self, "name", "unknown")
@@ -615,9 +611,9 @@ class MessageBusIntegration:
                 getattr(self, "name", "unknown"),
             )
 
-            # Route through existing event system to apply pipes and hooks
-            event_manager = get_global_event_manager()
-            await event_manager.emit(event_type, payload.get("data", payload))
+            # Route through unified event bus to apply pipes and hooks
+            event_bus = get_global_event_bus()
+            await event_bus.emit(event_type, payload.get("data", payload))
 
             log.debug(
                 "[MessageBusIntegration] Processed distributed message '%s' for %s",
