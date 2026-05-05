@@ -7,32 +7,26 @@ from abc import ABC, abstractmethod
 from woodwork.components.component import component
 from woodwork.interfaces import tool_interface
 from woodwork.utils import format_kwargs, get_optional
-from woodwork.runtime.task_master import task_master
 from woodwork.components.tools.planning import planning_tools
-
 
 log = logging.getLogger(__name__)
 
 
 class agent(component, tool_interface, ABC):
-    def __init__(self, tools, task_m: task_master, **config):
+    def __init__(self, tools, **config):
         log.debug(f"[Agent] Received config keys: {list(config.keys())}")
-        format_kwargs(config, tools=tools, task_m=task_m, component="agent")
+        # Remove task_m from config if passed (legacy support)
+        config.pop("task_m", None)
+        format_kwargs(config, tools=tools, component="agent")
         log.debug(f"[Agent] Config keys after format_kwargs: {list(config.keys())}")
         super().__init__(**config)
         log.debug("Creating the agent...")
 
         self._tools = tools
-        self._task_m = task_m
-        # Try to initialize cache, but don't fail if Neo4j is unavailable
-        try:
-            self._cache = task_m.cache
-        except ConnectionError as e:
-            log.warning(f"[Agent] Failed to initialize workflow cache: {e}. Cache features will be disabled.")
-            self._cache = None
+        self._cache = None
         self._cache_mode = False
-        # Agents must be provided with a model (an LLM component instance) via the config key 'model'.
-        # This is mandatory — agents should not require an api_key to be passed directly.
+
+        # Agents must be provided with a model (an LLM component instance)
         model = get_optional(config, "model")
         if model is None:
             raise TypeError("Agent components must be configured with a 'model' (LLM component).")
@@ -50,7 +44,6 @@ class agent(component, tool_interface, ABC):
         if self._is_planner:
             planning = planning_tools(**{"name": "planning_tools"})
             self._tools.append(planning)
-            self._task_m.add_tools([planning])
 
         # Auto-discover and register tool schemas with event bus
         try:
@@ -62,22 +55,22 @@ class agent(component, tool_interface, ABC):
         except Exception as e:
             log.warning(f"[Agent] Failed to auto-discover tool schemas: {e}")
 
-        if "cache" in config:
-            if config["cache"] and self._cache is not None:
-                # Initialise neo4j cache
+        if config.get("cache", False):
+            try:
+                from woodwork.components.knowledge_bases.graph_databases.neo4j import neo4j
+                from woodwork.defaults import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+
+                self._cache = neo4j(uri=NEO4J_URI, user=NEO4J_USER, password=NEO4J_PASSWORD, name="agent_cache")
                 self._cache_mode = True
 
                 if api_key is None:
-                    # If cache functionality requires an API key, prefer taking it from the provided model.
                     raise TypeError("Cache enabled for agent but no API key provided via model or agent config.")
 
                 self._cache.set_api_key(api_key=api_key)
                 self._cache.init_vector_index(index_name="embeddings", label="Prompt", property="embedding")
-            elif config["cache"] and self._cache is None:
-                log.warning("[Agent] Cache requested but unavailable (Neo4j not connected). Continuing without cache.")
+            except Exception as e:
+                log.warning(f"[Agent] Cache requested but unavailable: {e}. Continuing without cache.")
                 self._cache_mode = False
-        else:
-            self._cache_mode = False
 
 
     def close(self):

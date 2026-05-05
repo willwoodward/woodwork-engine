@@ -147,19 +147,16 @@ def create_object(command):
         if type == "keyword_voice":
             from woodwork.components.inputs.keyword_voice import keyword_voice
 
-            config["task_master"] = task_m
             return init_object(keyword_voice, **config)
 
         if type == "push_to_talk":
             from woodwork.components.inputs.push_to_talk import push_to_talk
 
-            config["task_master"] = task_m
             return init_object(push_to_talk, **config)
 
         if type == "command_line":
             from woodwork.components.inputs.command_line import command_line
 
-            config["task_master"] = task_m
             return init_object(command_line, **config)
 
         if type == "api":
@@ -178,7 +175,6 @@ def create_object(command):
             return init_object(functions, **config)
 
     if component == "agent":
-        config["task_m"] = task_m
         if type == "llm":
             from woodwork.components.agents.llm import llm
 
@@ -231,7 +227,6 @@ def create_component_object(component_type: str, type_name: str, config: dict):
             elif type_name == "command_line":
                 from woodwork.components.inputs.command_line import command_line
 
-                config["task_master"] = task_m
                 return init_object(command_line, **config)
 
         elif component_type == "llm" or component_type == "llms":
@@ -248,7 +243,6 @@ def create_component_object(component_type: str, type_name: str, config: dict):
             if type_name == "llm":
                 from woodwork.components.agents.llm import llm
 
-                config["task_m"] = task_m
                 return init_object(llm, **config)
 
         elif component_type == "output" or component_type == "outputs":
