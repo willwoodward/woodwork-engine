@@ -14,11 +14,13 @@ class TestStreamingFlow:
         """Set up streaming infrastructure."""
         from woodwork.runtime.stream_manager import StreamManager
         from woodwork.components.streaming_mixin import StreamingMixin
-        from woodwork.runtime.simple_message_bus import SimpleMessageBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 
         # Create message bus and stream manager
-        message_bus = SimpleMessageBus()
+        message_bus = InMemoryMessageBus()
+        await message_bus.start()
         stream_manager = StreamManager(message_bus)
+        await stream_manager.start()
 
         # Create streaming components
         class StreamProducer(StreamingMixin):

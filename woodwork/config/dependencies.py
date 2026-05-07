@@ -6,7 +6,7 @@ import sys
 
 log = logging.getLogger(__name__)
 
-REQUIREMENTS_DIR = pkg_resources.files("woodwork") / "parser" / "requirements"
+REQUIREMENTS_DIR = pkg_resources.files("woodwork") / "config" / "requirements"
 
 
 def setup_virtual_env(options):

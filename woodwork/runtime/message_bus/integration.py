@@ -1,118 +1,43 @@
 """
 Message Bus Integration Layer
 
-This module provides seamless integration between the new message bus system and
-the existing event system, enabling distributed component-to-component
-communication that replaces Task Master orchestration with a clean, intuitive API.
+This module provides the MessageBusIntegration mixin that adds distributed
+message bus capabilities to components.
 """
 
 import asyncio
 import logging
 import time
 from typing import Any, Dict, Optional, List, Tuple, AsyncGenerator
-from dataclasses import dataclass
 
-from .factory import get_global_message_bus
+from .errors import StreamingChunk, ComponentNotFoundError, ResponseTimeoutError, ComponentError
+from .builder import MessageBuilder, RequestContext
+from .manager import (
+    GlobalMessageBusManager,
+    get_global_message_bus_manager,
+    register_component_with_message_bus,
+    initialize_global_message_bus_integration,
+    initialize_global_message_bus_integration_sync,
+)
 from woodwork.runtime.unified_event_bus import get_global_event_bus
 
 log = logging.getLogger(__name__)
 
-
-@dataclass
-class StreamingChunk:
-    """Represents a chunk in a streaming response."""
-
-    data: Any
-    is_final: bool = False
-    chunk_index: int = 0
-    metadata: Optional[Dict[str, Any]] = None
-
-    def __post_init__(self):
-        if self.metadata is None:
-            self.metadata = {}
-
-
-class ComponentNotFoundError(Exception):
-    """Raised when target component is not found."""
-
-    pass
-
-
-class ResponseTimeoutError(Exception):
-    """Raised when response is not received within timeout."""
-
-    pass
-
-
-class ComponentError(Exception):
-    """Raised when target component throws an exception."""
-
-    pass
-
-
-class MessageBuilder:
-    """
-    Fluent interface for building and sending messages.
-    """
-
-    def __init__(self, sender):
-        self.sender = sender
-        self._target = None
-        self._data = {}
-        self._timeout = 5.0
-
-    def to(self, target_component: str) -> "MessageBuilder":
-        """Set the target component."""
-        self._target = target_component
-        return self
-
-    def with_data(self, data: dict) -> "MessageBuilder":
-        """Set the message data."""
-        self._data = data
-        return self
-
-    def timeout(self, seconds: float) -> "MessageBuilder":
-        """Set timeout for response."""
-        self._timeout = seconds
-        return self
-
-    async def send_and_wait(self) -> Any:
-        """Send message and wait for response."""
-        if not self._target:
-            raise ValueError("Target component not specified")
-
-        return await self.sender.request(self._target, self._data, self._timeout)
-
-
-class RequestContext:
-    """Context manager for request/response lifecycle management."""
-
-    def __init__(self, agent, target: str, timeout: float = 5.0):
-        self.agent = agent
-        self.target = target
-        self.timeout = timeout
-        self._request_id = None
-        self._start_time = None
-
-    async def __aenter__(self):
-        """Setup for request."""
-        self._start_time = time.time()
-        log.debug(f"[RequestContext] Starting request context for {self.target}")
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Cleanup resources."""
-        duration = time.time() - self._start_time if self._start_time else 0
-        log.debug(f"[RequestContext] Request context completed in {duration:.3f}s")
-
-        # Cleanup any pending request data if needed
-        if hasattr(self.agent, "_received_responses") and self._request_id:
-            self.agent._received_responses.pop(self._request_id, None)
-
-    async def send(self, data: dict) -> Any:
-        """Send data and return response."""
-        result = await self.agent.request(self.target, data, self.timeout)
-        return result
+# Re-export for backward compatibility
+__all__ = [
+    "StreamingChunk",
+    "ComponentNotFoundError",
+    "ResponseTimeoutError",
+    "ComponentError",
+    "MessageBuilder",
+    "RequestContext",
+    "MessageBusIntegration",
+    "GlobalMessageBusManager",
+    "get_global_message_bus_manager",
+    "register_component_with_message_bus",
+    "initialize_global_message_bus_integration",
+    "initialize_global_message_bus_integration_sync",
+]
 
 
 class MessageBusIntegration:
@@ -361,9 +286,6 @@ class MessageBusIntegration:
         """
         Send message directly to another component (bypasses local hooks/pipes)
 
-        This provides explicit component-to-component communication without
-        going through the local event system.
-
         Args:
             target_component: Name of target component
             event_type: Event type to send
@@ -568,9 +490,6 @@ class MessageBusIntegration:
     async def _route_response_to_console(self, component_name: str, result: str):
         """Route component response to console output by calling its input() method"""
         try:
-            # Get the console output component and call its input method directly
-            from woodwork.runtime.message_bus.integration import get_global_message_bus_manager
-
             manager = get_global_message_bus_manager()
 
             # Look for the console output component in registered components
@@ -889,283 +808,3 @@ class MessageBusIntegration:
         if hasattr(self, "_received_responses"):
             self._received_responses.pop(request_id, None)
         raise TimeoutError(f"Tool response timeout after {timeout}s")
-
-
-class GlobalMessageBusManager:
-    """
-    Global manager for coordinating message bus integration across all components
-
-    This provides centralized coordination while maintaining the distributed
-    nature of individual component communication.
-    """
-
-    def __init__(self):
-        self.router = None
-        self.message_bus = None
-        self.registered_components = {}
-        self.integration_active = False
-
-        log.debug("[GlobalMessageBusManager] Initialized")
-
-    async def initialize(self, component_configs: Dict[str, Dict[str, Any]]) -> None:
-        """Initialize global message bus integration"""
-        if self.integration_active:
-            log.debug("[GlobalMessageBusManager] Already initialized")
-            return
-
-        try:
-            # Get global message bus
-            self.message_bus = await get_global_message_bus()
-            log.info("[GlobalMessageBusManager] Connected to global message bus")
-
-            # Use unified event bus for routing (replaces DeclarativeRouter)
-            unified_event_bus = get_global_event_bus()
-            log.warning("[GlobalMessageBusManager] Got global event bus: id=%s", id(unified_event_bus))
-
-            # Set message bus reference on unified event bus for virtual component delivery
-            log.warning(
-                "[GlobalMessageBusManager] About to set message bus: %s (type=%s)",
-                self.message_bus,
-                type(self.message_bus).__name__,
-            )
-            unified_event_bus.set_message_bus(self.message_bus)
-            log.warning("[GlobalMessageBusManager] Message bus set on unified event bus")
-
-            # Set router early so it's available for component registration
-            self.router = unified_event_bus
-
-            # Register components with unified event bus
-            for component_name, config in component_configs.items():
-                component_obj = config.get("object")
-                if component_obj:
-                    unified_event_bus.register_component(component_obj)
-
-            # Configure routing from component relationships
-            unified_event_bus.configure_routing()
-
-            log.info(
-                "[GlobalMessageBusManager] Configured declarative router with %d components", len(component_configs)
-            )
-
-            # Setup built-in console output handler for components without explicit outputs
-            await self._setup_console_output_handler()
-
-            # Validate routing configuration
-            validation = self.router.validate_routing_configuration()
-            if not validation["valid"]:
-                log.warning("[GlobalMessageBusManager] Routing configuration issues: %s", validation["issues"])
-
-            if validation["warnings"]:
-                log.info("[GlobalMessageBusManager] Routing warnings: %s", validation["warnings"])
-
-            self.integration_active = True
-
-            log.info("[GlobalMessageBusManager] Message bus integration active: %s", self.router.get_routing_stats())
-
-        except Exception as e:
-            log.error("[GlobalMessageBusManager] Failed to initialize integration: %s", e)
-            raise
-
-    async def _setup_console_output_handler(self):
-        """Setup built-in console output handler for automatic console routing"""
-        try:
-            from woodwork.components.outputs.console import Console
-
-            # Create console output component
-            console_output = Console(name="_console_output")
-
-            # Store reference for direct access
-            self._console_output_component = console_output
-
-            # Register as message handler
-            self.message_bus.register_component_handler("_console_output", self._handle_console_message)
-
-            log.info("[GlobalMessageBusManager] Console output handler registered")
-
-        except Exception as e:
-            log.error("[GlobalMessageBusManager] Failed to setup console output handler: %s", e)
-
-    async def _handle_console_message(self, envelope):
-        """Handle messages routed to console output with streaming support"""
-        try:
-            payload = envelope.payload
-            data = getattr(payload, "data", payload)
-
-            log.debug("[GlobalMessageBusManager] Handling console message: %s", str(data)[:100])
-
-            # Handle streaming output (like task_master implementation)
-            if isinstance(data, str) and data.startswith("stream:"):
-                log.debug("[GlobalMessageBusManager] Detected streaming output, handling as stream")
-                await self._handle_streaming_console_output(data)
-            else:
-                # Handle structured response data
-                if isinstance(data, dict) and "response" in data:
-                    print(data["response"])
-                elif isinstance(data, str):
-                    print(data)
-                else:
-                    print(str(data))
-
-                log.debug("[GlobalMessageBusManager] Displayed regular output to console")
-
-        except Exception as e:
-            log.error("[GlobalMessageBusManager] Error in console message handler: %s", e)
-
-    async def _handle_streaming_console_output(self, stream_data: str):
-        """Handle streaming output to console (adapted from task_master)"""
-        try:
-            # Import stream manager at runtime to avoid circular imports
-            from woodwork.runtime.stream_manager import get_global_stream_manager
-
-            # Get global stream manager
-            stream_manager = get_global_stream_manager()
-            if stream_manager is None:
-                log.error("[GlobalMessageBusManager] No stream manager available for console output")
-                print(f"\nNo stream manager available. Output: {stream_data}")
-                return
-
-            # Extract stream ID
-            stream_id = stream_data.replace("stream:", "")
-            log.debug("[GlobalMessageBusManager] Extracting stream ID: %s", stream_id)
-
-            # Give a tiny moment for the stream to be set up
-            import asyncio
-
-            await asyncio.sleep(0.001)
-
-            # Stream output to console
-            log.debug("[GlobalMessageBusManager] Starting to receive stream chunks for %s", stream_id)
-            chunk_count = 0
-            async for chunk in stream_manager.receive_stream(stream_id):
-                chunk_count += 1
-                log.debug("[GlobalMessageBusManager] Received chunk %d: '%s'", chunk_count, chunk.data)
-                print(chunk.data, end="", flush=True)
-
-            print()  # New line at the end
-            log.debug("[GlobalMessageBusManager] Finished streaming %d chunks for %s", chunk_count, stream_id)
-
-        except Exception as e:
-            log.error("[GlobalMessageBusManager] Error handling streaming console output: %s", e)
-            # Fallback to simple output
-            print(f"Stream output error: {stream_data}")
-
-    def register_component(self, component) -> None:
-        """Register component with global integration"""
-        if not hasattr(component, "name"):
-            log.warning("[GlobalMessageBusManager] Component missing name attribute")
-            return
-
-        component_name = component.name
-
-        # Set router on component if it has integration
-        has_set_router = hasattr(component, "set_router")
-        has_router = self.router is not None
-        log.debug(
-            "[GlobalMessageBusManager] Component '%s': has_set_router=%s, has_router=%s, router_type=%s",
-            component_name,
-            has_set_router,
-            has_router,
-            type(self.router).__name__ if self.router else "None",
-        )
-
-        if has_set_router and has_router:
-            component.set_router(self.router)
-            log.debug("[GlobalMessageBusManager] Set router on component '%s'", component_name)
-        # else:
-        #     if not has_set_router:
-        #         log.warning("[GlobalMessageBusManager] Component '%s' missing set_router method", component_name)
-        #     if not has_router:
-        #         log.warning("[GlobalMessageBusManager] No router available to set on component '%s'", component_name)
-
-        self.registered_components[component_name] = component
-
-        log.debug("[GlobalMessageBusManager] Registered component '%s'", component_name)
-
-    async def send_to_component(self, target_component: str, event_type: str, payload: Dict[str, Any]) -> bool:
-        """
-        Send message directly to another component via the global message bus
-
-        Args:
-            target_component: Name of target component
-            event_type: Event type to send
-            payload: Message payload
-
-        Returns:
-            True if message sent successfully
-        """
-        if not self.integration_active or not self.message_bus:
-            log.error("[GlobalMessageBusManager] Cannot send message - integration not active")
-            return False
-
-        try:
-            from .interface import create_component_message
-
-            # Create message envelope
-            envelope = create_component_message(
-                session_id="global-manager",
-                event_type=event_type,
-                payload=payload,
-                target_component=target_component,
-                sender_component="global-manager",
-            )
-
-            # Send via message bus
-            success = await self.message_bus.send_to_component(envelope)
-
-            if success:
-                log.debug("[GlobalMessageBusManager] Sent '%s' to %s", event_type, target_component)
-            else:
-                log.warning("[GlobalMessageBusManager] Failed to send '%s' to %s", event_type, target_component)
-
-            return success
-
-        except Exception as e:
-            log.error("[GlobalMessageBusManager] Error sending message to %s: %s", target_component, e)
-            return False
-
-    def get_manager_stats(self) -> Dict[str, Any]:
-        """Get comprehensive manager statistics"""
-        return {
-            "integration_active": self.integration_active,
-            "registered_components": len(self.registered_components),
-            "message_bus_healthy": self.message_bus.is_healthy() if self.message_bus else False,
-            "router_stats": self.router.get_routing_stats() if self.router else {},
-            "component_list": list(self.registered_components.keys()),
-        }
-
-
-# Global instance for coordination
-_global_manager = GlobalMessageBusManager()
-
-
-async def initialize_global_message_bus_integration(component_configs: Dict[str, Dict[str, Any]]) -> None:
-    """Initialize global message bus integration"""
-    await _global_manager.initialize(component_configs)
-
-
-def initialize_global_message_bus_integration_sync(component_configs: Dict[str, Dict[str, Any]]) -> None:
-    """Synchronously initialize global message bus integration"""
-    import asyncio
-
-    # Try to get existing event loop, create new one if needed
-    try:
-        asyncio.get_running_loop()
-        # We're in an async context, need to run in thread
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(asyncio.run, _global_manager.initialize(component_configs))
-            future.result()
-    except RuntimeError:
-        # No running loop, safe to create new one
-        asyncio.run(_global_manager.initialize(component_configs))
-
-
-def register_component_with_message_bus(component) -> None:
-    """Register component with global message bus manager"""
-    _global_manager.register_component(component)
-
-
-def get_global_message_bus_manager() -> GlobalMessageBusManager:
-    """Get global message bus manager"""
-    return _global_manager

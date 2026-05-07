@@ -17,12 +17,7 @@ from .channels import MCPChannel, StdioChannel, SSEChannel
 from .manager import MCPServerManager
 from .messages import MCPMessage, MCPError
 
-# Legacy compatibility with existing mcp_base and server modules
-from .mcp_base import MCP
-from .server import MCPServerImpl
-
 __all__ = [
-    # New architecture components
     "MCPServer",
     "MCPRegistry",
     "ServerMetadata",
@@ -33,7 +28,4 @@ __all__ = [
     "MCPServerManager",
     "MCPMessage",
     "MCPError",
-    # Base components
-    "MCP",
-    "MCPServerImpl",
 ]

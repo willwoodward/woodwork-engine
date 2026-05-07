@@ -29,7 +29,7 @@ class LLMAgent(Agent, Startable):
         super().__init__(**config)
         log.debug("Initializing agent...")
 
-        self._llm = model._llm
+        self._model_component = model
 
         self._is_planner = get_optional(config, "planning", False)
         self._prompt_config = Prompt.from_dict(
@@ -55,6 +55,11 @@ class LLMAgent(Agent, Startable):
 
         # Workflow variables for action output tracking
         self._workflow_variables: dict[str, Any] = {}
+
+    @property
+    def _llm(self):
+        """Access the model's LLM instance dynamically (it's only available after start())."""
+        return self._model_component._llm
 
     def start(self, queue=None, config=None):
         """Start the agent and setup internal features (called during component starting phase)"""
@@ -218,7 +223,9 @@ class LLMAgent(Agent, Startable):
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
-        self._task_m.start_workflow(query)
+        # Workflow tracking (no-op if task master not available)
+        if hasattr(self, "_task_m") and self._task_m:
+            self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
         from woodwork.types.events import InputReceivedPayload
@@ -259,8 +266,16 @@ class LLMAgent(Agent, Startable):
                     log.debug(f"Failed to get tools from feature {feature.__class__.__name__}: {e}")
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
+        if not tool_documentation.strip():
+            log.warning(f"[Agent] No tool documentation available! Tools: {[t.name for t in self._tools]}")
 
-        system_prompt = ("Here are the available tools:\n{tools}\n\n").format(tools=tool_documentation) + self._prompt
+        from datetime import datetime
+
+        current_date = datetime.now().strftime("%Y-%m-%d %A")
+        system_prompt = (
+            f"Current date: {current_date}\n\n"
+            "Here are the available tools:\n{tools}\n\n"
+        ).format(tools=tool_documentation) + self._prompt
 
         log.debug(f"[FULL_CONTEXT]:\n{system_prompt}")
         system_prompt_tokens = self.count_tokens(system_prompt)
@@ -282,7 +297,11 @@ class LLMAgent(Agent, Startable):
         else:
             current_prompt = query
 
-        for iteration in range(1000):
+        max_iterations = 25
+        consecutive_no_action = 0
+        max_no_action = 3  # Force final answer after 3 thought-only iterations
+
+        for iteration in range(max_iterations):
             log.debug(f"\n--- Iteration {iteration + 1} ---")
 
             current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
@@ -317,7 +336,8 @@ class LLMAgent(Agent, Startable):
 
             if is_final:
                 log.debug("Final Answer found.")
-                self._task_m.end_workflow()
+                if hasattr(self, "_task_m") and self._task_m:
+                    self._task_m.end_workflow()
 
                 # Save state back to session if provided
                 if session:
@@ -329,9 +349,19 @@ class LLMAgent(Agent, Startable):
                 return thought
 
             if action_dict is None:
-                log.debug(f"Thought (no action): {thought}")
-                current_prompt += f"\n\nThought: {thought}\n\nContinue with the next step:"
+                consecutive_no_action += 1
+                log.debug(f"Thought (no action, {consecutive_no_action}/{max_no_action}): {thought}")
+
+                if consecutive_no_action >= max_no_action:
+                    # LLM is stuck generating thoughts without actions - treat last thought as final answer
+                    log.warning(f"[Agent] Forcing final answer after {consecutive_no_action} consecutive thought-only iterations")
+                    return thought
+
+                current_prompt += f"\n\nThought: {thought}\n\nYou must now either use a tool (Action) or provide your Final Answer. Do not respond with only a Thought."
                 continue
+
+            # Reset no-action counter since we have an action
+            consecutive_no_action = 0
 
             log.debug(f"Thought: {thought}")
             log.debug(f"Action: {action_dict}")

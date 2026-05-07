@@ -48,7 +48,7 @@ def find_action_plan(query: str):
             similar_prompts = tool._cache.similarity_search(query, "Prompt", "value")
             num_results = min(len(similar_prompts), 10)
 
-            print(f"Here are the top {num_results} most similar results:")
+            log.info(f"Here are the top {num_results} most similar results:")
             for i in range(num_results):
                 result = similar_prompts[i]
-                print(f"{result['value']} {result['nodeID']}")
+                log.info(f"{result['value']} {result['nodeID']}")

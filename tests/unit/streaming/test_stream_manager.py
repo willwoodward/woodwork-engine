@@ -1,9 +1,9 @@
 """Tests for StreamManager component."""
 
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 from woodwork.runtime.stream_manager import StreamManager
-from woodwork.runtime.simple_message_bus import SimpleMessageBus
+from woodwork.runtime.message_bus.interface import MessageBusInterface
 from woodwork.types.streaming_data import StreamDataType
 
 
@@ -14,8 +14,11 @@ class TestStreamManager:
     @pytest.fixture
     def mock_message_bus(self):
         """Create a mock message bus."""
-        bus = Mock(spec=SimpleMessageBus)
-        bus.subscribe = Mock()
+        bus = Mock(spec=MessageBusInterface)
+        bus.subscribe = AsyncMock(return_value="sub-id")
+        bus.publish = AsyncMock(return_value=True)
+        bus.start = AsyncMock()
+        bus.stop = AsyncMock()
         return bus
 
     @pytest.fixture
@@ -91,14 +94,18 @@ class TestStreamManager:
         assert "chunks_received" in stats
         assert isinstance(stats["streams_created"], int)
 
-    def test_message_bus_integration(self, stream_manager, mock_message_bus):
-        """Test that stream manager sets up message bus handlers."""
+    async def test_message_bus_integration(self, stream_manager, mock_message_bus):
+        """Test that stream manager sets up message bus handlers on start."""
+        await stream_manager.start()
+
         # Verify that subscribe was called for expected events
         expected_calls = ["stream.chunk", "stream.created", "stream.completed", "stream.failed"]
 
         subscribe_calls = [call[0][0] for call in mock_message_bus.subscribe.call_args_list]
         for expected_event in expected_calls:
             assert expected_event in subscribe_calls
+
+        await stream_manager.stop()
 
 
 @pytest.mark.slow
@@ -107,8 +114,11 @@ class TestStreamManagerErrorHandling:
 
     @pytest.fixture
     def mock_message_bus(self):
-        bus = Mock(spec=SimpleMessageBus)
-        bus.subscribe = Mock()
+        bus = Mock(spec=MessageBusInterface)
+        bus.subscribe = AsyncMock(return_value="sub-id")
+        bus.publish = AsyncMock(return_value=True)
+        bus.start = AsyncMock()
+        bus.stop = AsyncMock()
         return bus
 
     @pytest.fixture

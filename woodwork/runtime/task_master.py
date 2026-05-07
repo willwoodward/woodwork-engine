@@ -191,7 +191,7 @@ class TaskMaster(Component):
     def start(self):
         """Starts the input and output loops and orchestrates the execution of tasks."""
         # Currently only supports one input and output
-        print('Input initialized, type ";" to exit.')
+        log.info('Input initialized, type ";" to exit.')
 
         def run():
             # Create and set a persistent event loop for this thread
@@ -240,7 +240,7 @@ class TaskMaster(Component):
     def add_workflow(self, workflow: Workflow):
         self.validate_workflow(workflow, self._tools)
         id = self._cache_actions(workflow)
-        print(f"Successfully added a new workflow with ID: {id}")
+        log.info(f"Successfully added a new workflow with ID: {id}")
         return True
 
     def list_workflows(self):

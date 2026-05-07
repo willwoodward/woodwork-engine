@@ -80,6 +80,7 @@ from woodwork.cli.commands.status import status_cmd  # noqa: E402
 from woodwork.cli.commands.embed import embed_cmd  # noqa: E402
 from woodwork.cli.commands.clear import clear_cmd  # noqa: E402
 from woodwork.cli.commands.workflow import workflow_group  # noqa: E402
+from woodwork.cli.commands.auth import auth_group  # noqa: E402
 
 cli.add_command(run_cmd)
 cli.add_command(init_cmd)
@@ -91,3 +92,4 @@ cli.add_command(status_cmd)
 cli.add_command(embed_cmd)
 cli.add_command(clear_cmd)
 cli.add_command(workflow_group)
+cli.add_command(auth_group)

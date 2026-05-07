@@ -57,19 +57,19 @@ class MCPServerManager:
             raise
 
     async def _create_stdio_channel(self, metadata: ServerMetadata, env_vars: Dict[str, str]) -> StdioChannel:
-        """Create STDIO channel for local Docker container."""
+        """Create STDIO channel for local process (Docker or command)."""
         if not metadata.packages:
             raise ValueError("No packages available for STDIO transport")
 
-        # Use first OCI package
+        # Use first OCI or command package
         package = None
         for pkg in metadata.packages:
-            if pkg.type == "oci":
+            if pkg.type in ("oci", "command"):
                 package = pkg
                 break
 
         if not package:
-            raise ValueError("No OCI package found for STDIO transport")
+            raise ValueError("No OCI or command package found for STDIO transport")
 
         # Validate required environment variables
         self._validate_env_vars(metadata, env_vars)

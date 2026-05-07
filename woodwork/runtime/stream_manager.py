@@ -20,7 +20,7 @@ from woodwork.types.streaming_data import (
     generate_stream_id,
     create_stream_chunk,
 )
-from woodwork.runtime.simple_message_bus import SimpleMessageBus
+from woodwork.runtime.message_bus.interface import MessageBusInterface, MessageEnvelope, MessagePattern
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 class StreamManager:
     """Manages streaming data between components with reliability guarantees"""
 
-    def __init__(self, message_bus: SimpleMessageBus, state_store=None):
+    def __init__(self, message_bus: MessageBusInterface, state_store=None):
         self.message_bus = message_bus
         self.state_store = state_store  # For future persistent state
 
@@ -57,19 +57,6 @@ class StreamManager:
             "cleanup_runs": 0,
         }
 
-        # Setup message bus integration
-        self._setup_message_handlers()
-
-    def _setup_message_handlers(self):
-        """Setup message bus handlers for streaming events"""
-        # Handle incoming stream chunks
-        self.message_bus.subscribe("stream.chunk", self._handle_chunk_message)
-
-        # Handle stream lifecycle events
-        self.message_bus.subscribe("stream.created", self._handle_stream_created)
-        self.message_bus.subscribe("stream.completed", self._handle_stream_completed)
-        self.message_bus.subscribe("stream.failed", self._handle_stream_failed)
-
     async def start(self):
         """Start the stream manager"""
         if self._running:
@@ -77,10 +64,33 @@ class StreamManager:
 
         self._running = True
 
+        # Setup message bus subscriptions (async)
+        await self._setup_message_handlers()
+
         # Start cleanup task
         self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
 
         log.info("Stream manager started")
+
+    async def _setup_message_handlers(self):
+        """Setup message bus handlers for streaming events"""
+
+        async def _wrap_chunk(envelope: MessageEnvelope):
+            await self._handle_chunk_message({"data": envelope.payload})
+
+        async def _wrap_created(envelope: MessageEnvelope):
+            await self._handle_stream_created({"data": envelope.payload})
+
+        async def _wrap_completed(envelope: MessageEnvelope):
+            await self._handle_stream_completed({"data": envelope.payload})
+
+        async def _wrap_failed(envelope: MessageEnvelope):
+            await self._handle_stream_failed({"data": envelope.payload})
+
+        await self.message_bus.subscribe("stream.chunk", _wrap_chunk)
+        await self.message_bus.subscribe("stream.created", _wrap_created)
+        await self.message_bus.subscribe("stream.completed", _wrap_completed)
+        await self.message_bus.subscribe("stream.failed", _wrap_failed)
 
     async def stop(self):
         """Stop the stream manager and cleanup resources"""
@@ -147,7 +157,16 @@ class StreamManager:
         log.debug(f"Created stream {stream_id}: {component_source} -> {component_target}")
 
         # Notify about stream creation
-        await self.message_bus.publish("stream.created", {"stream_id": stream_id, "metadata": metadata.to_dict()})
+        await self.message_bus.publish(
+            MessageEnvelope(
+                message_id=f"stream-{stream_id[:8]}",
+                session_id=session_id,
+                event_type="stream.created",
+                payload={"stream_id": stream_id, "metadata": metadata.to_dict()},
+                sender_component=component_source,
+                pattern=MessagePattern.PUBLISH_SUBSCRIBE,
+            )
+        )
 
         return stream_id
 
@@ -204,7 +223,14 @@ class StreamManager:
 
         # Send via message bus
         await self.message_bus.publish(
-            "stream.chunk", {"chunk": chunk.to_dict(), "target_component": stream_meta.component_target}
+            MessageEnvelope(
+                message_id=f"chunk-{stream_id[:8]}-{chunk.chunk_index}",
+                session_id=stream_meta.session_id,
+                event_type="stream.chunk",
+                payload={"chunk": chunk.to_dict(), "target_component": stream_meta.component_target},
+                sender_component=stream_meta.component_source,
+                pattern=MessagePattern.PUBLISH_SUBSCRIBE,
+            )
         )
 
         # Update memory usage tracking
@@ -270,8 +296,15 @@ class StreamManager:
                     break
 
         # Emit completion event
+        stream_meta = self.active_streams.get(stream_id)
         await self.message_bus.publish(
-            "stream.received_complete", {"stream_id": stream_id, "chunks_received": buffer.next_expected_index}
+            MessageEnvelope(
+                message_id=f"recv-complete-{stream_id[:8]}",
+                session_id=stream_meta.session_id if stream_meta else "default",
+                event_type="stream.received_complete",
+                payload={"stream_id": stream_id, "chunks_received": buffer.next_expected_index},
+                pattern=MessagePattern.PUBLISH_SUBSCRIBE,
+            )
         )
 
     async def _handle_chunk_message(self, message: Dict[str, Any]):
@@ -383,7 +416,14 @@ class StreamManager:
 
         # Emit failure event
         await self.message_bus.publish(
-            "stream.failed", {"stream_id": stream_id, "reason": reason, "metadata": stream_meta.to_dict()}
+            MessageEnvelope(
+                message_id=f"stream-fail-{stream_id[:8]}",
+                session_id=stream_meta.session_id,
+                event_type="stream.failed",
+                payload={"stream_id": stream_id, "reason": reason, "metadata": stream_meta.to_dict()},
+                sender_component=stream_meta.component_source,
+                pattern=MessagePattern.PUBLISH_SUBSCRIBE,
+            )
         )
 
         log.warning(f"Stream {stream_id} failed: {reason}")
@@ -490,7 +530,7 @@ class StreamManager:
 
 
 # Integration function for setting up streaming with message bus
-async def setup_streaming(message_bus: SimpleMessageBus, stream_manager: Optional[StreamManager] = None):
+async def setup_streaming(message_bus: MessageBusInterface, stream_manager: Optional[StreamManager] = None):
     """Setup streaming integration with message bus"""
 
     if stream_manager is None:

@@ -1,5 +1,5 @@
 import logging
-from langchain_ollama import OllamaLLM as Ollama
+from langchain_ollama import ChatOllama
 import subprocess
 import shutil
 
@@ -40,7 +40,7 @@ class OllamaLLM(LLM, Initializable, Startable):
     def start(self) -> None:
         """Start the Ollama model."""
         log.debug("Establishing connection with model...")
-        self._llm_value = Ollama(
+        self._llm_value = ChatOllama(
             model=self._model,
         )
         log.debug("Model initialized.")

@@ -53,7 +53,7 @@ class Router:
 
     async def setup_streaming(self):
         """Set up stream managers for all streaming-enabled components"""
-        from woodwork.runtime.simple_message_bus import get_global_message_bus
+        from woodwork.runtime.message_bus.factory import get_global_message_bus
         from woodwork.runtime.stream_manager import StreamManager
 
         try:

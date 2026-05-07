@@ -271,6 +271,14 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
                                 cleaned_item.startswith("'") and cleaned_item.endswith("'")
                             ):
                                 cleaned_item = cleaned_item[1:-1]
+                            else:
+                                # Unquoted, non-dict item: treat as variable reference
+                                # (skip booleans and numbers)
+                                if cleaned_item.lower() not in ("true", "false"):
+                                    try:
+                                        float(cleaned_item)
+                                    except ValueError:
+                                        depends_on.append(cleaned_item)
                             array_items.append(cleaned_item)
                     current_item = ""
                 else:
@@ -299,14 +307,16 @@ def parse_config(entry: str) -> tuple[dict[Any, Any], list[Any] | Any]:
                         cleaned_item.startswith("'") and cleaned_item.endswith("'")
                     ):
                         cleaned_item = cleaned_item[1:-1]
+                    else:
+                        # Unquoted, non-dict item: treat as variable reference
+                        if cleaned_item.lower() not in ("true", "false"):
+                            try:
+                                float(cleaned_item)
+                            except ValueError:
+                                depends_on.append(cleaned_item)
                     array_items.append(cleaned_item)
 
             value = array_items
-
-            # Note: Array items are not treated as dependencies because we can't distinguish
-            # between quoted string literals (like ["GET", "POST"]) and actual variable references
-            # after quotes have been stripped during parsing. If variable references in arrays
-            # are needed, they should be handled explicitly.
 
         elif (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
             value = value[1:-1:]

@@ -20,6 +20,7 @@ class OpenAILLM(LLM, ParallelStartable, Startable):
         log.debug("Establishing connection with model...")
         self._model = model
         self._api_key = api_key
+        self._llm_value = None
         self._retriever = get_optional(config, "knowledge_base")
         if self._retriever is not None:
             self._retriever = self._retriever.retriever

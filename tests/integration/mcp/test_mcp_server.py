@@ -20,83 +20,200 @@ pytestmark = pytest.mark.slow
 
 
 class TestMCPRegistry:
-    """Test MCP Registry service for server metadata resolution."""
+    """Test MCP Registry service for server metadata resolution (v0.1 API)."""
 
     @pytest.fixture
-    def mock_http_response(self):
-        """Mock HTTP response from MCP registry."""
+    def mock_npm_server(self):
+        """Mock v0.1 registry response for an npm-based server."""
         return {
-            "servers": [
+            "name": "@anthropic/mcp-server",
+            "description": "Anthropic MCP Server",
+            "version_detail": {"version": "1.2.0"},
+            "packages": [
                 {
-                    "name": "io.github.github/mcp-server",
+                    "registryType": "npm",
+                    "name": "@anthropic/mcp-server",
                     "version": "1.2.0",
-                    "description": "GitHub MCP Server",
-                    "packages": [
-                        {
-                            "type": "oci",
-                            "identifier": "ghcr.io/github/github-mcp-server",
-                            "version": "1.2.0",
-                            "registry_base_url": "ghcr.io",
-                        }
+                    "registryBaseUrl": "https://registry.npmjs.org",
+                    "environmentVariables": [
+                        {"name": "ANTHROPIC_API_KEY", "isRequired": True, "description": "Anthropic API Key"},
                     ],
-                    "remotes": [
-                        {
-                            "type": "sse",
-                            "url": "https://api.github.com/mcp/sse",
-                            "headers": [{"name": "Authorization", "value": "Bearer {GITHUB_TOKEN}"}],
-                        }
-                    ],
-                    "env_vars": [
-                        {"name": "GITHUB_TOKEN", "required": True, "description": "GitHub Personal Access Token"}
-                    ],
-                    "_meta": {"publishedAt": "2024-12-01T10:00:00Z"},
                 }
-            ]
+            ],
+            "remotes": [],
         }
+
+    @pytest.fixture
+    def mock_pypi_server(self):
+        """Mock v0.1 registry response for a pypi-based server."""
+        return {
+            "name": "duckduckgo-mcp-server",
+            "description": "DuckDuckGo Search MCP Server",
+            "version_detail": {"version": "0.3.0"},
+            "packages": [
+                {
+                    "registryType": "pypi",
+                    "name": "duckduckgo-mcp-server",
+                    "version": "0.3.0",
+                    "registryBaseUrl": "https://pypi.org",
+                    "environmentVariables": [],
+                }
+            ],
+            "remotes": [],
+        }
+
+    @pytest.fixture
+    def mock_search_response(self, mock_npm_server):
+        """Mock v0.1 search endpoint response wrapping a server."""
+        return {"servers": [{"server": mock_npm_server}]}
 
     @pytest.fixture
     def registry(self):
         return MCPRegistry()
 
     @pytest.mark.asyncio
-    async def test_get_server_success(self, registry, mock_http_response):
-        """Test successful server metadata retrieval."""
+    async def test_get_server_success(self, registry, mock_npm_server):
+        """Test successful server metadata retrieval with pinned version."""
         with patch("aiohttp.ClientSession.get") as mock_get:
             mock_response = AsyncMock()
-            mock_response.json.return_value = mock_http_response
+            mock_response.status = 200
+            mock_response.raise_for_status = Mock()
+            mock_response.json.return_value = mock_npm_server
             mock_get.return_value.__aenter__.return_value = mock_response
 
-            metadata = await registry.get_server("io.github.github/mcp-server", "1.2.0")
+            metadata = await registry.get_server("@anthropic/mcp-server", "1.2.0")
 
-            assert metadata.name == "io.github.github/mcp-server"
+            assert metadata.name == "@anthropic/mcp-server"
             assert metadata.version == "1.2.0"
-            assert metadata.description == "GitHub MCP Server"
+            assert metadata.description == "Anthropic MCP Server"
             assert len(metadata.packages) == 1
-            assert len(metadata.remotes) == 1
+            assert metadata.packages[0].command == "npx"
+            assert metadata.packages[0].args == ["-y", "@anthropic/mcp-server"]
             assert len(metadata.env_vars) == 1
+            assert metadata.env_vars[0].name == "ANTHROPIC_API_KEY"
 
     @pytest.mark.asyncio
-    async def test_get_server_latest_version(self, registry, mock_http_response):
-        """Test retrieving latest version when 'latest' specified."""
+    async def test_get_server_latest_version(self, registry, mock_search_response):
+        """Test retrieving latest version via search endpoint."""
         with patch("aiohttp.ClientSession.get") as mock_get:
             mock_response = AsyncMock()
-            mock_response.json.return_value = mock_http_response
+            mock_response.status = 200
+            mock_response.raise_for_status = Mock()
+            mock_response.json.return_value = mock_search_response
             mock_get.return_value.__aenter__.return_value = mock_response
 
-            metadata = await registry.get_server("io.github.github/mcp-server", "latest")
+            metadata = await registry.get_server("@anthropic/mcp-server", "latest")
 
-            assert metadata.version == "1.2.0"  # Should resolve to actual version
+            assert metadata.version == "1.2.0"
+            assert metadata.name == "@anthropic/mcp-server"
 
     @pytest.mark.asyncio
     async def test_get_server_not_found(self, registry):
-        """Test handling of server not found."""
+        """Test handling of server not found (empty search results)."""
         with patch("aiohttp.ClientSession.get") as mock_get:
             mock_response = AsyncMock()
+            mock_response.status = 200
+            mock_response.raise_for_status = Mock()
             mock_response.json.return_value = {"servers": []}
             mock_get.return_value.__aenter__.return_value = mock_response
 
-            with pytest.raises(ValueError, match="Server not found"):
-                await registry.get_server("nonexistent/server", "1.0.0")
+            with pytest.raises(ValueError, match="not found"):
+                await registry.get_server("nonexistent/server", "latest")
+
+    @pytest.mark.asyncio
+    async def test_search_url_construction(self, registry, mock_search_response):
+        """Verify correct v0.1 search URL is built."""
+        with patch("aiohttp.ClientSession.get") as mock_get:
+            mock_response = AsyncMock()
+            mock_response.status = 200
+            mock_response.raise_for_status = Mock()
+            mock_response.json.return_value = mock_search_response
+            mock_get.return_value.__aenter__.return_value = mock_response
+
+            await registry.get_server("@anthropic/mcp-server", "latest")
+
+            call_args = mock_get.call_args
+            assert call_args[0][0] == "https://registry.modelcontextprotocol.io/v0.1/servers"
+            assert call_args[1]["params"]["search"] == "@anthropic/mcp-server"
+            assert call_args[1]["params"]["version"] == "latest"
+
+    def test_from_registry_maps_npm_to_npx(self, mock_npm_server):
+        """Verify npm registryType maps to command=npx with -y prefix."""
+        metadata = ServerMetadata.from_registry(mock_npm_server)
+
+        assert len(metadata.packages) == 1
+        pkg = metadata.packages[0]
+        assert pkg.type == "command"
+        assert pkg.command == "npx"
+        assert pkg.args == ["-y", "@anthropic/mcp-server"]
+
+    def test_from_registry_maps_pypi_to_uvx(self, mock_pypi_server):
+        """Verify pypi registryType maps to command=uvx."""
+        metadata = ServerMetadata.from_registry(mock_pypi_server)
+
+        assert len(metadata.packages) == 1
+        pkg = metadata.packages[0]
+        assert pkg.type == "command"
+        assert pkg.command == "uvx"
+        assert pkg.args == ["duckduckgo-mcp-server"]
+
+    def test_from_registry_extracts_env_vars_from_packages(self):
+        """Verify env vars are aggregated and deduped across packages."""
+        server_data = {
+            "name": "test-server",
+            "description": "Test",
+            "version_detail": {"version": "1.0.0"},
+            "packages": [
+                {
+                    "registryType": "npm",
+                    "name": "test-a",
+                    "version": "1.0.0",
+                    "environmentVariables": [
+                        {"name": "API_KEY", "isRequired": True, "description": "Key A"},
+                        {"name": "SHARED_VAR", "isRequired": False, "description": "Shared"},
+                    ],
+                },
+                {
+                    "registryType": "npm",
+                    "name": "test-b",
+                    "version": "1.0.0",
+                    "environmentVariables": [
+                        {"name": "SHARED_VAR", "isRequired": True, "description": "Duplicate"},
+                        {"name": "OTHER_KEY", "isRequired": True, "description": "Other"},
+                    ],
+                },
+            ],
+            "remotes": [],
+        }
+        metadata = ServerMetadata.from_registry(server_data)
+
+        env_names = [e.name for e in metadata.env_vars]
+        assert env_names == ["API_KEY", "SHARED_VAR", "OTHER_KEY"]
+        # First occurrence wins for dedup
+        shared = next(e for e in metadata.env_vars if e.name == "SHARED_VAR")
+        assert shared.required is False
+
+    def test_from_registry_runtime_hint_overrides_command(self):
+        """Verify runtimeHint overrides the default command."""
+        server_data = {
+            "name": "custom-server",
+            "description": "Custom",
+            "version_detail": {"version": "1.0.0"},
+            "packages": [
+                {
+                    "registryType": "npm",
+                    "name": "custom-server",
+                    "version": "1.0.0",
+                    "runtimeHint": "bunx",
+                    "environmentVariables": [],
+                },
+            ],
+            "remotes": [],
+        }
+        metadata = ServerMetadata.from_registry(server_data)
+
+        assert metadata.packages[0].command == "bunx"
+        assert metadata.packages[0].args == ["-y", "custom-server"]
 
 
 class TestServerMetadata:
@@ -128,7 +245,7 @@ class TestServerMetadata:
             name="test/server", version="1.0.0", description="Test server", packages=[], remotes=[]
         )
 
-        with pytest.raises(Exception, match="No supported transport"):
+        with pytest.raises(Exception, match="No transports available"):
             metadata.get_preferred_transport()
 
 

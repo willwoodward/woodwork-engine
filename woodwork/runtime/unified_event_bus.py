@@ -96,6 +96,9 @@ class UnifiedEventBus:
 
         total_routes = sum(len(targets) for targets in self._routing_table.values())
         log.info("[UnifiedEventBus] Routing configured: %d components, %d routes", len(self._components), total_routes)
+        for comp_name, targets in self._routing_table.items():
+            if targets:
+                log.info("[UnifiedEventBus] Route: %s -> %s", comp_name, targets)
 
     def _extract_routing_targets(self, component: Any) -> List[str]:
         """Extract routing targets from component 'to' property"""
@@ -121,6 +124,13 @@ class UnifiedEventBus:
             type(to_config).__name__,
             source_property,
         )
+        log.debug(
+            "[UnifiedEventBus] Component '%s': _output=%s, output_targets=%s, to_config=%s",
+            component_name,
+            getattr(component, "_output", None),
+            getattr(component, "output_targets", None),
+            to_config,
+        )
 
         if not to_config:
             log.debug(
@@ -134,7 +144,7 @@ class UnifiedEventBus:
             log.debug("[UnifiedEventBus] String target for '%s': %s", component_name, targets)
             return targets
         elif isinstance(to_config, list):
-            targets = [str(target) for target in to_config]
+            targets = [target.name if hasattr(target, "name") else str(target) for target in to_config]
             log.debug("[UnifiedEventBus] List targets for '%s': %s", component_name, targets)
             return targets
         elif hasattr(to_config, "name"):
@@ -392,6 +402,7 @@ class UnifiedEventBus:
         self, target_name: str, event_type: str, payload: BasePayload, source_component: str
     ) -> Any:
         """Deliver event directly to target component"""
+        log.debug("[UnifiedEventBus] Delivering '%s' from '%s' to '%s'", event_type, source_component, target_name)
         target_component = self._components.get(target_name)
 
         if not target_component:

@@ -16,6 +16,14 @@ from .interface import MessageBusInterface, MessageEnvelope, MessageDeliveryMode
 from .in_memory_bus import InMemoryMessageBus
 from .factory import MessageBusFactory, create_default_message_bus, get_global_message_bus, set_global_message_bus
 from .integration import MessageBusIntegration
+from .errors import StreamingChunk, ComponentNotFoundError, ResponseTimeoutError, ComponentError
+from .builder import MessageBuilder, RequestContext
+from .manager import (
+    GlobalMessageBusManager,
+    get_global_message_bus_manager,
+    register_component_with_message_bus,
+    initialize_global_message_bus_integration,
+)
 
 __all__ = [
     # Core interfaces
@@ -30,8 +38,19 @@ __all__ = [
     "create_default_message_bus",
     "get_global_message_bus",
     "set_global_message_bus",
-    # Routing
-    "DeclarativeRouter",
     # Integration
     "MessageBusIntegration",
+    # Errors
+    "StreamingChunk",
+    "ComponentNotFoundError",
+    "ResponseTimeoutError",
+    "ComponentError",
+    # Builder
+    "MessageBuilder",
+    "RequestContext",
+    # Manager
+    "GlobalMessageBusManager",
+    "get_global_message_bus_manager",
+    "register_component_with_message_bus",
+    "initialize_global_message_bus_integration",
 ]
