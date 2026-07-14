@@ -1,0 +1,23 @@
+config: ../main.ww
+
+cases:
+  - name: weekend_trip_planning
+    input: "Find me a 3-day weekend trip from London under £500 — flights, hotel, and things to do"
+    assert:
+      tool_called: search
+      response_contains: ["flight", "hotel"]
+      min_tool_calls: 2
+
+  - name: headphone_comparison
+    input: "What are the best noise-cancelling headphones under £200 right now? Compare the top 3"
+    assert:
+      tool_called: search
+      response_contains: ["noise", "cancel"]
+      min_tool_calls: 2
+
+  - name: moving_to_manchester
+    input: "I'm moving to Manchester next month, what areas should I look at for a young professional?"
+    assert:
+      tool_called: search
+      response_contains: ["manchester"]
+      min_tool_calls: 2

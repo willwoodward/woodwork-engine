@@ -160,7 +160,7 @@ class LLMAgent(Agent, Startable):
         final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
         thought_match = re.search(r"Thought:\s*(.*?)(?=\s*Action:|\s*Final Answer:|$)", agent_output, re.DOTALL)
         action_match = re.search(
-            r"Action:\s*(\{.*?\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))", agent_output, re.DOTALL
+            r"Action:\s*(\{.*\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))", agent_output, re.DOTALL
         )
 
         thought = ""
@@ -178,12 +178,47 @@ class LLMAgent(Agent, Startable):
         action_str = action_match.group(1).strip()
         cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
 
+        # The regex may capture too little or too much for nested JSON.
+        # Use brace counting to extract the outermost JSON object.
+        cleaned_action_str = self._extract_json_object(cleaned_action_str)
+
         try:
             action = json.loads(cleaned_action_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
 
         return thought, action, False
+
+    @staticmethod
+    def _extract_json_object(s: str) -> str:
+        """Extract the outermost balanced JSON object from a string using brace counting."""
+        start = s.find("{")
+        if start == -1:
+            return s
+        depth = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(s)):
+            c = s[i]
+            if escape:
+                escape = False
+                continue
+            if c == "\\":
+                escape = True
+                continue
+            if c == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return s[start : i + 1]
+        # Unbalanced — return original and let json.loads report the error
+        return s
 
     def count_tokens(self, text: str, model: str = "gpt-5-mini"):
         if not isinstance(text, str):
@@ -272,10 +307,9 @@ class LLMAgent(Agent, Startable):
         from datetime import datetime
 
         current_date = datetime.now().strftime("%Y-%m-%d %A")
-        system_prompt = (
-            f"Current date: {current_date}\n\n"
-            "Here are the available tools:\n{tools}\n\n"
-        ).format(tools=tool_documentation) + self._prompt
+        system_prompt = (f"Current date: {current_date}\n\nHere are the available tools:\n{{tools}}\n\n").format(
+            tools=tool_documentation
+        ) + self._prompt
 
         log.debug(f"[FULL_CONTEXT]:\n{system_prompt}")
         system_prompt_tokens = self.count_tokens(system_prompt)
@@ -354,7 +388,9 @@ class LLMAgent(Agent, Startable):
 
                 if consecutive_no_action >= max_no_action:
                     # LLM is stuck generating thoughts without actions - treat last thought as final answer
-                    log.warning(f"[Agent] Forcing final answer after {consecutive_no_action} consecutive thought-only iterations")
+                    log.warning(
+                        f"[Agent] Forcing final answer after {consecutive_no_action} consecutive thought-only iterations"
+                    )
                     return thought
 
                 current_prompt += f"\n\nThought: {thought}\n\nYou must now either use a tool (Action) or provide your Final Answer. Do not respond with only a Thought."

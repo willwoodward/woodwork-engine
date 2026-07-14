@@ -1,9 +1,3 @@
 - Proper MCP support
 - REALLY good documentation
 - Simplified environments
-
-
-
-Today:
-- Agent level testing suite
-- Clean docs
