@@ -1,23 +1,22 @@
-import logging
-import multiprocessing
 import asyncio
+import logging
 import threading
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-import time
 from typing import Any
 
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
 from woodwork.components.llms.llm import LLM
-from woodwork.interfaces import ParallelStartable, Startable
+from woodwork.components.streaming_mixin import StreamingMixin
 from woodwork.utils import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
 
-class OpenAILLM(LLM, ParallelStartable, Startable):
+class OpenAILLM(LLM):
     def __init__(self, api_key: str, model="gpt-4o-mini", **config):
         format_kwargs(config, api_key=api_key, model=model, type="openai")
-        log.debug("Establishing connection with model...")
+        log.debug("Establishing connection with OpenAI model...")
         self._model = model
         self._api_key = api_key
         self._llm_value = None
@@ -32,7 +31,7 @@ class OpenAILLM(LLM, ParallelStartable, Startable):
                 timeout=None,
                 max_retries=2,
                 api_key=self._api_key,
-                streaming=False,  # Enable streaming support
+                streaming=False,
             )
 
         super().__init__(**config)
@@ -45,12 +44,10 @@ class OpenAILLM(LLM, ParallelStartable, Startable):
     def retriever(self):
         return self._retriever
 
-    def parallel_start(self, queue: multiprocessing.Queue, config: dict = {}):
-        time.sleep(1)
-
-    def start(self, queue: multiprocessing.Queue, config: dict = {}):
+    def initialize(self) -> None:
+        """Initialise the LLM client (called before start)."""
         if self._model == "gpt-5-mini":
-            log.debug("Model initialized.")
+            log.debug("OpenAI model already initialised.")
             return
         self._llm_value = ChatOpenAI(
             model=self._model,
@@ -59,29 +56,30 @@ class OpenAILLM(LLM, ParallelStartable, Startable):
             timeout=None,
             max_retries=2,
             api_key=self._api_key,
-            streaming=True,  # Enable streaming support
+            streaming=True,
         )
+        log.debug("OpenAI model initialized.")
+
+    # Keep legacy start() for backwards-compat with old runtime paths
+    def start(self, queue=None, config=None):
+        self.initialize()
+        import time
         time.sleep(1)
-        log.debug("Model initialized.")
+
+    def parallel_start(self, queue=None, config=None):
+        import time
+        time.sleep(1)
 
     async def _generate_and_stream_output(self, input_data: Any, stream_id: str):
-        """Generate streaming response using OpenAI's streaming API"""
-
         def _sync_streaming():
-            """Run streaming in a separate thread with its own event loop"""
             try:
-                # Create a new event loop for this thread
                 new_loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(new_loop)
 
                 async def _async_stream():
-                    log.debug(f"OpenAI LLM generating streaming output for stream {stream_id}, input: '{input_data}'")
-
-                    # Prepare the prompt using the same logic as the base class
                     prompt = str(input_data)
                     short_term_memory = self._get_short_term_memory()
 
-                    # Use question_answer logic but with streaming
                     if self._memory:
                         system_prompt = (
                             "You are a helpful assistant, answer the provided question, In 3 sentences or less. {memory}"
@@ -92,61 +90,42 @@ class OpenAILLM(LLM, ParallelStartable, Startable):
                         )
 
                     chat_prompt = ChatPromptTemplate.from_messages(
-                        [
-                            ("system", system_prompt),
-                            ("human", "{input}"),
-                        ]
+                        [("system", system_prompt), ("human", "{input}")]
                     )
-
-                    # Create streaming chain
                     chain = chat_prompt | self._llm
 
-                    # Stream the response
                     async for chunk in chain.astream({"input": prompt}):
                         if hasattr(chunk, "content") and chunk.content:
-                            # We need to call stream_output in the original event loop
                             asyncio.run_coroutine_threadsafe(
-                                self.stream_output(stream_id, chunk.content, is_final=False), self._original_loop
+                                self.stream_output(stream_id, chunk.content, is_final=False),
+                                self._original_loop,
                             ).result()
 
-                    # Mark as final
                     asyncio.run_coroutine_threadsafe(
                         self.stream_output(stream_id, "", is_final=True), self._original_loop
                     ).result()
 
-                    # Add to memory after completion
                     if self._memory:
                         self._memory.add(f"[USER] {prompt}")
                         self._memory.add("[AI] <streamed response>")
 
-                    log.debug(f"OpenAI LLM finished streaming for stream {stream_id}")
-
-                # Run the async streaming
                 new_loop.run_until_complete(_async_stream())
-
-            except Exception as e:
-                log.error(f"OpenAI LLM streaming error: {e}")
+            except Exception as exc:
+                log.error("OpenAI LLM streaming error: %s", exc)
                 try:
-                    # Send error back to original loop
                     asyncio.run_coroutine_threadsafe(
-                        self.stream_output(stream_id, f"Error: {e}", is_final=True), self._original_loop
+                        self.stream_output(stream_id, f"Error: {exc}", is_final=True),
+                        self._original_loop,
                     ).result()
                 except Exception:
-                    log.error(f"Failed to send error message to stream {stream_id}")
+                    pass
             finally:
                 new_loop.close()
 
         try:
-            # Store the original event loop
             self._original_loop = asyncio.get_running_loop()
-
-            # Run streaming in a separate thread to avoid executor shutdown issues
             thread = threading.Thread(target=_sync_streaming)
             thread.start()
-
-        except Exception as e:
-            log.error(f"OpenAI LLM streaming setup error: {e}")
-            try:
-                await self.stream_output(stream_id, f"Error: {e}", is_final=True)
-            except Exception:
-                log.error(f"Failed to send error message to stream {stream_id}")
+        except Exception as exc:
+            log.error("OpenAI LLM streaming setup error: %s", exc)
+            await self.stream_output(stream_id, f"Error: {exc}", is_final=True)

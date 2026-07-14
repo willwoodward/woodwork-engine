@@ -12,7 +12,7 @@ class HuggingFaceLLM(LLM):
     def __init__(self, api_key: str, model="mistralai/Mixtral-8x7B-Instruct-v0.1", **config):
         format_kwargs(config, api_key=api_key, model=model, type="hugging_face")
         super().__init__(**config)
-        log.debug("Establishing connection with model...")
+        log.debug("Establishing connection with HuggingFace model...")
 
         self._llm_value = HuggingFaceEndpoint(
             repo_id=model,
@@ -25,7 +25,7 @@ class HuggingFaceLLM(LLM):
         if self._retriever:
             self._retriever = self._retriever.retriever
 
-        log.debug("Model initialized.")
+        log.debug("HuggingFace model initialized.")
 
     @property
     def _llm(self):

@@ -52,37 +52,12 @@ class Router:
             self.deployments[deployment.name] = deployment
 
     async def setup_streaming(self):
-        """Set up stream managers for all streaming-enabled components"""
-        from woodwork.runtime.message_bus.factory import get_global_message_bus
-        from woodwork.runtime.stream_manager import StreamManager
+        """Set up stream managers for all streaming-enabled components.
 
-        try:
-            # Get global message bus and stream manager
-            message_bus = await get_global_message_bus()
-            stream_manager = StreamManager(message_bus)
-            await stream_manager.start()
-
-            # Set stream manager for all streaming components
-            streaming_count = 0
-            for component_wrapper in self.components.values():
-                component = component_wrapper.component
-                if hasattr(component, "streaming_enabled") and component.streaming_enabled:
-                    if hasattr(component, "set_stream_manager"):
-                        component.set_stream_manager(stream_manager)
-                        streaming_count += 1
-                        log.debug(f"✅ Set up streaming for component: {component.name}")
-                    else:
-                        log.debug(
-                            f"❌ Component {component.name} has streaming enabled but no set_stream_manager method"
-                        )
-
-            log.debug(f"Router set up streaming for {streaming_count} components")
-
-            return stream_manager
-
-        except Exception as e:
-            log.error(f"Error setting up streaming: {e}")
-            return None
+        Streaming via StreamManager is disabled in the new architecture
+        (message_bus was removed). This is a no-op kept for call-site compat.
+        """
+        log.debug("Router.setup_streaming: no-op in new architecture")
 
 
 _router = None

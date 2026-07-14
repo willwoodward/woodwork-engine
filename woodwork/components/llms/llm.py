@@ -1,18 +1,23 @@
+"""Abstract LLM base class."""
+
+from abc import ABC, abstractmethod
+from typing import Any
+
+from langchain_core.prompts import ChatPromptTemplate
+
 from woodwork.components.component import Component
+from woodwork.components.streaming_mixin import StreamingMixin
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.interfaces.knowledge_base_interface import knowledge_base_interface
 from woodwork.types import Prompt
 from woodwork.utils import format_kwargs, get_prompt
 
-from langchain_core.prompts import ChatPromptTemplate
-from abc import ABC, abstractmethod
-from typing import Any
 import logging
 
 log = logging.getLogger(__name__)
 
 
-class LLM(Component, tool_interface, knowledge_base_interface, ABC):
+class LLM(Component, StreamingMixin, tool_interface, knowledge_base_interface, ABC):
     def __init__(self, **config):
         format_kwargs(config, component="llm")
         super().__init__(**config)
@@ -23,11 +28,9 @@ class LLM(Component, tool_interface, knowledge_base_interface, ABC):
         self._output = config.get("to")
 
     def _can_stream_input(self) -> bool:
-        """LLMs cannot stream input - they need the complete prompt"""
         return False
 
     def _can_stream_output(self) -> bool:
-        """LLMs can stream output when supported"""
         return True
 
     @property
@@ -35,13 +38,39 @@ class LLM(Component, tool_interface, knowledge_base_interface, ABC):
     def _llm(self):
         pass
 
+    # ------------------------------------------------------------------ #
+    # New clean call() API — used by AgentLoop                           #
+    # ------------------------------------------------------------------ #
+
+    async def call(self, system_prompt: str, history: str, query: str) -> str:
+        """
+        Call the LLM with a system prompt and user query.
+
+        Returns the response content as a plain string.
+        """
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", "{input}"),
+            ]
+        )
+        chain = prompt | self._llm
+        response = chain.invoke({"input": query})
+        try:
+            return response.content
+        except AttributeError:
+            return str(response)
+
+    # ------------------------------------------------------------------ #
+    # Legacy tool_interface / knowledge_base_interface methods           #
+    # ------------------------------------------------------------------ #
+
     def _get_short_term_memory(self):
         if self._memory:
             return f"Here are the previous messages as context: \n{self._memory.data}"
         return ""
 
     def question_answer(self, query, short_term_memory=""):
-        # Defining the system prompt
         if self._memory:
             system_prompt = (
                 "You are a helpful assistant, answer the provided question, In 3 sentences or less. {memory}"
@@ -55,29 +84,20 @@ class LLM(Component, tool_interface, knowledge_base_interface, ABC):
                 ("human", "{input}"),
             ]
         )
-
         chain = prompt | self._llm
         response = chain.invoke({"input": query})
-
         try:
-            response = response.content
+            return response.content
         except AttributeError:
-            pass
-        return response
+            return response
 
     def context_answer(self, query, short_term_memory=""):
         results = self._retriever.invoke(query)
-
         context_parts = []
         for x in results:
-            # Escape braces in content for formatting safety
             content = x.page_content.replace("{", "{{").replace("}", "}}")
-            # Extract the file_path metadata (change key if yours is different)
             file_path = x.metadata.get("file_path", "unknown file")
-
-            # Format how you want the metadata to appear — here just prefixing
             context_parts.append(f"[File: {file_path}]\n{content}")
-
         context = "\n\n".join(context_parts)
 
         system_prompt = (
@@ -97,16 +117,12 @@ class LLM(Component, tool_interface, knowledge_base_interface, ABC):
                 ("human", "{input}"),
             ]
         )
-
         chain = prompt | self._llm
         response = chain.invoke({"input": query})
-
         try:
-            response = response.content
+            return response.content
         except AttributeError:
-            pass
-
-        return response
+            return response
 
     @property
     def description(self):
@@ -118,47 +134,37 @@ class LLM(Component, tool_interface, knowledge_base_interface, ABC):
             """
 
     def input(self, query: str, inputs: dict = {}) -> str | None:
-        # Substitute inputs
         prompt = query
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
         short_term_memory = self._get_short_term_memory()
-        answer = ""
         if self._retriever is None:
             answer = self.question_answer(prompt, short_term_memory)
         else:
             answer = self.context_answer(prompt, short_term_memory)
 
-        # Adding to short-term memory
         if self._memory:
             self._memory.add(f"[USER] {query}")
             self._memory.add(f"[AI] {answer}")
 
         return answer
 
+    async def execute(self, action: str, inputs: dict = {}) -> str | None:
+        """New execute() alias for tool_interface compatibility."""
+        return self.input(action, inputs)
+
     async def process(self, query: str) -> str:
-        """Process input with optional streaming output"""
-        log.debug(f"LLM processing query: '{query}', streaming_output={self.streaming_output}")
+        log.debug("LLM processing query: '%s', streaming_output=%s", query, self.streaming_output)
         if self.streaming_output:
             result = await self.process_with_streaming_output(query)
-            log.debug(f"LLM streaming result: {result}")
             return result
-        else:
-            result = self.input(query)
-            log.debug(f"LLM non-streaming result: {result}")
-            return result
+        return self.input(query)
 
     async def _generate_and_stream_output(self, input_data: Any, stream_id: str):
-        """Generate and stream LLM response - override in subclasses"""
         try:
-            log.debug(f"LLM generating streaming output for stream {stream_id}, input: '{input_data}'")
-
-            # Default implementation: get full response and send as single chunk
-            # Subclasses should override this for proper streaming
             response = self.input(str(input_data))
             await self.stream_output(stream_id, response, is_final=True)
-
-        except Exception as e:
-            log.error(f"LLM streaming error: {e}")
-            await self.stream_output(stream_id, f"Error: {e}", is_final=True)
+        except Exception as exc:
+            log.error("LLM streaming error: %s", exc)
+            await self.stream_output(stream_id, f"Error: {exc}", is_final=True)

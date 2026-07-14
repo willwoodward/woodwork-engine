@@ -19,7 +19,12 @@ from fastapi.responses import JSONResponse
 from woodwork.components.inputs.inputs import Input
 from woodwork import defaults
 from woodwork.utils import format_kwargs
-from woodwork.runtime.unified_event_bus import get_global_event_bus
+from woodwork.core.events import EventBus as _EventBus
+
+
+def get_global_event_bus():
+    """Shim: return a standalone EventBus (no global singleton in new arch)."""
+    return _EventBus()
 from woodwork.types import InputReceivedPayload
 
 log = logging.getLogger(__name__)
@@ -954,9 +959,9 @@ class APIInput(Input):
         async def get_event_pipeline():
             """Get all registered hooks and pipes in the event system."""
             try:
-                from woodwork.runtime.unified_event_bus import get_global_event_bus
+                from woodwork.core.events import EventBus as _EB
 
-                event_bus = get_global_event_bus()
+                event_bus = _EB()
 
                 # Get hooks and pipes from the event bus
                 hooks_data = {}

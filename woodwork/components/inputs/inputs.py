@@ -9,7 +9,6 @@ log = logging.getLogger(__name__)
 
 class Input(Component):
     def __init__(self, to=None, **config):
-        # Remove task_master from config if passed (legacy support)
         config.pop("task_master", None)
         if to is not None:
             config["to"] = to
@@ -19,15 +18,7 @@ class Input(Component):
 
         self._output = config.get("to")
 
-    def _can_stream_input(self) -> bool:
-        """Input components typically don't receive streams"""
-        return False
-
-    def _can_stream_output(self) -> bool:
-        """Input components can stream output if configured"""
-        return True
-
     @abstractmethod
     def input_function(self):
-        """The function that will be run in a separate thread to handle input."""
+        """Blocking call that returns one line of user input."""
         pass

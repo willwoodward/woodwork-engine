@@ -1,332 +1,132 @@
-import os
-import importlib.util
+"""
+Base Component class.
+
+Stripped of MessageBusIntegration and StreamingMixin.
+All components share: name, config, lifecycle hooks, and hook/pipe registration.
+"""
+
 import logging
-from typing import List, Optional, Any, Dict
+import importlib.util
+import os
+from typing import Any, Dict, List, Optional
+
 from woodwork.types.workflows import Hook, Pipe
-from woodwork.runtime.unified_event_bus import get_global_event_bus
-from woodwork.components.streaming_mixin import StreamingMixin
-from woodwork.runtime.message_bus.integration import MessageBusIntegration, register_component_with_message_bus
 
 log = logging.getLogger(__name__)
 
 
-class Component(StreamingMixin, MessageBusIntegration):
-    def __init__(self, name, component, type, **config):
-        log.debug(
-            "[component] Initializing component '%s' (type: %s, component: %s) with config keys: %s",
-            name,
-            type,
-            component,
-            list(config.keys()),
-        )
+class Component:
+    """
+    Minimal base class for all woodwork components.
 
-        # Set basic attributes first
+    Subclasses add domain logic (LLM calls, API requests, …) and may mix
+    in StreamingMixin if they need streaming I/O.
+    """
+
+    def __init__(self, name: str, component: str, type: str, **config: Any) -> None:
         self.name = name
         self.component = component
         self.type = type
         self.config = config
 
-        # Initialize both mixins with the full config
-        log.debug("[component] Calling super().__init__ for '%s'", name)
-        super().__init__(name=name, config=config)
+        # Hook / pipe configs parsed from the .ww file
+        self._hook_configs: List[Hook] = self._parse_hooks(config.get("hooks", []))
+        self._pipe_configs: List[Pipe] = self._parse_pipes(config.get("pipes", []))
 
-        log.debug(
-            "[component] Component '%s' initialization complete, hasattr(output_targets): %s",
-            name,
-            hasattr(self, "output_targets"),
-        )
+        log.debug("[Component] Initialized '%s' (component=%s type=%s)", name, component, type)
 
-        self._hooks: List[Hook] = []
-        self._pipes: List[Pipe] = []
+    # ------------------------------------------------------------------ #
+    # Lifecycle (no-op defaults — subclasses override as needed)          #
+    # ------------------------------------------------------------------ #
 
-        # Internal features are now handled by specific component types
-        # (moved to LLM agents, etc. to avoid enabling for all components)
+    def initialize(self) -> None:
+        """Synchronous pre-start initialisation (e.g. pulling Ollama model)."""
 
-        self._setup_event_system(config)
+    async def start(self) -> None:
+        """Async start (e.g. connecting to a service)."""
 
-        # Register with global message bus manager
-        register_component_with_message_bus(self)
+    async def stop(self) -> None:
+        """Async teardown."""
 
-        # Set up tool message handling if this is a tool component
-        self._setup_tool_message_handling()
+    def close(self) -> None:
+        """Synchronous cleanup (backwards-compat alias for stop)."""
 
-        # Log configuration
-        if hasattr(self, "streaming_enabled") and self.streaming_enabled:
-            log.debug(
-                f"[Component {self.name}] Streaming enabled: input={self.streaming_input}, output={self.streaming_output}"
-            )
+    # ------------------------------------------------------------------ #
+    # Execute — override in tool / agent components                       #
+    # ------------------------------------------------------------------ #
 
-        if hasattr(self, "output_targets") and self.output_targets:
-            log.debug(f"[Component {self.name}] Message bus routing targets: {self.output_targets}")
+    async def execute(self, action: str, inputs: Dict[str, Any]) -> Any:
+        raise NotImplementedError(f"{self.__class__.__name__} does not implement execute()")
 
-        streaming_enabled = getattr(self, "streaming_enabled", False)
-        self.streaming_enabled = streaming_enabled
+    # ------------------------------------------------------------------ #
+    # Hook / pipe wiring                                                  #
+    # ------------------------------------------------------------------ #
 
-        # Ensure output_targets is properly set from config
-        # The parser resolves 'to: [ag]' to actual component objects
-        if not hasattr(self, "output_targets") or self.output_targets is None:
-            self.output_targets = config.get("to", [])
+    def _register_hooks_pipes(self, event_bus: Any) -> None:
+        """Register all configured hooks and pipes on *event_bus*."""
+        for hook in self._hook_configs:
+            fn = self._load_function(hook.script_path, hook.function_name)
+            if fn:
+                event_bus.register_hook(hook.event, fn)
+                log.debug("[Component %s] Registered hook '%s' on '%s'", self.name, hook.function_name, hook.event)
 
-        # Ensure it's always a list for consistency
-        if self.output_targets and not isinstance(self.output_targets, list):
-            self.output_targets = [self.output_targets]
+        for pipe in self._pipe_configs:
+            fn = self._load_function(pipe.script_path, pipe.function_name)
+            if fn:
+                event_bus.register_pipe(pipe.event, fn)
+                log.debug("[Component %s] Registered pipe '%s' on '%s'", self.name, pipe.function_name, pipe.event)
 
-        # Ensure required attributes exist for MessageBusIntegration
-        if not hasattr(self, "session_id"):
-            self.session_id = "default"
-        if not hasattr(self, "integration_stats"):
-            self.integration_stats = {
-                "messages_sent": 0,
-                "messages_received": 0,
-                "routing_events": 0,
-                "integration_errors": 0,
-            }
+    # ------------------------------------------------------------------ #
+    # Config parsers                                                      #
+    # ------------------------------------------------------------------ #
 
-        log.info(
-            f"[Component {self.name}] Initialized with streaming={streaming_enabled}, routing={bool(self.output_targets)}, type={self.type}"
-        )
+    def _parse_hooks(self, hooks_config: List[Dict[str, Any]]) -> List[Hook]:
+        result = []
+        for cfg in hooks_config:
+            try:
+                result.append(Hook.from_dict(cfg))
+            except Exception as exc:
+                log.warning("[Component %s] Invalid hook config %s: %s", self.name, cfg, exc)
+        return result
 
-    def _setup_tool_message_handling(self):
-        """Setup message bus handling for tool components."""
+    def _parse_pipes(self, pipes_config: List[Dict[str, Any]]) -> List[Pipe]:
+        result = []
+        for cfg in pipes_config:
+            try:
+                result.append(Pipe.from_dict(cfg))
+            except Exception as exc:
+                log.warning("[Component %s] Invalid pipe config %s: %s", self.name, cfg, exc)
+        return result
+
+    # ------------------------------------------------------------------ #
+    # Dynamic function loader (used by hooks/pipes)                       #
+    # ------------------------------------------------------------------ #
+
+    def _load_function(self, script_path: str, function_name: str) -> Optional[Any]:
+        """Load *function_name* from *script_path* (abs or cwd-relative)."""
         try:
-            # Check if this is a tool component (has tool_interface)
-            from woodwork.interfaces.tool_interface import tool_interface
-
-            if isinstance(self, tool_interface):
-                log.debug(f"[Component {self.name}] Setting up tool message handling")
-
-                # Register handler for tool.execute messages
-                async def handle_tool_execute(payload):
-                    if hasattr(self, "handle_tool_execute_message"):
-                        return await self.handle_tool_execute_message(payload)
-                    else:
-                        log.warning(f"[Tool {self.name}] Received tool.execute message but no handler available")
-
-                # Store the handler for potential message bus registration
-                self._tool_message_handler = handle_tool_execute
-                log.info(f"[Tool {self.name}] Registered for tool.execute messages via message bus")
-
-        except Exception as e:
-            log.debug(f"[Component {self.name}] No tool interface detected: {e}")
-
-    def _setup_event_system(self, config: Dict[str, Any]):
-        """Initialize the event system with hooks and pipes from config."""
-        try:
-            log.debug(f"[Component {self.name}] Setting up event system...")
-            log.debug(f"[Component {self.name}] Config keys: {list(config.keys())}")
-
-            # Check if hooks are configured
-            hooks_config = config.get("hooks", [])
-            if hooks_config:
-                log.debug(f"[Component {self.name}] Found {len(hooks_config)} hook configurations: {hooks_config}")
-                self._hooks = self._parse_hooks_config(hooks_config)
-            else:
-                log.debug(f"[Component {self.name}] No hooks configured")
-
-            # Check if pipes are configured
-            pipes_config = config.get("pipes", [])
-            if pipes_config:
-                log.debug(f"[Component {self.name}] Found {len(pipes_config)} pipe configurations: {pipes_config}")
-                self._pipes = self._parse_pipes_config(pipes_config)
-            else:
-                log.debug(f"[Component {self.name}] No pipes configured")
-
-            # Register hooks and pipes with the global event manager
-            if self._hooks or self._pipes:
-                log.debug(
-                    f"[Component {self.name}] Registering with global event manager: {len(self._hooks)} hooks and {len(self._pipes)} pipes"
-                )
-                self._register_hooks_global()
-                self._register_pipes_global()
-            else:
-                log.debug(f"[Component {self.name}] No hooks or pipes configured")
-
-        except Exception as e:
-            log.warning(f"Failed to setup event system for component {self.name}: {e}")
-
-    def _parse_hooks_config(self, hooks_config: List[Dict[str, Any]]) -> List[Hook]:
-        """Parse hook configurations from config."""
-        hooks = []
-        log.debug(f"[Component {self.name}] Parsing hooks_config type: {type(hooks_config)}, content: {hooks_config}")
-        for i, hook_config in enumerate(hooks_config):
-            try:
-                log.debug(
-                    f"[Component {self.name}] Processing hook {i}: type={type(hook_config)}, content={hook_config}"
-                )
-                hook = Hook.from_dict(hook_config)
-                hooks.append(hook)
-            except Exception as e:
-                log.warning(f"Invalid hook config in component {self.name}: {e}")
-        return hooks
-
-    def _parse_pipes_config(self, pipes_config: List[Dict[str, Any]]) -> List[Pipe]:
-        """Parse pipe configurations from config."""
-        pipes = []
-        log.debug(f"[Component {self.name}] Parsing pipes_config type: {type(pipes_config)}, content: {pipes_config}")
-        for i, pipe_config in enumerate(pipes_config):
-            try:
-                log.debug(
-                    f"[Component {self.name}] Processing pipe {i}: type={type(pipe_config)}, content={pipe_config}"
-                )
-                pipe = Pipe.from_dict(pipe_config)
-                pipes.append(pipe)
-            except Exception as e:
-                log.warning(f"Invalid pipe config in component {self.name}: {e}")
-        return pipes
-
-    def _register_hooks_global(self):
-        """Register all configured hooks with the unified event bus."""
-        unified_bus = get_global_event_bus()
-
-        log.debug(f"[Component {self.name}] Registering {len(self._hooks)} hooks globally...")
-        for i, hook in enumerate(self._hooks):
-            try:
-                log.debug(
-                    f"[Component {self.name}] Loading hook {i + 1}: {hook.function_name} from {hook.script_path} for event '{hook.event}'"
-                )
-                func = self._load_function(hook.script_path, hook.function_name)
-                if func:
-                    unified_bus.register_hook(hook.event, func)
-                    log.debug(
-                        f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name}"
-                    )
-                else:
-                    log.warning(
-                        f"[Component {self.name}] Failed to load function {hook.function_name} from {hook.script_path}"
-                    )
-            except Exception as e:
-                log.warning(
-                    f"[Component {self.name}] Failed to register hook {hook.function_name} for event {hook.event}: {e}"
-                )
-
-    def _register_pipes_global(self):
-        """Register all configured pipes with the unified event bus."""
-        unified_bus = get_global_event_bus()
-
-        log.debug(f"[Component {self.name}] Registering {len(self._pipes)} pipes globally...")
-        for i, pipe in enumerate(self._pipes):
-            try:
-                log.debug(
-                    f"[Component {self.name}] Loading pipe {i + 1}: {pipe.function_name} from {pipe.script_path} for event '{pipe.event}'"
-                )
-                func = self._load_function(pipe.script_path, pipe.function_name)
-                if func:
-                    unified_bus.register_pipe(pipe.event, func)
-                    log.debug(
-                        f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name}"
-                    )
-                else:
-                    log.warning(
-                        f"[Component {self.name}] Failed to load function {pipe.function_name} from {pipe.script_path}"
-                    )
-            except Exception as e:
-                log.warning(
-                    f"[Component {self.name}] Failed to register pipe {pipe.function_name} for event {pipe.event}: {e}"
-                )
-
-    def _load_function(self, script_path: str, function_name: str):
-        """Load a function from a Python script file."""
-        try:
-            # Handle relative paths relative to the component's location
             if not os.path.isabs(script_path):
-                # Try relative to current working directory first
-                if os.path.exists(script_path):
-                    abs_path = os.path.abspath(script_path)
-                else:
-                    # Try relative to the examples directory if in examples
-                    if "examples" in os.getcwd():
-                        abs_path = os.path.join(os.getcwd(), script_path)
-                    else:
-                        abs_path = script_path
+                abs_path = os.path.abspath(script_path) if os.path.exists(script_path) else script_path
             else:
                 abs_path = script_path
 
             if not os.path.exists(abs_path):
-                log.warning(f"Script file not found: {abs_path}")
+                log.warning("[Component %s] Script not found: %s", self.name, abs_path)
                 return None
 
-            # Load the module
-            spec = importlib.util.spec_from_file_location("dynamic_module", abs_path)
+            spec = importlib.util.spec_from_file_location("_dynamic", abs_path)
             if spec is None or spec.loader is None:
-                log.warning(f"Could not load module spec from {abs_path}")
+                log.warning("[Component %s] Cannot load spec from %s", self.name, abs_path)
                 return None
 
             module = importlib.util.module_from_spec(spec)
-            # Type checker doesn't recognize the None check above, but we've verified it's not None
             spec.loader.exec_module(module)  # type: ignore[union-attr]
 
-            # Get the function
-            if hasattr(module, function_name):
-                return getattr(module, function_name)
-            else:
-                log.warning(f"Function {function_name} not found in {abs_path}")
-                return None
+            fn = getattr(module, function_name, None)
+            if fn is None:
+                log.warning("[Component %s] Function '%s' not in %s", self.name, function_name, abs_path)
+            return fn
 
-        except Exception as e:
-            log.error(f"Error loading function {function_name} from {script_path}: {e}")
+        except Exception as exc:
+            log.error("[Component %s] Error loading %s from %s: %s", self.name, function_name, script_path, exc)
             return None
-
-    def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
-        """
-        Add a hook to this component that listens for specific events.
-
-        Any component can add hooks to listen for events in the system.
-
-        Args:
-            event_name: Event to listen for (e.g., 'agent.thought', 'input.received', 'tool.call')
-            hook_function: Function to call when event occurs
-            description: Optional description for debugging
-
-        Example:
-            # In any component's __init__ or method:
-            def log_tool_calls(payload):
-                print(f"Tool called: {payload.tool_name}")
-
-            self.add_hook("tool.call", log_tool_calls, "Log all tool calls")
-        """
-        try:
-            from woodwork.runtime.unified_event_bus import get_global_event_bus
-
-            event_bus = get_global_event_bus()
-            event_bus.register_hook(event_name, hook_function)
-
-            desc = f" ({description})" if description else ""
-            log.info(f"[{self.__class__.__name__} {self.name}] Added hook for '{event_name}'{desc}")
-        except Exception as e:
-            log.error(f"[{self.__class__.__name__} {self.name}] Failed to add hook for '{event_name}': {e}")
-
-    def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
-        """
-        Add a pipe to this component that can transform event payloads.
-
-        Any component can add pipes to transform events flowing through the system.
-
-        Args:
-            event_name: Event to transform (e.g., 'input.received', 'agent.thought')
-            pipe_function: Function that takes payload and returns modified payload
-            description: Optional description for debugging
-
-        Example:
-            # In any component's __init__ or method:
-            def add_component_context(payload):
-                enhanced = f"[{self.name}] {payload.input}"
-                return payload._replace(input=enhanced)
-
-            self.add_pipe("input.received", add_component_context, "Add component context to input")
-        """
-        try:
-            from woodwork.runtime.unified_event_bus import get_global_event_bus
-
-            event_bus = get_global_event_bus()
-            event_bus.register_pipe(event_name, pipe_function)
-
-            desc = f" ({description})" if description else ""
-            log.info(f"[{self.__class__.__name__} {self.name}] Added pipe for '{event_name}'{desc}")
-        except Exception as e:
-            log.error(f"[{self.__class__.__name__} {self.name}] Failed to add pipe for '{event_name}': {e}")
-
-    def close(self):
-        """Clean up component resources."""
-        # Base implementation for cleanup
-        # Internal features cleanup is handled by specific component types
-        pass

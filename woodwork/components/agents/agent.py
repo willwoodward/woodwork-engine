@@ -45,15 +45,8 @@ class Agent(Component, tool_interface, ABC):
             planning = planning_tools(**{"name": "planning_tools"})
             self._tools.append(planning)
 
-        # Auto-discover and register tool schemas with event bus
-        try:
-            from woodwork.runtime.unified_event_bus import get_global_event_bus
-
-            event_bus = get_global_event_bus()
-            schemas = event_bus.discover_tools_from_agent(self)
-            log.info(f"[Agent] Auto-discovered {len(schemas)} tool schemas for workflow builder")
-        except Exception as e:
-            log.warning(f"[Agent] Failed to auto-discover tool schemas: {e}")
+        # Tool-schema discovery is now handled by WorkflowsFeature via the per-agent EventBus.
+        log.debug("[Agent] Tool schema discovery deferred to features")
 
         if config.get("cache", False):
             try:

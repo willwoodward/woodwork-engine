@@ -372,6 +372,10 @@ class MCPServer(Component, tool_interface):
             log.warning(f"[MCPServer] Background startup for description failed: {e}")
 
     # Tool interface implementation
+    async def execute(self, action: str, inputs: Dict[str, Any]) -> Any:
+        """New execute() API — delegates to input()."""
+        return await self.input(action, inputs)
+
     async def input(self, action: str, inputs: Dict[str, Any]) -> Any:
         """
         Handle framework input calls as MCP tool calls.

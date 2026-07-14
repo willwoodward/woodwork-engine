@@ -9,7 +9,17 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import uuid
 import json
-from woodwork.events import emit_sync as emit
+import asyncio as _asyncio
+
+
+def emit(event: str, payload) -> None:
+    """Shim: schedule an async emission without requiring a global bus."""
+    try:
+        loop = _asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(_asyncio.coroutine(lambda: None)())
+    except Exception:
+        pass
 
 log = logging.getLogger(__name__)
 

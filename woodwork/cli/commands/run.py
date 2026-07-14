@@ -31,8 +31,8 @@ def run_cmd(ctx, config, gui):
         asyncio.run(start_gui_server())
         return
 
-    components = parse_and_validate_config()
+    components, dep_map = parse_and_validate_config()
     generate_exports()
     deploy_containers()
     start_components(components)
-    start_runtime(components)
+    start_runtime(components, dep_map)

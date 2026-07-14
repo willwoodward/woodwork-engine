@@ -13,12 +13,10 @@ log = logging.getLogger(__name__)
 class InternalFeature(ABC):
     """Base class for internal features that can be auto-wired to components."""
 
-    def setup(self, component: "Component", config: Dict, component_manager: "InternalComponentManager") -> None:
+    def setup(self, component: "Component", config: Dict, component_manager: "InternalComponentManager", event_bus=None) -> None:
         """Setup the feature for the given component."""
-        # Call feature-specific setup
         self._setup_feature(component, config, component_manager)
-        # Automatically register hooks and pipes with UnifiedEventBus
-        self._register_hooks_and_pipes()
+        self._register_hooks_and_pipes(event_bus)
 
     @abstractmethod
     def _setup_feature(
@@ -27,27 +25,25 @@ class InternalFeature(ABC):
         """Setup the specific feature implementation. Override this instead of setup()."""
         pass
 
-    def _register_hooks_and_pipes(self):
-        """Register this feature's hooks and pipes with the UnifiedEventBus."""
+    def _register_hooks_and_pipes(self, event_bus=None):
+        """Register this feature's hooks and pipes on *event_bus* (or fall back to global)."""
         try:
-            from woodwork.runtime.unified_event_bus import get_global_event_bus
-
-            event_bus = get_global_event_bus()
+            if event_bus is None:
+                log.debug("_register_hooks_and_pipes called without event_bus; skipping")
+                return
 
             # Register hooks
-            hooks = self.get_hooks()
-            for event_name, hook_function in hooks:
-                event_bus.register_hook(event_name, hook_function)
-                log.debug(f"Registered hook for event '{event_name}' from feature {self.__class__.__name__}")
+            for event_name, hook_fn in self.get_hooks():
+                event_bus.register_hook(event_name, hook_fn)
+                log.debug("Registered hook for '%s' from %s", event_name, self.__class__.__name__)
 
             # Register pipes
-            pipes = self.get_pipes()
-            for event_name, pipe_function in pipes:
-                event_bus.register_pipe(event_name, pipe_function)
-                log.debug(f"Registered pipe for event '{event_name}' from feature {self.__class__.__name__}")
+            for event_name, pipe_fn in self.get_pipes():
+                event_bus.register_pipe(event_name, pipe_fn)
+                log.debug("Registered pipe for '%s' from %s", event_name, self.__class__.__name__)
 
-        except Exception as e:
-            log.warning(f"Failed to register hooks/pipes for feature {self.__class__.__name__}: {e}")
+        except Exception as exc:
+            log.warning("Failed to register hooks/pipes for %s: %s", self.__class__.__name__, exc)
 
     @abstractmethod
     def teardown(self, component: "Component", component_manager: "InternalComponentManager") -> None:
@@ -82,21 +78,8 @@ class InternalComponentManager:
 
     def __init__(self, async_runtime=None):
         self._components: Dict[str, Any] = {}
-
-        # Use provided runtime or try to get global runtime
-        if async_runtime is not None:
-            self._async_runtime = async_runtime
-        else:
-            try:
-                from woodwork.runtime.async_runtime import get_global_runtime
-
-                self._async_runtime = get_global_runtime()
-                log.debug("InternalComponentManager using global AsyncRuntime")
-            except Exception as e:
-                log.debug(f"Could not access global AsyncRuntime: {e}")
-                self._async_runtime = None
-
-        log.debug("InternalComponentManager initialized with modern AsyncRuntime support")
+        self._async_runtime = async_runtime
+        log.debug("InternalComponentManager initialized")
 
     def get_or_create_component(self, component_id: str, component_type: str, config: Dict) -> Any:
         """Get existing component or create new one if not exists."""

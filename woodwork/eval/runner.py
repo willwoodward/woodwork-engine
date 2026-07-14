@@ -9,7 +9,6 @@ from woodwork.eval.assertions import evaluate_assertions
 from woodwork.eval.loader import EvalSuite
 from woodwork.eval.report import CaseResult, EvalReport
 from woodwork.eval.trace import TraceCollector
-from woodwork.runtime.unified_event_bus import get_global_event_bus
 
 log = logging.getLogger(__name__)
 
@@ -23,16 +22,16 @@ class EvalRunner:
 
         await self._start_async(components)
 
-        event_bus = get_global_event_bus()
+        # TraceCollector hooks into the agent's per-agent event bus
         collector = TraceCollector()
-        collector.register(event_bus)
+        collector.register(agent.event_bus)
 
         results: list[CaseResult] = []
         for case in suite.cases:
             collector.reset()
             start = time.time()
             try:
-                response = await agent.input(case.input)
+                response = await agent.execute("run", {"query": case.input})
                 if response is None:
                     response = ""
                 else:
@@ -45,22 +44,19 @@ class EvalRunner:
             assertion_results = evaluate_assertions(trace, case.assertions)
             results.append(CaseResult(case=case, trace=trace, assertions=assertion_results))
 
-        collector.unregister(event_bus)
+        collector.unregister(agent.event_bus)
         await self._cleanup(components)
 
         return EvalReport(results=results)
 
     def _boot(self, config_path: str) -> tuple:
-        """Parse .ww config and return (components, agent).
-
-        Reuses the existing parse pipeline: activate venv, parse config, get components.
-        """
+        """Parse .ww config and return (components, agent)."""
         import queue
 
         from woodwork.components.agents.llm import LLMAgent
         from woodwork.config import dependencies
         from woodwork.config import parser as config_parser
-        from woodwork.config.factory import _get_task_master
+        from woodwork.config.factory import build_components
         from woodwork.cli.progress.lifecycles import start_component
 
         config_dir = os.path.dirname(os.path.abspath(config_path))
@@ -69,8 +65,8 @@ class EvalRunner:
         try:
             os.chdir(config_dir)
             dependencies.activate_virtual_environment()
-            config_parser.main_function()
-            components = _get_task_master()._tools
+            commands = config_parser.parse(open(config_path).read())
+            components, _ = build_components(commands)
         finally:
             os.chdir(original_cwd)
 
@@ -95,14 +91,7 @@ class EvalRunner:
         return components, agent
 
     async def _start_async(self, components: list) -> None:
-        """Handle async startup (MCP servers with _blocking_startup_task)."""
-        event_bus = get_global_event_bus()
-
-        # Register components with event bus
-        for comp in components:
-            event_bus.register_component(comp)
-
-        # Gather blocking startup tasks (MCP servers)
+        """Handle async startup (e.g. MCP servers)."""
         tasks = []
         for comp in components:
             if hasattr(comp, "_blocking_startup_task") and comp._blocking_startup_task:
@@ -113,8 +102,6 @@ class EvalRunner:
                 await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=30.0)
             except asyncio.TimeoutError:
                 log.warning("Some async components did not start within 30 seconds")
-
-        event_bus.configure_routing()
 
     async def _cleanup(self, components: list) -> None:
         """Close components and clean up."""

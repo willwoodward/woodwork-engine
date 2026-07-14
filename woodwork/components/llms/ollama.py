@@ -1,17 +1,17 @@
 import logging
-from langchain_ollama import ChatOllama
 import subprocess
 import shutil
+
+from langchain_ollama import ChatOllama
 
 from woodwork.components.llms.llm import LLM
 from woodwork.utils.errors.errors import RuntimeError
 from woodwork.utils import format_kwargs, get_optional
-from woodwork.interfaces import Initializable, Startable
 
 log = logging.getLogger(__name__)
 
 
-class OllamaLLM(LLM, Initializable, Startable):
+class OllamaLLM(LLM):
     def __init__(self, model, **config):
         format_kwargs(config, model=model, type="ollama")
         self._model = model
@@ -29,29 +29,28 @@ class OllamaLLM(LLM, Initializable, Startable):
     def retriever(self):
         return self._retriever
 
-    def init(self) -> None:
-        """Initialize the Ollama model."""
+    def initialize(self) -> None:
+        """Check Ollama is installed and pull the model."""
         if not self._is_ollama_installed():
             raise RuntimeError("Ollama is not installed. Please install it from https://ollama.com.")
-
-        # Pulling the model, does not redownload if already present
         self._pull_ollama_model(self._model)
 
-    def start(self) -> None:
-        """Start the Ollama model."""
-        log.debug("Establishing connection with model...")
-        self._llm_value = ChatOllama(
-            model=self._model,
-        )
-        log.debug("Model initialized.")
+    # init() alias kept for any old code that calls it directly
+    def init(self) -> None:
+        self.initialize()
+
+    def start(self, queue=None, config=None) -> None:
+        """Connect to the Ollama backend."""
+        log.debug("Establishing connection with Ollama model...")
+        self._llm_value = ChatOllama(model=self._model)
+        log.debug("Ollama model initialized.")
 
     def _is_ollama_installed(self) -> bool:
         return shutil.which("ollama") is not None
 
     def _pull_ollama_model(self, model: str) -> None:
-        """Pull the model using `ollama pull`."""
         try:
-            log.debug(f"Pulling model: {model}")
+            log.debug("Pulling model: %s", model)
             subprocess.run(["ollama", "pull", model], check=True)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to pull Ollama model: {e}")
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(f"Failed to pull Ollama model: {exc}") from exc

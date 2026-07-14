@@ -6,7 +6,6 @@ import shutil
 import webbrowser
 import os
 
-from woodwork.runtime.task_master import TaskMaster
 from woodwork.types import Workflow
 
 
@@ -15,15 +14,15 @@ class GUI:
     A class to represent a developer GUI for Woodwork Engine.
     """
 
-    def __init__(self, task_master: TaskMaster):
-        """Initialize the GUI."""
+    def __init__(self, components: list):
+        """Initialize the GUI with a flat list of components."""
         self.app = Flask(__name__, static_folder="dist", static_url_path="")
         self.port = 43000
-        self.task_m = task_master
+        self._components = components
 
         @self.app.route("/api/components/list", methods=["GET"])
         def get_tools_list():
-            return jsonify(list(map(lambda x: x.name, self.task_m._tools)))
+            return jsonify([c.name for c in self._components])
 
         @self.app.route("/api/input", methods=["GET"])
         def get_output():

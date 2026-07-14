@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import logging.config
@@ -9,7 +10,7 @@ from woodwork.utils import helper_functions
 from woodwork.cli import argument_parser
 from woodwork.config import parser as config_parser
 from woodwork.config import operations as config_operations
-from woodwork.config.factory import _get_task_master
+from woodwork.config.factory import build_components
 from woodwork.utils.errors.errors import ParseError
 from woodwork.utils.helper_functions import set_globals
 from woodwork.deploy.registry import get_registry
@@ -21,6 +22,7 @@ from rich.console import Console
 from woodwork.cli.setup_defaults import copy_prompts
 from woodwork.cli.cleanup import clean_all
 from woodwork.utils import get_package_directory
+from woodwork.core.runtime import AsyncRuntime
 
 import woodwork.globals as globals
 
@@ -28,18 +30,22 @@ log = logging.getLogger(__name__)
 
 
 def parse_and_validate_config():
-    """Parse .ww configuration files and return components."""
+    """Parse .ww configuration files and return (commands, components)."""
     import time
 
     console = Console()
-
     console.print("Parsing configuration...", style="dim", highlight=False)
     start = time.time()
     dependencies.activate_virtual_environment()
-    config_parser.main_function()
-    console.print(f"✓ Config parsed in {time.time() - start:.1f}s", style="dim", highlight=False)
 
-    return _get_task_master()._tools
+    import os
+    with open(os.path.join(os.getcwd(), "main.ww")) as f:
+        ww_text = f.read()
+    commands = config_parser.parse(ww_text)
+    components, dep_map = build_components(commands)
+
+    console.print(f"✓ Config parsed in {time.time() - start:.1f}s", style="dim", highlight=False)
+    return components, dep_map
 
 
 def generate_exports():
@@ -47,7 +53,6 @@ def generate_exports():
     import time
 
     console = Console()
-
     start = time.time()
     registry = get_registry()
     generate_exported_objects_file(registry=registry)
@@ -59,7 +64,6 @@ def deploy_containers():
     import time
 
     console = Console()
-
     console.print("Deploying containers...", style="dim", highlight=False)
     start = time.time()
     deployer = Deployer()
@@ -69,104 +73,39 @@ def deploy_containers():
 
 def start_components(components):
     """Start all components with progress bar display."""
-    import time
-
     console = Console()
-
     console.print(f"Starting {len(components)} components...", style="dim", highlight=False)
-    time.time()
     parallel_func_apply(components, start_component, "started", "starting")
 
 
-def start_runtime(components):
-    """Start the appropriate runtime (async or task master)."""
-    Console()
-
-    if globals.global_config.get("message_bus_active", False):
-        _start_async_runtime(components)
-    else:
-        _start_task_master_runtime()
-
-
-def _start_async_runtime(components):
-    """Start async runtime with distributed message bus orchestration."""
-    from woodwork.runtime.async_runtime import AsyncRuntime
-    import asyncio
-    from rich.spinner import Spinner
-    from rich.live import Live
-    import sys
-
-    console = Console()
-
-    component_config = {}
-    for tool in components:
-        component_config[tool.name] = {
-            "component": tool.__class__.__name__.lower(),
-            "type": getattr(tool, "type", "unknown"),
-            "object": tool,
-        }
-
-    async def start_async_runtime():
+def start_runtime(components, dep_map):
+    """Start the AsyncRuntime."""
+    async def _run():
         runtime = AsyncRuntime()
         try:
-            await runtime.start({"components": components, "component_configs": component_config})
+            await runtime.start(components, dep_map)
         except KeyboardInterrupt:
-            print("\n", flush=True)
-            sys.stderr.flush()
-
-            with Live(
-                Spinner("dots", text="[dim]Shutting down...[/dim]"),
-                console=console,
-                refresh_per_second=10,
-                redirect_stdout=False,
-                redirect_stderr=False,
-                transient=False,
-            ):
-                await runtime.stop()
-        except Exception as e:
-            log.error("Runtime error: %s", e)
+            pass
+        finally:
             await runtime.stop()
-            raise
 
     try:
-        asyncio.run(start_async_runtime())
+        asyncio.run(_run())
     except KeyboardInterrupt:
         Console().print("[dim]✓ Shutdown complete[/dim]", highlight=False)
-        # Program will exit naturally after this
-
-
-def _start_task_master_runtime():
-    """Start traditional task master orchestration."""
-    log.debug("Traditional mode - using TaskMaster orchestration")
-    _get_task_master().start()
 
 
 def app_entrypoint(args):
-    """Main application entrypoint for Woodwork CLI.
-
-    Handles different execution modes:
-    - --init: Install dependencies for .ww config files
-    - --gui: Run GUI interface (FastAPI or legacy)
-    - --clean: Clean up resources
-    - default: Run Woodwork with configured components
-    """
+    """Main application entrypoint for Woodwork CLI."""
     get_registry()
-
-    # Set a delineator for a new application run in log file
     log.debug("\n%s NEW LOG RUN %s\n", "=" * 60, "=" * 60)
 
-    # ============================================================================
-    # VALIDATION: Check arguments before doing anything else
-    # ============================================================================
     try:
         argument_parser.check_parse_conflicts(args)
     except ParseError as e:
         log.critical("ParseError: %s", e)
         return
 
-    # ============================================================================
-    # UTILITY MODES: Handle simple commands that don't require full initialization
-    # ============================================================================
     if args.version:
         version_from_toml = helper_functions.get_version_from_pyproject(
             str(pathlib.Path(__file__).parent.parent / "pyproject.toml")
@@ -181,17 +120,13 @@ def app_entrypoint(args):
 
     log.debug("Arguments: %s", args)
 
-    # ============================================================================
-    # CONFIGURATION: Set up globals and copy default prompts
-    # ============================================================================
     match args.mode:
         case "run":
             log.debug("Mode set to 'run'.")
         case "debug":
             log.debug("Mode set to 'debug'.")
             log.warning(
-                "Mode is set to 'debug'. This mode has been deprecated and will be removed in a future release. "
-                "You can access debug information by setting the logging level to DEBUG in your logging configuration. "
+                "Mode is set to 'debug'. This mode has been deprecated. "
                 "Please use 'run' mode instead. Defaulting to 'run' mode.",
             )
         case "embed":
@@ -204,56 +139,32 @@ def app_entrypoint(args):
     log.debug("Globals set: Mode = %s", globals.global_config["mode"])
     copy_prompts()
 
-    # ============================================================================
-    # INIT MODE: Install dependencies only (no component initialization)
-    # ============================================================================
     if args.init is not None:
         options = {"isolated": False, "all": False}
         if args.init == "isolated":
             options["isolated"] = True
-            log.debug("Initialization mode set to 'isolated'.")
         elif args.init == "all":
             options["isolated"] = True
             options["all"] = True
-            log.debug("Initialization mode set to 'all'.")
-
-        # Only install dependencies - no parsing, no components, no initialization
         dependencies.init(options)
         return
 
-    # ============================================================================
-    # GUI MODE: Run web interface
-    # ============================================================================
     if args.gui is not None:
         if args.gui == "run":
             log.debug("GUI is set to run.")
-            dependencies.activate_virtual_environment()
-            config_parser.main_function()
+            components, _ = parse_and_validate_config()
             from woodwork.gui.gui import GUI
-
-            gui = GUI(_get_task_master())  # type: ignore[arg-type]
+            gui = GUI(components)
             gui.run()
             return
         elif args.gui == "fastapi":
             log.debug("FastAPI GUI is set to run.")
-            dependencies.activate_virtual_environment()
-            # Import and run the FastAPI GUI server
-            import asyncio
             from woodwork.gui.fastapi_gui_server import start_gui_server
-
             asyncio.run(start_gui_server())
             return
 
-    # ============================================================================
-    # WORKFLOW CONFIGURATION: Handle workflow-specific settings
-    # ============================================================================
     if args.workflow != "none":
         if args.mode in {"run", "debug"}:
-            log.debug(
-                "Workflow is set to %s, which isn't compatible with %s Mode.",
-                args.workflow,
-                args.mode,
-            )
             log.warning(
                 "Possible conflict: Mode is %s which conflicts with %s Workflow.",
                 args.mode,
@@ -261,22 +172,17 @@ def app_entrypoint(args):
             )
         set_globals(inputs_activated=False)
 
-    # ============================================================================
-    # MAIN EXECUTION: Build, deploy, and run
-    # ============================================================================
-    # Phase 1: Build - Parse configuration and generate exports
-    components = parse_and_validate_config()
+    # Phase 1: Parse
+    components, dep_map = parse_and_validate_config()
     generate_exports()
 
-    # Phase 2: Deploy - Start Docker containers
+    # Phase 2: Deploy
     deploy_containers()
 
-    # Phase 3: Start - Initialize all components
+    # Phase 3: Start components
     start_components(components)
 
-    # ============================================================================
-    # POST-EXECUTION: Handle mode-specific cleanup and operations
-    # ============================================================================
+    # Phase 4: Mode-specific operations
     match args.mode:
         case "embed":
             config_operations.embed_all()
@@ -285,39 +191,23 @@ def app_entrypoint(args):
         case _:
             pass
 
-    # Handle workflow operations (add/remove/find action plans)
     match args.workflow:
-        case "add":
-            pass
         case "remove":
             config_operations.delete_action_plan(args.target)
-            log.debug("%s Workflow removed with id: %s.", args.workflow, args.target)
         case "find":
             config_operations.find_action_plan(args.target)
-            log.debug("%s Workflow found with query: %s.", args.workflow, args.target)
         case _:
             pass
 
-    # ============================================================================
-    # RUNTIME: Start the appropriate orchestration system
-    # ============================================================================
-    # Phase 4: Run - Start the runtime event loop
-    start_runtime(components)
+    # Phase 5: Run runtime
+    start_runtime(components, dep_map)
 
 
 def cli_entrypoint() -> None:
-    """
-    Initializes a custom logger based on the configuration file and runs the main function of the Woodwork library.
-
-    This is used to configure logging when ran standalone from any external scripts.
-    If a logging configuration file is not found, a default logger is created.
-    Do not use this function if you have configured your own logger. Simply call `main()` directly.
-    """
-
+    """Initializes logging and runs the main Woodwork CLI entrypoint."""
     args = argument_parser.parse_args()
 
     if args.logConfig is not None:
-        # If a custom logging configuration file is specified, use it
         config_file = pathlib.Path(args.logConfig)
     else:
         config_file = pathlib.Path(get_package_directory()) / "config" / "log_config.json"
@@ -328,19 +218,9 @@ def cli_entrypoint() -> None:
     except FileNotFoundError:
         sys.exit(1)
 
-    # Get the directory for logging as specified in the logging_config.json file to
-    # create the log directory if it does not exist. The filename in the config file
-    # must be only one folder deep from the root, such as "./logs/", however the
-    # directory name can be anything.
     log_directory = pathlib.Path(config["handlers"]["file"]["filename"].split("/")[0])
     if not log_directory.exists():
         log_directory.mkdir()
 
     logging.config.dictConfig(config)
-
     app_entrypoint(args)
-
-
-# Note: start_message_bus_loop and message_bus_main_loop functions have been
-# replaced by the DistributedStartupCoordinator class in woodwork.runtime.distributed_startup
-# The new implementation provides proper event loop ownership and clean shutdown

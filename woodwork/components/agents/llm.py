@@ -1,33 +1,34 @@
-import json
-import re
-import logging
-import asyncio
-import uuid
+"""
+LLMAgent — Component wrapper around AgentLoop.
 
-from langchain_core.prompts import ChatPromptTemplate
-from typing import Any, Tuple, Optional
-import tiktoken
+Responsibilities:
+  - Own a per-agent EventBus (child of the system bus).
+  - Build the ToolRegistry from its tool list.
+  - Delegate execution to AgentLoop.run().
+  - Register hook/pipe configs from the .ww file.
+  - Wire internal features (workflows, etc.).
+"""
+
+import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from woodwork.components.agents.agent import Agent
-from woodwork.utils import format_kwargs, get_optional, get_prompt
+from woodwork.components.agents.agent_loop import AgentLoop
+from woodwork.core.events import EventBus
+from woodwork.core.tools import ToolRegistry
+from woodwork.core.types import AgentContext
 from woodwork.types import Action, Prompt
-from woodwork.runtime.unified_event_bus import emit, get_global_event_bus
-from woodwork.types.event_source import EventSource
-from woodwork.components.llms.llm import LLM
-from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
+from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
-from woodwork.interfaces.startable import Startable
-from typing import Dict
 
 log = logging.getLogger(__name__)
 
 
-class LLMAgent(Agent, Startable):
-    def __init__(self, model: LLM, **config):
-        # Require a model (an LLM component instance or a ChatOpenAI instance) be provided.
+class LLMAgent(Agent):
+    def __init__(self, model, system_bus: Optional[EventBus] = None, **config):
         format_kwargs(config, model=model, type="llm")
         super().__init__(**config)
-        log.debug("Initializing agent...")
 
         self._model_component = model
 
@@ -40,36 +41,26 @@ class LLMAgent(Agent, Startable):
         )
         self._prompt = get_prompt(self._prompt_config.file)
 
-        # Event-based ask_user handling
-        self._pending_user_requests: dict[str, asyncio.Future] = {}
-        self._event_bus = get_global_event_bus()
+        # Per-agent event bus, optionally bubbling to the system bus
+        self.event_bus = EventBus(parent=system_bus)
 
-        # Register for user input responses
-        self._event_bus.register_hook("user.input.response", self._handle_user_input_response)
-
-        # Defer internal features setup to start() method
+        # Internal features (workflows, etc.)
         self._internal_component_manager = InternalComponentManager()
-        self._internal_features = []
-        self._internal_features_config = config  # Store config for later
+        self._internal_features: List[InternalFeature] = []
+        self._internal_features_config = config
         self._internal_features_setup = False
 
-        # Workflow variables for action output tracking
-        self._workflow_variables: dict[str, Any] = {}
-
-    @property
-    def _llm(self):
-        """Access the model's LLM instance dynamically (it's only available after start())."""
-        return self._model_component._llm
+    # ------------------------------------------------------------------ #
+    # Lifecycle                                                            #
+    # ------------------------------------------------------------------ #
 
     def start(self, queue=None, config=None):
-        """Start the agent and setup internal features (called during component starting phase)"""
+        """Set up internal features and build the AgentLoop."""
         if not self._internal_features_setup:
-            log.debug(f"[LLM Agent] Setting up internal features for {self.name}...")
+            log.debug("[LLMAgent %s] Setting up internal features...", self.name)
 
-            # Report progress if queue is available
             if queue:
                 from woodwork.types import Update
-
                 queue.put(Update(progress=10, component_name=self.name))
 
             self._internal_features = InternalFeatureRegistry.create_features(self._internal_features_config)
@@ -83,646 +74,128 @@ class LLMAgent(Agent, Startable):
             if queue:
                 queue.put(Update(progress=50, component_name=self.name))
 
-            log.debug(f"[LLM Agent] {self.name} internal features setup complete")
+        # Register .ww-configured hooks/pipes on this agent's event bus
+        self._register_hooks_pipes(self.event_bus)
 
-    async def _handle_user_input_response(self, payload):
-        """Handle user input response events"""
-        try:
-            if isinstance(payload, UserInputResponsePayload):
-                request_id = payload.request_id
-                if request_id in self._pending_user_requests:
-                    future = self._pending_user_requests[request_id]
-                    if not future.done():
-                        future.set_result(payload.response)
-                    del self._pending_user_requests[request_id]
-                    log.debug(f"[Agent] Received user response for request {request_id}: {payload.response}")
-                else:
-                    log.warning(f"[Agent] Received user response for unknown request {request_id}")
-            elif isinstance(payload, dict) and "request_id" in payload:
-                # Handle dict format for compatibility
-                request_id = payload["request_id"]
-                if request_id in self._pending_user_requests:
-                    future = self._pending_user_requests[request_id]
-                    if not future.done():
-                        future.set_result(payload.get("response", ""))
-                    del self._pending_user_requests[request_id]
-                    log.debug(f"[Agent] Received user response for request {request_id}: {payload.get('response', '')}")
-        except Exception as e:
-            log.error(f"[Agent] Error handling user input response: {e}")
+        log.debug("[LLMAgent %s] Startup complete", self.name)
 
-    async def _ask_user_via_events(self, question: str, timeout_seconds: int = 600) -> str:
-        """Ask user for input via event system instead of blocking input()"""
-        request_id = str(uuid.uuid4())
+    def close(self):
+        """Tear down internal features."""
+        for feature in self._internal_features:
+            try:
+                feature.teardown(self, self._internal_component_manager)
+            except Exception as exc:
+                log.warning("[LLMAgent %s] Feature teardown error: %s", self.name, exc)
+        self._internal_component_manager.cleanup_components()
+        super().close()
 
-        # Create a future to wait for the response
-        future = asyncio.Future()
-        self._pending_user_requests[request_id] = future
+    # ------------------------------------------------------------------ #
+    # Execution                                                            #
+    # ------------------------------------------------------------------ #
 
-        try:
-            # Create and emit the user input request
-            request_payload = UserInputRequestPayload(
-                question=question,
-                request_id=request_id,
-                timeout_seconds=timeout_seconds,
-                component_id=self.name,
-                component_type="agent",
-            )
-
-            log.debug(f"[Agent] Requesting user input: {question}")
-            await emit("user.input.request", request_payload)
-
-            # Wait for response with timeout
-            response = await asyncio.wait_for(future, timeout=timeout_seconds)
-            log.debug(f"[Agent] User response received: {response}")
-            return response
-
-        except asyncio.TimeoutError:
-            log.warning(f"[Agent] User input request {request_id} timed out after {timeout_seconds} seconds")
-            # Clean up
-            if request_id in self._pending_user_requests:
-                del self._pending_user_requests[request_id]
-            return f"[Timeout: No user response received within {timeout_seconds} seconds]"
-        except Exception as e:
-            log.error(f"[Agent] Error requesting user input: {e}")
-            # Clean up
-            if request_id in self._pending_user_requests:
-                del self._pending_user_requests[request_id]
-            return f"[Error requesting user input: {e}]"
-
-    def _parse(self, agent_output: str) -> Tuple[str, Optional[dict], bool]:
+    async def execute(self, action: str, inputs: Dict[str, Any]) -> Any:
         """
-        Parse a ReAct-style agent output and extract either:
-        - (thought, action_dict, False) if Action is present
-        - (final_answer, None, True) if Final Answer is present
-        - (raw_output, None, False) if nothing structured is found
+        Run the agent.
+
+        *action* is typically "run".
+        *inputs* should contain at least {"query": "..."}
+        and optionally {"session_id": "..."}.
         """
-        # Match Thought up to Action or Final Answer or end
-        final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
-        thought_match = re.search(r"Thought:\s*(.*?)(?=\s*Action:|\s*Final Answer:|$)", agent_output, re.DOTALL)
-        action_match = re.search(
-            r"Action:\s*(\{.*\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))", agent_output, re.DOTALL
-        )
+        query = inputs.get("query", action)
+        session_id = inputs.get("session_id", "default")
+        extra_inputs = {k: v for k, v in inputs.items() if k not in ("query", "session_id")}
 
-        thought = ""
-        if thought_match:
-            thought = thought_match.group(1).strip()
+        ctx = AgentContext(query=query, session_id=session_id, inputs=extra_inputs)
 
-        # Final Answer takes precedence over thought and action
-        if final_answer_match and not action_match:
-            final_answer = final_answer_match.group(1).strip()
-            return final_answer, None, True
+        # Build registry on every call so dynamic tools (from features) are current
+        registry = self._build_registry()
 
-        if not action_match:
-            return (thought or agent_output.strip(), None, False)
+        # Build system prompt with current date + tool docs
+        tool_docs = self._build_tool_docs(registry)
+        current_date = datetime.now().strftime("%Y-%m-%d %A")
+        system_prompt = (
+            f"Current date: {current_date}\n\nHere are the available tools:\n{tool_docs}\n\n"
+        ) + self._prompt
 
-        action_str = action_match.group(1).strip()
-        cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
+        loop = AgentLoop(self._model_component, registry, self.event_bus)
+        return await loop.run(ctx, system_prompt)
 
-        # The regex may capture too little or too much for nested JSON.
-        # Use brace counting to extract the outermost JSON object.
-        cleaned_action_str = self._extract_json_object(cleaned_action_str)
-
-        try:
-            action = json.loads(cleaned_action_str)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
-
-        return thought, action, False
-
-    @staticmethod
-    def _extract_json_object(s: str) -> str:
-        """Extract the outermost balanced JSON object from a string using brace counting."""
-        start = s.find("{")
-        if start == -1:
-            return s
-        depth = 0
-        in_string = False
-        escape = False
-        for i in range(start, len(s)):
-            c = s[i]
-            if escape:
-                escape = False
-                continue
-            if c == "\\":
-                escape = True
-                continue
-            if c == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-                if depth == 0:
-                    return s[start : i + 1]
-        # Unbalanced — return original and let json.loads report the error
-        return s
-
-    def count_tokens(self, text: str, model: str = "gpt-5-mini"):
-        if not isinstance(text, str):
-            text = str(text)
-
-        try:
-            encoding = tiktoken.encoding_for_model(model)
-        except KeyError:
-            # Fall back to a known encoding
-            encoding = tiktoken.get_encoding("cl100k_base")
-        return len(encoding.encode(text))
-
+    # Legacy input() alias kept for existing event-bus delivery paths
     async def input(self, query: str, inputs: Optional[dict] = None):
-        if inputs is None:
-            inputs = {}
+        inputs = inputs or {}
+        return await self.execute("run", {"query": query, **inputs})
 
-        # Check for session in inputs
-        session = inputs.pop("_session", None)
+    # ------------------------------------------------------------------ #
+    # Registry / tool doc helpers                                         #
+    # ------------------------------------------------------------------ #
 
-        # Handle session-aware state management
-        if session:
-            # Use existing session state - don't reset
-            self._workflow_variables = session.workflow_variables.copy()
-            # Update with any new inputs (excluding _session)
-            self._workflow_variables.update(inputs)
-            log.debug(f"[Agent] Using session {session.id} with {len(session.conversation_history)} history items")
-        else:
-            # Reset workflow variables for new query (old behavior)
-            self._workflow_variables = inputs.copy()
-            log.debug(f"Initialized workflow variables with inputs: {list(inputs.keys())}")
+    def _build_registry(self) -> ToolRegistry:
+        registry = ToolRegistry()
+        for tool in self._tools:
+            registry.register(tool)
 
-        # Set component context for proper event attribution
-        EventSource.set_current(getattr(self, "name", "unknown_agent"), "agent")
-
-        # Substitute inputs
-        prompt = query
-        for key in inputs:
-            prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
-
-        # Workflow tracking (no-op if task master not available)
-        if hasattr(self, "_task_m") and self._task_m:
-            self._task_m.start_workflow(query)
-
-        # Allow input pipes/hooks to transform the incoming query before the main loop
-        from woodwork.types.events import InputReceivedPayload
-
-        input_payload = InputReceivedPayload(
-            input=query,
-            inputs=inputs,
-            session_id=getattr(self, "_session", None),
-            component_id=self.name,
-            component_type="agent",
-        )
-        transformed = await emit("input.received", input_payload)
-
-        # Extract from typed payload (handle fallback to GenericPayload)
-        if hasattr(transformed, "input"):
-            query = transformed.input
-            inputs = transformed.inputs
-        else:
-            # Fallback for GenericPayload
-            query = input_payload.input
-            inputs = input_payload.inputs
-
-        # Build tool documentation string
-        tool_documentation = ""
-        for obj in self._tools:
-            tool_documentation += f"tool name: {obj.name}\ntool type: {obj.type}\n<tool_description>\n{obj.description}</tool_description>\n\n\n"
-
-        # Add dynamic tools from internal features (like workflows)
+        # Dynamic tools from internal features
         for feature in self._internal_features:
             if hasattr(feature, "get_tools"):
                 try:
-                    dynamic_tools = feature.get_tools()
-                    if dynamic_tools:
-                        log.debug(f"Adding {len(dynamic_tools)} dynamic tools from {feature.__class__.__name__}")
-                    for tool in dynamic_tools:
-                        tool_documentation += f"tool name: {tool['name']}\ntool type: {tool['type']}\n<tool_description>\n{tool['description']}</tool_description>\n\n\n"
-                except Exception as e:
-                    log.debug(f"Failed to get tools from feature {feature.__class__.__name__}: {e}")
+                    for tool_meta in feature.get_tools():
+                        # Wrap feature tool dict in a shim if needed
+                        if not hasattr(tool_meta, "name"):
+                            tool_meta = _FeatureToolShim(tool_meta, feature)
+                        registry.register(tool_meta)
+                except Exception as exc:
+                    log.debug("[LLMAgent %s] get_tools() error in %s: %s", self.name, feature.__class__.__name__, exc)
 
-        log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
-        if not tool_documentation.strip():
-            log.warning(f"[Agent] No tool documentation available! Tools: {[t.name for t in self._tools]}")
+        return registry
 
-        from datetime import datetime
+    def _build_tool_docs(self, registry: ToolRegistry) -> str:
+        docs = ""
+        for tool in registry.all():
+            desc = getattr(tool, "description", "")
+            docs += f"tool name: {tool.name}\ntool type: {getattr(tool, 'type', 'tool')}\n<tool_description>\n{desc}</tool_description>\n\n\n"
+        return docs
 
-        current_date = datetime.now().strftime("%Y-%m-%d %A")
-        system_prompt = (f"Current date: {current_date}\n\nHere are the available tools:\n{{tools}}\n\n").format(
-            tools=tool_documentation
-        ) + self._prompt
-
-        log.debug(f"[FULL_CONTEXT]:\n{system_prompt}")
-        system_prompt_tokens = self.count_tokens(system_prompt)
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("human", "{input}"),
-            ]
-        )
-
-        chain = prompt | self._llm
-
-        # Initialize current_prompt with session context if available
-        if session and session.current_prompt:
-            # Append new query to existing conversation context
-            current_prompt = session.current_prompt + f"\n\nUser: {query}"
-            log.debug(f"[Agent] Continuing session with accumulated context ({len(session.current_prompt)} chars)")
-        else:
-            current_prompt = query
-
-        max_iterations = 25
-        consecutive_no_action = 0
-        max_no_action = 3  # Force final answer after 3 thought-only iterations
-
-        for iteration in range(max_iterations):
-            log.debug(f"\n--- Iteration {iteration + 1} ---")
-
-            current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
-            log.debug(f"tokens: {current_tokens}")
-
-            if current_tokens > 90000:
-                log.debug("Token limit reached, summarising context...")
-
-                summariser_prompt = ChatPromptTemplate.from_messages(
-                    [
-                        ("system", "You are a helpful assistant that summarises context for another agent."),
-                        (
-                            "human",
-                            "Summarise the following context into a concise form that retains all important facts, goals, decisions, and observations:\n\n{context}",
-                        ),
-                    ]
-                )
-
-                summariser_chain = summariser_prompt | self._llm
-
-                summary = summariser_chain.invoke({"context": current_prompt}).content
-                log.debug(f"[SUMMARY]: {summary}")
-
-                current_prompt = f"Summary of previous context:\n{summary}\n\nContinue reasoning from here."
-                system_prompt_tokens = self.count_tokens(system_prompt)
-                continue
-
-            result = chain.invoke({"input": current_prompt}).content
-            log.debug(f"[RESULT] {result}")
-
-            thought, action_dict, is_final = self._parse(result)
-
-            if is_final:
-                log.debug("Final Answer found.")
-                if hasattr(self, "_task_m") and self._task_m:
-                    self._task_m.end_workflow()
-
-                # Save state back to session if provided
-                if session:
-                    session.add_turn("assistant", thought)
-                    session.current_prompt = current_prompt
-                    session.workflow_variables = self._workflow_variables.copy()
-                    log.debug(f"[Agent] Saved state to session {session.id}")
-
-                return thought
-
-            if action_dict is None:
-                consecutive_no_action += 1
-                log.debug(f"Thought (no action, {consecutive_no_action}/{max_no_action}): {thought}")
-
-                if consecutive_no_action >= max_no_action:
-                    # LLM is stuck generating thoughts without actions - treat last thought as final answer
-                    log.warning(
-                        f"[Agent] Forcing final answer after {consecutive_no_action} consecutive thought-only iterations"
-                    )
-                    return thought
-
-                current_prompt += f"\n\nThought: {thought}\n\nYou must now either use a tool (Action) or provide your Final Answer. Do not respond with only a Thought."
-                continue
-
-            # Reset no-action counter since we have an action
-            consecutive_no_action = 0
-
-            log.debug(f"Thought: {thought}")
-            log.debug(f"Action: {action_dict}")
-
-            # Emit agent.thought (non-blocking hook)
-            await emit("agent.thought", {"thought": thought})
-
-            # Emit agent.action (pipes can transform, hooks can observe)
-            action_payload = await emit("agent.action", {"action": action_dict})
-            action_dict = action_payload.action
-
-            try:
-                # Create Action from possibly-transformed dict
-                action = Action.from_dict(action_dict)
-
-                # Emit tool.call (pipes can transform, hooks can observe)
-                tool_call = await emit(
-                    "tool.call", {"tool": action_dict.get("tool"), "args": action_dict.get("inputs")}
-                )
-
-                # Update action if pipes modified it
-                if tool_call.tool != action_dict.get("tool") or tool_call.args != action_dict.get("inputs"):
-                    action_dict["tool"] = tool_call.tool
-                    action_dict["inputs"] = tool_call.args
-                    action = Action.from_dict(action_dict)
-
-                # Use improved message bus API for tool execution
-                result = await self._execute_tool_with_improved_api(action)
-
-                # Ensure observation is a string (tools might return dicts, lists, etc.)
-                if isinstance(result, str):
-                    observation = result
-                else:
-                    observation = json.dumps(result) if result is not None else "No output"
-
-                observation_tokens = self.count_tokens(observation)
-                if observation_tokens > 15000:
-                    observation = (
-                        f"The output from this tool was way too large, it contained {observation_tokens} tokens."
-                    )
-
-            except KeyError as e:
-                log.warning(f"Action dict missing key {e}, feeding back as context.")
-                if e == "output":
-                    action_dict["output"] = ""  # type: ignore[index]
-                else:
-                    observation = f"Received incomplete action from Agent: {json.dumps(action_dict)}. It is likely missing the key {e}."
-            except Exception as e:
-                log.exception("Unhandled error while executing action: %s", e)
-                # Emit agent.error for unexpected failures
-                await emit("agent.error", {"error": e, "context": {"query": query}})
-                # feed back a generic observation and continue
-                observation = f"An error occurred while executing the action: {e}"
-
-            log.debug(f"Observation: {observation}")
-
-            # Emit tool.observation (pipes can transform, hooks can observe)
-            obs = await emit("tool.observation", {"tool": action_dict.get("tool"), "observation": observation})
-            observation = obs.observation
-
-            # Append step to ongoing prompt
-            current_prompt += f"\n\nThought: {thought}\nAction: {json.dumps(action_dict)}\nObservation: {observation}\n\nContinue with the next step:"
-
-            # Emit step complete
-            await emit("agent.step_complete", {"step": iteration + 1, "session_id": getattr(self, "_session", None)})
-
-    async def _execute_workflow_by_name(self, workflow_name: str, inputs: Dict[str, Any]) -> str:
-        """
-        Execute a workflow by name or ID.
-
-        This allows agents to call workflows using:
-        tool: workflow, action: "workflow_name", inputs: {...}
-        """
-        try:
-            # Get the workflows feature if available
-            workflows_feature = None
-            for feature in self._internal_features:
-                if feature.__class__.__name__ == "WorkflowsFeature":
-                    workflows_feature = feature
-                    break
-
-            if not workflows_feature:
-                return "Error: Workflows feature not enabled"
-
-            # Look up workflow ID by name
-            workflow_id = workflows_feature._get_workflow_id_by_name(workflow_name)
-
-            if not workflow_id:
-                return f"Error: Workflow '{workflow_name}' not found"
-
-            # Execute the workflow
-            result = await workflows_feature._execute_workflow_tool(workflow_id, inputs)
-
-            log.info(f"[Agent] Executed workflow '{workflow_name}' ({workflow_id}) with inputs {inputs}")
-
-            # Format result as string
-            if isinstance(result, dict):
-                return json.dumps(result)
-            return str(result)
-
-        except Exception as e:
-            log.error(f"[Agent] Error executing workflow '{workflow_name}': {e}")
-            return f"Error executing workflow: {e}"
-
-    def _resolve_action_inputs(self, inputs: dict[str, Any]) -> dict[str, Any]:
-        """
-        Resolve variable references in action inputs.
-
-        If an input value is a string that matches a workflow variable name,
-        replace it with the actual variable value.
-        """
-        resolved = {}
-        for key, value in inputs.items():
-            if isinstance(value, str) and value in self._workflow_variables:
-                # This is a variable reference - substitute with actual value
-                resolved[key] = self._workflow_variables[value]
-                log.debug(f"Resolved variable '{value}' to: {resolved[key]}")
-            else:
-                # Keep as literal value
-                resolved[key] = value
-        return resolved
-
-    async def _execute_tool_with_improved_api(self, action: Action):
-        """
-        Execute tool using the clean message bus API.
-
-        This leverages the standard MessageBusIntegration methods for
-        simple, reliable component-to-component communication.
-        """
-        try:
-            # Special handling for ask_user (uses event-based communication)
-            if action.tool == "ask_user":
-                question = action.inputs.get("question", "Please provide input:")
-                timeout = action.inputs.get("timeout_seconds", 60)
-                return await self._ask_user_via_events(question, timeout)
-
-            # Special handling for workflow execution
-            if action.tool == "workflow":
-                return await self._execute_workflow_by_name(action.action, action.inputs)
-
-            # Resolve variable references in inputs
-            resolved_inputs = self._resolve_action_inputs(action.inputs)
-
-            # Use the clean message API with resolved inputs
-            result = await self.request(action.tool, {"action": action.action, "inputs": resolved_inputs})
-
-            # Store output in workflow variables if action has output variable
-            # NOTE: We store the raw result (could be dict, list, etc.) so subsequent
-            # actions can use the structured data. The observation converts to string separately.
-            if action.output:
-                self._workflow_variables[action.output] = result
-                log.debug(f"Stored output in variable '{action.output}': {result}")
-
-            return result
-
-        except Exception as e:
-            log.error(f"[Agent] Error executing tool '{action.tool}': {e}")
-            return f"Error executing tool '{action.tool}': {e}"
+    # ------------------------------------------------------------------ #
+    # Internal features                                                   #
+    # ------------------------------------------------------------------ #
 
     def _setup_internal_features(self, config: dict) -> None:
-        """Setup internal features, create required components, and register hooks/pipes."""
-        log.debug(f"[LLM Agent {self.name}] Setting up {len(self._internal_features)} internal features")
-
         for feature in self._internal_features:
             try:
-                # Create required components for this feature
                 self._create_required_components(feature)
-
-                # Setup the feature with component manager access
-                # (This automatically registers hooks and pipes via feature.setup())
-                feature.setup(self, config, self._internal_component_manager)
-
-                log.debug(f"[LLM Agent {self.name}] Successfully set up internal feature: {feature.__class__.__name__}")
-            except Exception as e:
-                log.error(f"[LLM Agent {self.name}] Failed to setup internal feature {feature.__class__.__name__}: {e}")
+                feature.setup(self, config, self._internal_component_manager, self.event_bus)
+                log.debug("[LLMAgent %s] Set up feature: %s", self.name, feature.__class__.__name__)
+            except Exception as exc:
+                log.error("[LLMAgent %s] Feature setup error in %s: %s", self.name, feature.__class__.__name__, exc)
 
     def _create_required_components(self, feature: InternalFeature) -> None:
-        """Create all components required by a feature."""
-        required_components = feature.get_required_components()
-
-        for component_spec in required_components:
-            component_id = component_spec["component_id"]
-            component_type = component_spec["component_type"]
-            component_config = component_spec["config"]
-            is_optional = component_spec.get("optional", False)
-
+        for spec in feature.get_required_components():
+            cid = spec["component_id"]
+            ctype = spec["component_type"]
+            ccfg = spec["config"]
+            optional = spec.get("optional", False)
             try:
-                self._internal_component_manager.get_or_create_component(component_id, component_type, component_config)
-                log.debug(f"[LLM Agent {self.name}] Created internal component: {component_id}")
-            except Exception as e:
-                if not is_optional:
-                    raise RuntimeError(f"Failed to create required internal component {component_id}: {e}")
-                log.warning(f"[LLM Agent {self.name}] Failed to create optional internal component {component_id}: {e}")
+                self._internal_component_manager.get_or_create_component(cid, ctype, ccfg)
+            except Exception as exc:
+                if not optional:
+                    raise RuntimeError(f"Failed to create required component {cid}: {exc}") from exc
+                log.warning("[LLMAgent %s] Optional component %s unavailable: %s", self.name, cid, exc)
 
     def get_internal_component(self, component_id: str):
-        """Get an internal component by ID."""
-        if hasattr(self, "_internal_component_manager"):
-            return self._internal_component_manager.get_component(component_id)
-        return None
+        return self._internal_component_manager.get_component(component_id)
 
-    def create_component(self, component_type: str, component_id: Optional[str] = None, **config):
-        """
-        Direct API to create and attach internal components at runtime.
 
-        Args:
-            component_type: Type of component to create (e.g., 'neo4j', 'redis', 'chroma')
-            component_id: Optional custom ID, auto-generated if not provided
-            **config: Component configuration parameters
+class _FeatureToolShim:
+    """Wraps a feature-tool dict so it satisfies the ToolRegistry.register() interface."""
 
-        Returns:
-            Created component instance
+    def __init__(self, meta: dict, feature: Any) -> None:
+        self.name: str = meta["name"]
+        self.type: str = meta.get("type", "feature_tool")
+        self.description: str = meta.get("description", "")
+        self._meta = meta
+        self._feature = feature
 
-        Example:
-            # Create Neo4j component directly
-            neo4j = agent.create_component(
-                "neo4j",
-                uri="bolt://localhost:7687",
-                api_key="my-key"
-            )
-
-            # Create Redis component
-            redis = agent.create_component(
-                "redis",
-                host="localhost",
-                port=6379
-            )
-        """
-        if not hasattr(self, "_internal_component_manager"):
-            raise RuntimeError("Internal component manager not available")
-
-        # Auto-generate component ID if not provided
-        if component_id is None:
-            existing_count = len(
-                [
-                    k
-                    for k in self._internal_component_manager._components.keys()
-                    if k.startswith(f"{self.name}_{component_type}")
-                ]
-            )
-            component_id = f"{self.name}_{component_type}_{existing_count}"
-
-        # Add API key from model if available and not provided
-        if "api_key" not in config and hasattr(self, "model") and hasattr(self.model, "_api_key"):
-            config["api_key"] = self.model._api_key
-
-        # Create component through internal manager
-        component = self._internal_component_manager.get_or_create_component(component_id, component_type, config)
-
-        # Auto-attach to agent with clean attribute name
-        attr_name = f"_{component_type}_{existing_count}" if existing_count > 0 else f"_{component_type}"
-        setattr(self, attr_name, component)
-
-        log.info(f"[LLM Agent {self.name}] Created {component_type} component: {component_id}")
-        return component
-
-    def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
-        """
-        Add a hook to this agent that listens for specific events.
-
-        Args:
-            event_name: Event to listen for (e.g., 'agent.thought', 'input.received')
-            hook_function: Function to call when event occurs
-            description: Optional description for debugging
-
-        Example:
-            def log_thoughts(payload):
-                print(f"Agent thought: {payload.thought}")
-
-            agent.add_hook("agent.thought", log_thoughts, "Log all agent thoughts")
-        """
-        try:
-            from woodwork.runtime.unified_event_bus import get_global_event_bus
-
-            event_bus = get_global_event_bus()
-            event_bus.register_hook(event_name, hook_function)
-
-            desc = f" ({description})" if description else ""
-            log.info(f"[LLM Agent {self.name}] Added hook for '{event_name}'{desc}")
-        except Exception as e:
-            log.error(f"[LLM Agent {self.name}] Failed to add hook for '{event_name}': {e}")
-
-    def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
-        """
-        Add a pipe to this agent that can transform event payloads.
-
-        Args:
-            event_name: Event to transform (e.g., 'input.received')
-            pipe_function: Function that takes payload and returns modified payload
-            description: Optional description for debugging
-
-        Example:
-            def enhance_input(payload):
-                enhanced = f"Enhanced: {payload.input}"
-                return payload._replace(input=enhanced)
-
-            agent.add_pipe("input.received", enhance_input, "Add enhancement prefix")
-        """
-        try:
-            from woodwork.runtime.unified_event_bus import get_global_event_bus
-
-            event_bus = get_global_event_bus()
-            event_bus.register_pipe(event_name, pipe_function)
-
-            desc = f" ({description})" if description else ""
-            log.info(f"[LLM Agent {self.name}] Added pipe for '{event_name}'{desc}")
-        except Exception as e:
-            log.error(f"[LLM Agent {self.name}] Failed to add pipe for '{event_name}': {e}")
-
-    def close(self):
-        """Clean up internal features and components, then call parent close."""
-        try:
-            # Teardown features first
-            if hasattr(self, "_internal_features"):
-                for feature in self._internal_features:
-                    try:
-                        feature.teardown(self, self._internal_component_manager)
-                    except Exception as e:
-                        log.warning(f"[LLM Agent {self.name}] Error during feature teardown: {e}")
-
-            # Then cleanup all internal components
-            if hasattr(self, "_internal_component_manager"):
-                self._internal_component_manager.cleanup_components()
-                log.debug(f"[LLM Agent {self.name}] Internal features and components cleaned up")
-        except Exception as e:
-            log.warning(f"[LLM Agent {self.name}] Error during close: {e}")
-
-        # Call parent close method
-        super().close()
+    async def execute(self, action: str, inputs: dict) -> Any:
+        if hasattr(self._feature, "_execute_workflow_tool"):
+            return await self._feature._execute_workflow_tool(action, inputs)
+        raise NotImplementedError(f"Feature tool '{self.name}' has no execute handler")

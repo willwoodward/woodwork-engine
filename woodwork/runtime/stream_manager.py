@@ -20,7 +20,15 @@ from woodwork.types.streaming_data import (
     generate_stream_id,
     create_stream_chunk,
 )
-from woodwork.runtime.message_bus.interface import MessageBusInterface, MessageEnvelope, MessagePattern
+# MessageBus removed — stub out only what StreamManager needs
+class MessageBusInterface:
+    pass
+
+class MessageEnvelope:
+    pass
+
+class MessagePattern:
+    pass
 
 log = logging.getLogger(__name__)
 
