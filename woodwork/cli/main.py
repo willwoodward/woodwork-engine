@@ -92,7 +92,7 @@ def start_runtime(components, dep_map):
     try:
         asyncio.run(_run())
     except KeyboardInterrupt:
-        Console().print("[dim]✓ Shutdown complete[/dim]", highlight=False)
+        Console().print("\n[dim]✓ Shutdown complete[/dim]", highlight=False)
 
 
 def app_entrypoint(args):

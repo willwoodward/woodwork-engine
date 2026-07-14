@@ -10,12 +10,13 @@ import importlib.util
 import os
 from typing import Any, Dict, List, Optional
 
+from woodwork.interfaces.stoppable import Stoppable
 from woodwork.types.workflows import Hook, Pipe
 
 log = logging.getLogger(__name__)
 
 
-class Component:
+class Component(Stoppable):
     """
     Minimal base class for all woodwork components.
 

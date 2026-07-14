@@ -242,6 +242,10 @@ class MCPServer(Component, tool_interface):
         log.info(f"[MCPServer] Closing {self.name}")
         await self._cleanup()
 
+    async def stop(self) -> None:
+        """Stoppable interface — delegates to close()."""
+        await self.close()
+
     async def _cleanup(self):
         """Internal cleanup method."""
         # Cancel message listener

@@ -20,12 +20,29 @@ class CommandLineInput(Input):
     # --- New stream() / respond() API used by AsyncRuntime ---
 
     async def stream(self) -> AsyncGenerator[str, None]:
-        """Yield user queries one at a time from stdin."""
+        """Yield user queries one at a time from stdin.
+
+        Uses asyncio's native pipe reader so that task cancellation (Ctrl+C)
+        propagates immediately without leaving a blocking thread behind.
+        """
         import asyncio
-        loop = asyncio.get_event_loop()
-        while True:
-            query = await loop.run_in_executor(None, self.input_function)
-            yield query
+        import sys
+
+        loop = asyncio.get_running_loop()
+        reader = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(reader)
+        transport, _ = await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+        try:
+            while True:
+                try:
+                    line = await reader.readline()
+                except asyncio.CancelledError:
+                    return
+                if not line:  # EOF (Ctrl+D)
+                    break
+                yield line.decode().rstrip("\n")
+        finally:
+            transport.close()
 
     async def respond(self, result: str) -> None:
         """Print the agent's response to stdout."""

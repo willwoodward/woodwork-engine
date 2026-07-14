@@ -110,19 +110,33 @@ class AsyncRuntime:
                     log.error("[AsyncRuntime] Error starting '%s': %s", comp.name, result)
 
     async def _cleanup(self) -> None:
-        for comp in self._components.values():
-            for method in ("stop", "close"):
-                fn = getattr(comp, method, None)
-                if fn is None:
-                    continue
-                try:
-                    if asyncio.iscoroutinefunction(fn):
-                        await fn()
-                    else:
-                        fn()
-                except Exception as exc:
-                    log.error("[AsyncRuntime] Error stopping '%s': %s", getattr(comp, "name", "?"), exc)
-                break  # only call the first available method
+        # Temporarily suspend pending task cancellations (Python 3.11+).
+        # Without this, every `await` inside a finally-driven cleanup raises
+        # CancelledError immediately, leaving sessions / connections open.
+        task = asyncio.current_task()
+        cancelling = task.cancelling() if task is not None else 0
+        for _ in range(cancelling):
+            task.uncancel()
+
+        try:
+            for comp in self._components.values():
+                for method in ("stop", "close"):
+                    fn = getattr(comp, method, None)
+                    if fn is None:
+                        continue
+                    try:
+                        if asyncio.iscoroutinefunction(fn):
+                            await fn()
+                        else:
+                            fn()
+                    except Exception as exc:
+                        log.debug("[AsyncRuntime] Error stopping '%s': %s", getattr(comp, "name", "?"), exc)
+                    break  # only call the first available method
+        finally:
+            # Restore the cancellation counter so the task resumes cancelling
+            # normally after cleanup finishes.
+            for _ in range(cancelling):
+                task.cancel()
 
     # ------------------------------------------------------------------ #
     # Main loop                                                            #

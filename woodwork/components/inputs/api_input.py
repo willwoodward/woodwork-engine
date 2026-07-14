@@ -1022,5 +1022,9 @@ class APIInput(Input):
             except Exception as e:
                 log.debug("[api_input] Error closing websocket %s: %s", session_id, e)
 
+    async def stop(self) -> None:
+        """Stoppable interface — delegates to close()."""
+        await self.close()
+
         self._websocket_sessions.clear()
         log.debug("[api_input] Closed all websocket sessions")
