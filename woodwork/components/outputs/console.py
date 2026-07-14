@@ -1,13 +1,13 @@
 import logging
 from typing import Any
 
-from woodwork.components.outputs.outputs import outputs
+from woodwork.components.outputs.outputs import Output
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class console(outputs):
+class Console(Output):
     """Console output component with streaming support"""
 
     def __init__(self, **config):

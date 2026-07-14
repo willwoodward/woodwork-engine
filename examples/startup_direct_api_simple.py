@@ -83,7 +83,7 @@ def demo_startup_direct_api():
     print("\\n🧪 Testing hooks and pipes...")
 
     # Test hooks by simulating events
-    from woodwork.core.unified_event_bus import get_global_event_bus
+    from woodwork.runtime.unified_event_bus import get_global_event_bus
 
     get_global_event_bus()
 

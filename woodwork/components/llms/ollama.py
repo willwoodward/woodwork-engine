@@ -1,9 +1,9 @@
 import logging
-from langchain_ollama import OllamaLLM as Ollama
+from langchain_ollama import ChatOllama
 import subprocess
 import shutil
 
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.utils.errors.errors import RuntimeError
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.interfaces import Initializable, Startable
@@ -11,7 +11,7 @@ from woodwork.interfaces import Initializable, Startable
 log = logging.getLogger(__name__)
 
 
-class ollama(llm, Initializable, Startable):
+class OllamaLLM(LLM, Initializable, Startable):
     def __init__(self, model, **config):
         format_kwargs(config, model=model, type="ollama")
         self._model = model
@@ -40,7 +40,7 @@ class ollama(llm, Initializable, Startable):
     def start(self) -> None:
         """Start the Ollama model."""
         log.debug("Establishing connection with model...")
-        self._llm_value = Ollama(
+        self._llm_value = ChatOllama(
             model=self._model,
         )
         log.debug("Model initialized.")

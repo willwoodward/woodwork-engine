@@ -4,15 +4,17 @@ import logging.config
 import pathlib
 import sys
 
-from woodwork.parser import dependencies
+from woodwork.config import dependencies
 from woodwork.utils import helper_functions
 from woodwork.cli import argument_parser
-from woodwork.parser import config_parser
+from woodwork.config import parser as config_parser
+from woodwork.config import operations as config_operations
+from woodwork.config.factory import _get_task_master
 from woodwork.utils.errors.errors import ParseError
 from woodwork.utils.helper_functions import set_globals
-from woodwork.deployments.registry import get_registry
-from woodwork.deployments import Deployer
-from woodwork.deployments.generate_exports import generate_exported_objects_file
+from woodwork.deploy.registry import get_registry
+from woodwork.deploy import Deployer
+from woodwork.deploy.generate_exports import generate_exported_objects_file
 from .progress.progress import parallel_func_apply
 from .progress.lifecycles import start_component
 from rich.console import Console
@@ -37,7 +39,7 @@ def parse_and_validate_config():
     config_parser.main_function()
     console.print(f"✓ Config parsed in {time.time() - start:.1f}s", style="dim", highlight=False)
 
-    return config_parser.task_m._tools
+    return _get_task_master()._tools
 
 
 def generate_exports():
@@ -88,7 +90,7 @@ def start_runtime(components):
 
 def _start_async_runtime(components):
     """Start async runtime with distributed message bus orchestration."""
-    from woodwork.core.async_runtime import AsyncRuntime
+    from woodwork.runtime.async_runtime import AsyncRuntime
     import asyncio
     from rich.spinner import Spinner
     from rich.live import Live
@@ -135,8 +137,8 @@ def _start_async_runtime(components):
 
 def _start_task_master_runtime():
     """Start traditional task master orchestration."""
-    print("🔧 DEBUG: Traditional mode - using TaskMaster orchestration")
-    config_parser.task_m.start()
+    log.debug("Traditional mode - using TaskMaster orchestration")
+    _get_task_master().start()
 
 
 def app_entrypoint(args):
@@ -229,7 +231,7 @@ def app_entrypoint(args):
             config_parser.main_function()
             from woodwork.gui.gui import GUI
 
-            gui = GUI(config_parser.task_m)  # type: ignore[arg-type]
+            gui = GUI(_get_task_master())  # type: ignore[arg-type]
             gui.run()
             return
         elif args.gui == "fastapi":
@@ -277,9 +279,9 @@ def app_entrypoint(args):
     # ============================================================================
     match args.mode:
         case "embed":
-            config_parser.embed_all()
+            config_operations.embed_all()
         case "clear":
-            config_parser.clear_all()
+            config_operations.clear_all()
         case _:
             pass
 
@@ -288,10 +290,10 @@ def app_entrypoint(args):
         case "add":
             pass
         case "remove":
-            config_parser.delete_action_plan(args.target)
+            config_operations.delete_action_plan(args.target)
             log.debug("%s Workflow removed with id: %s.", args.workflow, args.target)
         case "find":
-            config_parser.find_action_plan(args.target)
+            config_operations.find_action_plan(args.target)
             log.debug("%s Workflow found with query: %s.", args.workflow, args.target)
         case _:
             pass
@@ -340,5 +342,5 @@ def cli_entrypoint() -> None:
 
 
 # Note: start_message_bus_loop and message_bus_main_loop functions have been
-# replaced by the DistributedStartupCoordinator class in woodwork.core.distributed_startup
+# replaced by the DistributedStartupCoordinator class in woodwork.runtime.distributed_startup
 # The new implementation provides proper event loop ownership and clean shutdown

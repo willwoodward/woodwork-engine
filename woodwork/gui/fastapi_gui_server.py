@@ -24,6 +24,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uvicorn
 
+from woodwork import defaults
+
 logger = logging.getLogger(__name__)
 
 
@@ -377,7 +379,7 @@ class FastAPIGUIServer:
             # Use raw Neo4j driver to avoid creating new Docker containers
             from neo4j import GraphDatabase
 
-            driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+            driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
             # Build query with optional filters
             where_clauses = []
@@ -475,7 +477,7 @@ class FastAPIGUIServer:
             # Use raw Neo4j driver to avoid creating new Docker containers
             from neo4j import GraphDatabase
 
-            driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "testpassword"))
+            driver = GraphDatabase.driver(defaults.NEO4J_URI, auth=(defaults.NEO4J_USER, defaults.NEO4J_PASSWORD))
 
             # Query to get complete workflow with action chain and dependencies
             query = """

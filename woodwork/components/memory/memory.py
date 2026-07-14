@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.utils import format_kwargs
 
 
-class memory(component, ABC):
+class Memory(Component, ABC):
     def __init__(self, **config):
         format_kwargs(config, component="memory")
         super().__init__(**config)

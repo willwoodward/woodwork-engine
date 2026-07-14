@@ -8,12 +8,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from typing import Any, Tuple, Optional
 import tiktoken
 
-from woodwork.components.agents.agent import agent
+from woodwork.components.agents.agent import Agent
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.types import Action, Prompt
-from woodwork.core.unified_event_bus import emit, get_global_event_bus
+from woodwork.runtime.unified_event_bus import emit, get_global_event_bus
 from woodwork.types.event_source import EventSource
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.types.events import UserInputRequestPayload, UserInputResponsePayload
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
 from woodwork.interfaces.startable import Startable
@@ -22,14 +22,14 @@ from typing import Dict
 log = logging.getLogger(__name__)
 
 
-class llm(agent, Startable):
-    def __init__(self, model: llm, **config):
+class LLMAgent(Agent, Startable):
+    def __init__(self, model: LLM, **config):
         # Require a model (an LLM component instance or a ChatOpenAI instance) be provided.
         format_kwargs(config, model=model, type="llm")
         super().__init__(**config)
         log.debug("Initializing agent...")
 
-        self._llm = model._llm
+        self._model_component = model
 
         self._is_planner = get_optional(config, "planning", False)
         self._prompt_config = Prompt.from_dict(
@@ -55,6 +55,11 @@ class llm(agent, Startable):
 
         # Workflow variables for action output tracking
         self._workflow_variables: dict[str, Any] = {}
+
+    @property
+    def _llm(self):
+        """Access the model's LLM instance dynamically (it's only available after start())."""
+        return self._model_component._llm
 
     def start(self, queue=None, config=None):
         """Start the agent and setup internal features (called during component starting phase)"""
@@ -155,7 +160,7 @@ class llm(agent, Startable):
         final_answer_match = re.search(r"Final Answer:\s*(.*)", agent_output, re.DOTALL)
         thought_match = re.search(r"Thought:\s*(.*?)(?=\s*Action:|\s*Final Answer:|$)", agent_output, re.DOTALL)
         action_match = re.search(
-            r"Action:\s*(\{.*?\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))", agent_output, re.DOTALL
+            r"Action:\s*(\{.*\})(?=\s*(Thought:|Action:|Observation:|Final Answer:|$))", agent_output, re.DOTALL
         )
 
         thought = ""
@@ -173,12 +178,47 @@ class llm(agent, Startable):
         action_str = action_match.group(1).strip()
         cleaned_action_str = action_str.replace("\r", "").replace("\u200b", "").strip()
 
+        # The regex may capture too little or too much for nested JSON.
+        # Use brace counting to extract the outermost JSON object.
+        cleaned_action_str = self._extract_json_object(cleaned_action_str)
+
         try:
             action = json.loads(cleaned_action_str)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in action: {e.msg}\nRaw string: {repr(cleaned_action_str)}")
 
         return thought, action, False
+
+    @staticmethod
+    def _extract_json_object(s: str) -> str:
+        """Extract the outermost balanced JSON object from a string using brace counting."""
+        start = s.find("{")
+        if start == -1:
+            return s
+        depth = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(s)):
+            c = s[i]
+            if escape:
+                escape = False
+                continue
+            if c == "\\":
+                escape = True
+                continue
+            if c == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return s[start : i + 1]
+        # Unbalanced — return original and let json.loads report the error
+        return s
 
     def count_tokens(self, text: str, model: str = "gpt-5-mini"):
         if not isinstance(text, str):
@@ -218,7 +258,9 @@ class llm(agent, Startable):
         for key in inputs:
             prompt = prompt.replace(f"{{{key}}}", str(inputs[key]))
 
-        self._task_m.start_workflow(query)
+        # Workflow tracking (no-op if task master not available)
+        if hasattr(self, "_task_m") and self._task_m:
+            self._task_m.start_workflow(query)
 
         # Allow input pipes/hooks to transform the incoming query before the main loop
         from woodwork.types.events import InputReceivedPayload
@@ -259,8 +301,15 @@ class llm(agent, Startable):
                     log.debug(f"Failed to get tools from feature {feature.__class__.__name__}: {e}")
 
         log.debug(f"[DOCUMENTATION]:\n{tool_documentation}")
+        if not tool_documentation.strip():
+            log.warning(f"[Agent] No tool documentation available! Tools: {[t.name for t in self._tools]}")
 
-        system_prompt = ("Here are the available tools:\n{tools}\n\n").format(tools=tool_documentation) + self._prompt
+        from datetime import datetime
+
+        current_date = datetime.now().strftime("%Y-%m-%d %A")
+        system_prompt = (f"Current date: {current_date}\n\nHere are the available tools:\n{{tools}}\n\n").format(
+            tools=tool_documentation
+        ) + self._prompt
 
         log.debug(f"[FULL_CONTEXT]:\n{system_prompt}")
         system_prompt_tokens = self.count_tokens(system_prompt)
@@ -282,11 +331,15 @@ class llm(agent, Startable):
         else:
             current_prompt = query
 
-        for iteration in range(1000):
+        max_iterations = 25
+        consecutive_no_action = 0
+        max_no_action = 3  # Force final answer after 3 thought-only iterations
+
+        for iteration in range(max_iterations):
             log.debug(f"\n--- Iteration {iteration + 1} ---")
 
             current_tokens = system_prompt_tokens + self.count_tokens(current_prompt)
-            print(f"tokens: {current_tokens}")
+            log.debug(f"tokens: {current_tokens}")
 
             if current_tokens > 90000:
                 log.debug("Token limit reached, summarising context...")
@@ -317,7 +370,8 @@ class llm(agent, Startable):
 
             if is_final:
                 log.debug("Final Answer found.")
-                self._task_m.end_workflow()
+                if hasattr(self, "_task_m") and self._task_m:
+                    self._task_m.end_workflow()
 
                 # Save state back to session if provided
                 if session:
@@ -329,13 +383,24 @@ class llm(agent, Startable):
                 return thought
 
             if action_dict is None:
-                print(f"Thought: {thought}")
-                current_prompt += f"\n\nThought: {thought}\n\nContinue with the next step:"
+                consecutive_no_action += 1
+                log.debug(f"Thought (no action, {consecutive_no_action}/{max_no_action}): {thought}")
+
+                if consecutive_no_action >= max_no_action:
+                    # LLM is stuck generating thoughts without actions - treat last thought as final answer
+                    log.warning(
+                        f"[Agent] Forcing final answer after {consecutive_no_action} consecutive thought-only iterations"
+                    )
+                    return thought
+
+                current_prompt += f"\n\nThought: {thought}\n\nYou must now either use a tool (Action) or provide your Final Answer. Do not respond with only a Thought."
                 continue
+
+            # Reset no-action counter since we have an action
+            consecutive_no_action = 0
 
             log.debug(f"Thought: {thought}")
             log.debug(f"Action: {action_dict}")
-            print(f"Thought: {thought}")
 
             # Emit agent.thought (non-blocking hook)
             await emit("agent.thought", {"thought": thought})
@@ -604,7 +669,7 @@ class llm(agent, Startable):
             agent.add_hook("agent.thought", log_thoughts, "Log all agent thoughts")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_hook(event_name, hook_function)
@@ -631,7 +696,7 @@ class llm(agent, Startable):
             agent.add_pipe("input.received", enhance_input, "Add enhancement prefix")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_pipe(event_name, pipe_function)

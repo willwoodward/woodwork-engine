@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import AsyncGenerator, Optional, Any, Dict, Union, List
 
-from woodwork.core.stream_manager import StreamManager
+from woodwork.runtime.stream_manager import StreamManager
 from woodwork.types.streaming_data import StreamDataType
 
 log = logging.getLogger(__name__)

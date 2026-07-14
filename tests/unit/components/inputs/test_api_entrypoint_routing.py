@@ -30,7 +30,7 @@ class TestAPIEntrypointRouting:
     @pytest.fixture
     def api_input_with_entrypoints(self, mock_task_master):
         """Create API input with workflow entrypoints configured."""
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
         config = {
             "port": 8000,
@@ -41,15 +41,15 @@ class TestAPIEntrypointRouting:
             "task_m": mock_task_master,
         }
 
-        return api_input(**config)
+        return APIInput(**config)
 
     def test_api_input_accepts_workflow_entrypoints_config(self):
         """Test that api_input accepts workflow_entrypoints in config."""
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
         config = {"workflow_entrypoints": {"test_workflow": "/workflow/test"}}
 
-        api = api_input(**config)
+        api = APIInput(**config)
 
         assert hasattr(api, "workflow_entrypoints")
         assert api.workflow_entrypoints == {"test_workflow": "/workflow/test"}
@@ -125,9 +125,9 @@ class TestAPIEntrypointRouting:
 
     def test_get_workflow_executor_returns_none_without_task_master(self):
         """Test _get_workflow_executor returns None without task master."""
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
-        api = api_input(port=8000)
+        api = APIInput(port=8000)
 
         executor = api._get_workflow_executor()
 
@@ -136,7 +136,7 @@ class TestAPIEntrypointRouting:
     @pytest.mark.asyncio
     async def test_multiple_entrypoints_registered(self):
         """Test that multiple entrypoints can be registered."""
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
         config = {
             "workflow_entrypoints": {
@@ -146,7 +146,7 @@ class TestAPIEntrypointRouting:
             }
         }
 
-        api = api_input(**config)
+        api = APIInput(**config)
         routes = [route.path for route in api.app.routes]
 
         assert "/workflow/one" in routes

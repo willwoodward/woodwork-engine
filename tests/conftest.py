@@ -101,7 +101,7 @@ def mock_router():
 def real_message_bus():
     """Create a real InMemoryMessageBus for integration tests."""
     try:
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 
         bus = InMemoryMessageBus()
         bus.start()
@@ -115,7 +115,7 @@ def real_message_bus():
 def real_router(real_message_bus):
     """Create a real DeclarativeRouter for integration tests."""
     try:
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         router = UnifiedEventBus()
         router.set_message_bus(real_message_bus)
@@ -218,11 +218,11 @@ def mock_pipes():
 
 @pytest.fixture
 def real_event_manager():
-    """Create a real event manager if available."""
+    """Create a real event bus if available."""
     try:
-        from woodwork.events import create_default_emitter
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
-        return create_default_emitter()
+        return UnifiedEventBus()
     except ImportError:
         return Mock()
 
@@ -232,8 +232,8 @@ def real_event_manager():
 async def full_system():
     """Create a complete system setup for integration tests."""
     try:
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         # Create message bus infrastructure
         message_bus = InMemoryMessageBus()

@@ -2,7 +2,7 @@
 Test agent session support for persistent context.
 """
 
-from woodwork.core.session import ConversationSession
+from woodwork.runtime.session import ConversationSession
 
 
 def test_session_workflow_variables():

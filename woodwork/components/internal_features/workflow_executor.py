@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import uuid
 import json
-from woodwork.events import emit
+from woodwork.events import emit_sync as emit
 
 log = logging.getLogger(__name__)
 

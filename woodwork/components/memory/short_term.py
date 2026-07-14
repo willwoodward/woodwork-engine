@@ -1,8 +1,8 @@
-from woodwork.components.memory.memory import memory
+from woodwork.components.memory.memory import Memory
 from woodwork.utils import format_kwargs
 
 
-class short_term(memory):
+class ShortTermMemory(Memory):
     def __init__(self, **config):
         format_kwargs(config, type="short_term")
         super().__init__(**config)

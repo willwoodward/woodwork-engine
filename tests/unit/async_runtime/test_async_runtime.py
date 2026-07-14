@@ -9,8 +9,8 @@ input loops, lifecycle management, and error handling.
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
-from woodwork.core.async_runtime import AsyncRuntime
-from woodwork.core.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.async_runtime import AsyncRuntime
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
 
 @pytest.mark.slow
@@ -77,7 +77,7 @@ class TestAsyncRuntime:
     @pytest.mark.asyncio
     async def test_component_parsing_from_config(self, runtime, mock_config):
         """Test parsing components from configuration."""
-        with patch("woodwork.parser.config_parser.parse_config_dict") as mock_parser:
+        with patch("woodwork.config.config_parser.parse_config_dict") as mock_parser:
             # Mock parser to return component list
             mock_parser.return_value = {"components": ["comp1", "comp2"]}
 
@@ -274,7 +274,7 @@ class TestAsyncRuntime:
     @pytest.mark.asyncio
     async def test_error_handling_in_component_initialization(self, runtime, mock_config):
         """Test error handling during component initialization."""
-        with patch("woodwork.parser.config_parser.parse_config_dict") as mock_parser:
+        with patch("woodwork.config.config_parser.parse_config_dict") as mock_parser:
             # Make parser throw error
             mock_parser.side_effect = Exception("Parser error")
 
@@ -379,7 +379,7 @@ class TestAsyncRuntime:
 
     def test_global_runtime_management(self):
         """Test global runtime instance management."""
-        from woodwork.core.async_runtime import get_global_runtime, set_global_runtime
+        from woodwork.runtime.async_runtime import get_global_runtime, set_global_runtime
 
         # Test getting global runtime
         runtime1 = get_global_runtime()
@@ -395,12 +395,12 @@ class TestAsyncRuntime:
     @pytest.mark.asyncio
     async def test_global_runtime_functions(self):
         """Test global runtime utility functions."""
-        from woodwork.core.async_runtime import start_runtime, stop_runtime
+        from woodwork.runtime.async_runtime import start_runtime, stop_runtime
 
         mock_config = {"components": {}}
 
         # Test global start
-        with patch("woodwork.core.async_runtime.get_global_runtime") as mock_get_runtime:
+        with patch("woodwork.runtime.async_runtime.get_global_runtime") as mock_get_runtime:
             mock_runtime = Mock()
             mock_runtime.start = AsyncMock()
             mock_get_runtime.return_value = mock_runtime
@@ -409,7 +409,7 @@ class TestAsyncRuntime:
             mock_runtime.start.assert_called_once_with(mock_config)
 
         # Test global stop
-        with patch("woodwork.core.async_runtime.get_global_runtime") as mock_get_runtime:
+        with patch("woodwork.runtime.async_runtime.get_global_runtime") as mock_get_runtime:
             mock_runtime = Mock()
             mock_runtime.stop = AsyncMock()
             mock_get_runtime.return_value = mock_runtime

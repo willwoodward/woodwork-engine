@@ -8,7 +8,7 @@ component-to-component routing, message bus compatibility, and edge cases.
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock
-from woodwork.core.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
 
 @pytest.mark.slow

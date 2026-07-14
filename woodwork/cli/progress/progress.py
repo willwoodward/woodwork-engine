@@ -17,7 +17,7 @@ import time
 from datetime import timedelta
 from typing import Dict, List, Callable
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.types import Update
 
 log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class SpinnerOrCheckColumn(ProgressColumn):
 
 def component_progression_display(
     console,
-    components: List[component],
+    components: List[Component],
     progress_queue: queue.Queue,
     present_verb: str,
     threads: List[threading.Thread],
@@ -123,7 +123,7 @@ def component_progression_display(
     return completed
 
 
-def parallel_func_apply(components: List[component], component_func: Callable, past_verb: str, present_verb: str):
+def parallel_func_apply(components: List[Component], component_func: Callable, past_verb: str, present_verb: str):
     progress_queue = queue.Queue()
 
     # Start threads - each thread calls start() on its component

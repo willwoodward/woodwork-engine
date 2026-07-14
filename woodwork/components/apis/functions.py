@@ -4,12 +4,12 @@ import logging
 from importlib import util
 
 from woodwork.utils import format_kwargs
-from woodwork.components.apis.api import api
+from woodwork.components.apis.api import API
 
 log = logging.getLogger(__name__)
 
 
-class functions(api):
+class Functions(API):
     def __init__(self, path: str, **config):
         format_kwargs(config, path=path, type="functions")
         super().__init__(**config)

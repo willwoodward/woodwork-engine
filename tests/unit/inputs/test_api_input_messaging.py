@@ -13,10 +13,10 @@ import json
 import time
 import threading
 from unittest.mock import AsyncMock
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.message_bus.interface import MessageEnvelope, create_component_message
-from woodwork.core.message_bus.integration import MessageBusIntegration
-from woodwork.events import emit
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.message_bus.interface import MessageEnvelope, create_component_message
+from woodwork.runtime.message_bus.integration import MessageBusIntegration
+from woodwork.events import emit_sync as emit
 
 
 @pytest.mark.slow
@@ -38,10 +38,10 @@ class TestAPIInputComponentDesign:
 
         The new implementation should use UnifiedEventBus for direct component communication.
         """
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
         # Should be able to create without task_master
-        api_component = api_input(name="test_api", to=["test_agent"], local=False)
+        api_component = APIInput(name="test_api", to=["test_agent"], local=False)
 
         # Should have unified event bus integration
         assert hasattr(api_component, "event_bus")
@@ -92,7 +92,7 @@ class TestAPIInputWebSocketIntegration:
     @pytest.fixture
     async def message_bus_setup(self):
         """Setup mock message bus for testing."""
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         bus = UnifiedEventBus()
         return bus
@@ -363,11 +363,11 @@ class TestRealTimeEventStreaming:
     @pytest.fixture
     async def real_time_setup(self):
         """Setup for real-time streaming tests."""
-        from woodwork.components.inputs.api_input import api_input, WebSocketSession
-        from woodwork.events import get_global_event_manager
+        from woodwork.components.inputs.api_input import APIInput, WebSocketSession
+        from woodwork.events import get_global_event_bus
 
         # Create API input component
-        api_component = api_input(name="input", to=["coding_ag"], local=False)
+        api_component = APIInput(name="input", to=["coding_ag"], local=False)
 
         # Mock WebSocket session
         mock_websocket = AsyncMock()
@@ -384,7 +384,7 @@ class TestRealTimeEventStreaming:
             "mock_websocket": mock_websocket,
             "session": session,
             "processor_task": processor_task,
-            "event_manager": get_global_event_manager(),
+            "event_manager": get_global_event_bus(),
         }
 
         # Cleanup
@@ -406,7 +406,7 @@ class TestRealTimeEventStreaming:
         mock_websocket.send_json.reset_mock()
 
         # Emit event in same thread
-        from woodwork.events import emit
+        from woodwork.events import emit_sync as emit
 
         emit("agent.thought", {"thought": "Immediate thought", "component_id": "coding_ag"})
 
@@ -652,7 +652,7 @@ class TestRealTimeEventStreaming:
         mock_websocket.send_json.reset_mock()
         delivery_times.clear()
 
-        from woodwork.events import emit
+        from woodwork.events import emit_sync as emit
 
         emit_time = time.time()
         emit(
@@ -794,7 +794,7 @@ class TestRealTimeEventStreaming:
         # Test the actual emission pattern
         def simulate_real_usage():
             # This simulates what happens in real usage
-            from woodwork.events import emit
+            from woodwork.events import emit_sync as emit
 
             # input.received comes from distributed startup thread
             emit(

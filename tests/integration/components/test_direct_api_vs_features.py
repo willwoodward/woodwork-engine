@@ -7,6 +7,7 @@ This shows both ways to add components and hooks/pipes to agents.
 import pytest
 from typing import Optional
 from unittest.mock import Mock, patch
+from woodwork.components.component import Component
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
@@ -61,14 +62,14 @@ class TestDirectAPIVsFeatures:
 
             def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
                 """Direct hook addition."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_hook(event_name, hook_function)
 
             def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
                 """Direct pipe addition."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_pipe(event_name, pipe_function)
@@ -112,7 +113,7 @@ class TestDirectAPIVsFeatures:
         )
 
         # Hooks are registered with event bus
-        from woodwork.core.unified_event_bus import get_global_event_bus
+        from woodwork.runtime.unified_event_bus import get_global_event_bus
 
         get_global_event_bus()
 
@@ -195,14 +196,14 @@ class TestDirectAPIVsFeatures:
 
             def add_hook(self, event_name: str, hook_function, description: Optional[str] = None):
                 """Components can add hooks to themselves."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_hook(event_name, hook_function)
 
             def add_pipe(self, event_name: str, pipe_function, description: Optional[str] = None):
                 """Components can add pipes to themselves."""
-                from woodwork.core.unified_event_bus import get_global_event_bus
+                from woodwork.runtime.unified_event_bus import get_global_event_bus
 
                 event_bus = get_global_event_bus()
                 event_bus.register_pipe(event_name, pipe_function)
@@ -219,14 +220,13 @@ class TestDirectAPIVsFeatures:
         """Test that base component class provides hook/pipe methods."""
 
         # Test that our base component class has the methods
-        from woodwork.components.component import component
 
         # Check methods exist
-        assert hasattr(component, "add_hook")
-        assert hasattr(component, "add_pipe")
+        assert hasattr(Component, "add_hook")
+        assert hasattr(Component, "add_pipe")
 
         # Mock component instance
-        mock_comp = Mock(spec=component)
+        mock_comp = Mock(spec=Component)
         mock_comp.name = "test_component"
         mock_comp.__class__.__name__ = "TestComponent"
 

@@ -3,7 +3,7 @@
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.test_messages import create_component_message, MockMessageEnvelope
 
 

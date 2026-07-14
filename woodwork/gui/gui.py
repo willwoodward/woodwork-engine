@@ -6,7 +6,7 @@ import shutil
 import webbrowser
 import os
 
-from woodwork.core.task_master import task_master
+from woodwork.runtime.task_master import TaskMaster
 from woodwork.types import Workflow
 
 
@@ -15,7 +15,7 @@ class GUI:
     A class to represent a developer GUI for Woodwork Engine.
     """
 
-    def __init__(self, task_master: task_master):
+    def __init__(self, task_master: TaskMaster):
         """Initialize the GUI."""
         self.app = Flask(__name__, static_folder="dist", static_url_path="")
         self.port = 43000
@@ -68,7 +68,7 @@ class GUI:
                 return
         try:
             webbrowser.open(f"http://localhost:{self.port}")
-        except:
+        except Exception:
             pass
 
     def run(self):

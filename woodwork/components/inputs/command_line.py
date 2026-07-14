@@ -1,12 +1,12 @@
 import logging
 
-from woodwork.components.inputs.inputs import inputs
+from woodwork.components.inputs.inputs import Input
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class command_line(inputs):
+class CommandLineInput(Input):
     def __init__(self, **config):
         format_kwargs(config, type="command_line")
         super().__init__(**config)

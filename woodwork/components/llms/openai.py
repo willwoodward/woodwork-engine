@@ -7,19 +7,20 @@ from langchain_core.prompts import ChatPromptTemplate
 import time
 from typing import Any
 
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.interfaces import ParallelStartable, Startable
 from woodwork.utils import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
 
-class openai(llm, ParallelStartable, Startable):
+class OpenAILLM(LLM, ParallelStartable, Startable):
     def __init__(self, api_key: str, model="gpt-4o-mini", **config):
         format_kwargs(config, api_key=api_key, model=model, type="openai")
         log.debug("Establishing connection with model...")
         self._model = model
         self._api_key = api_key
+        self._llm_value = None
         self._retriever = get_optional(config, "knowledge_base")
         if self._retriever is not None:
             self._retriever = self._retriever.retriever
@@ -130,7 +131,7 @@ class openai(llm, ParallelStartable, Startable):
                     asyncio.run_coroutine_threadsafe(
                         self.stream_output(stream_id, f"Error: {e}", is_final=True), self._original_loop
                     ).result()
-                except:
+                except Exception:
                     log.error(f"Failed to send error message to stream {stream_id}")
             finally:
                 new_loop.close()
@@ -147,5 +148,5 @@ class openai(llm, ParallelStartable, Startable):
             log.error(f"OpenAI LLM streaming setup error: {e}")
             try:
                 await self.stream_output(stream_id, f"Error: {e}", is_final=True)
-            except:
+            except Exception:
                 log.error(f"Failed to send error message to stream {stream_id}")

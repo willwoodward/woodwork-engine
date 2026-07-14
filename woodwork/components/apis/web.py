@@ -3,13 +3,13 @@ import os
 
 import requests
 
-from woodwork.components.apis.api import api
+from woodwork.components.apis.api import API
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class web(api):
+class Web(API):
     def __init__(self, url: str, **config):
         format_kwargs(config, url=url, type="web")
         super().__init__(**config)

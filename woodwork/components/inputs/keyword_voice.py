@@ -15,7 +15,7 @@ import sounddevice as sd
 import webrtcvad
 from vosk import KaldiRecognizer, Model
 
-from woodwork.components.inputs.inputs import inputs
+from woodwork.components.inputs.inputs import Input
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def suppress_stderr():
             os.close(saved_stderr_fd)
 
 
-class keyword_voice(inputs):
+class KeywordVoice(Input):
     def __init__(self, api_key, keyword, **config):
         format_kwargs(config, type="keyword_voice")
         super().__init__(**config)
@@ -96,7 +96,7 @@ class keyword_voice(inputs):
         # Initialize the audio stream (for some reason it sometimes doesn't work the first time)
         try:
             sd.RawInputStream(samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=callback_wrapper)
-        except:
+        except Exception:
             pass
 
         with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype="int16", channels=1, callback=callback_wrapper):

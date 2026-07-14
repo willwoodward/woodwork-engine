@@ -5,16 +5,17 @@ from openai import OpenAI
 from typing import Callable
 
 from woodwork.components.knowledge_bases.graph_databases.graph_database import (
-    graph_database,
+    GraphDatabase as GraphDatabaseBase,
 )
-from woodwork.deployments import Docker
+from woodwork import defaults
+from woodwork.deploy import Docker
 from woodwork.utils import format_kwargs, get_optional
 from woodwork.interfaces.startable import Startable
 
 log = logging.getLogger(__name__)
 
 
-class neo4j(graph_database, Startable):
+class Neo4j(GraphDatabaseBase, Startable):
     def __init__(self, uri, user, password, **config):
         format_kwargs(config, uri=uri, user=user, password=password, type="neo4j")
         super().__init__(**config)
@@ -29,9 +30,9 @@ class neo4j(graph_database, Startable):
         self.docker = Docker(
             image_name="custom-neo4j",
             container_name="neo4j-container",
-            dockerfile="""
+            dockerfile=f"""
             FROM neo4j:latest
-            ENV NEO4J_AUTH=neo4j/testpassword
+            ENV NEO4J_AUTH={defaults.NEO4J_AUTH}
             EXPOSE 7474 7687
             CMD ["neo4j"]
             """,
@@ -41,10 +42,10 @@ class neo4j(graph_database, Startable):
                     "7687/tcp": 7687,
                 },
                 "environment": {
-                    "NEO4J_AUTH": "neo4j/testpassword",
+                    "NEO4J_AUTH": defaults.NEO4J_AUTH,
                     "NEO4J_PLUGINS": '["genai"]',
-                    "NEO4J_dbms_security_procedures_unrestricted": "genai.*",  # Allow unrestricted genai procedures
-                    "NEO4J_dbms_security_procedures_allowlist": "genai.*",  # Allowlist genai procedures
+                    "NEO4J_dbms_security_procedures_unrestricted": "genai.*",
+                    "NEO4J_dbms_security_procedures_allowlist": "genai.*",
                 },
             },
             volume_location=".woodwork/neo4j/data",

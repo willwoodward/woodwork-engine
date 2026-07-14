@@ -1,5 +1,5 @@
 # from woodwork.dependencies import activate_virtual_environment
-from woodwork.parser.config_parser import parse
+from woodwork.config.parser import parse
 from woodwork.utils.errors.errors import ForbiddenVariableNameError
 
 import pytest
@@ -13,13 +13,7 @@ import subprocess
 def docker_available():
     """Check if Docker is available on the system."""
     try:
-        subprocess.run(
-            ["docker", "info"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=True,
-            timeout=5
-        )
+        subprocess.run(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=5)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return False

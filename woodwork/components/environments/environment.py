@@ -1,10 +1,14 @@
+import logging
 from abc import ABC, abstractmethod
-from woodwork.components.component import component
+
+from woodwork.components.component import Component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.utils import format_kwargs
 
+log = logging.getLogger(__name__)
 
-class environment(component, tool_interface, ABC):
+
+class Environment(Component, tool_interface, ABC):
     def __init__(self, **config):
         format_kwargs(config, component="environment")
         super().__init__(**config)
@@ -46,7 +50,7 @@ class environment(component, tool_interface, ABC):
             if isinstance(script, str):
                 # Execute script path or command
                 result = self.execute_command(script)
-                print(f"Setup script result: {result}")
+                log.debug(f"Setup script result: {result}")
             elif isinstance(script, dict):
                 # Handle script with additional configuration
                 script_path = script.get("path") or script.get("command")
@@ -57,4 +61,4 @@ class environment(component, tool_interface, ABC):
                     self.execute_command(f"export {key}='{value}'")
 
                 result = self.execute_command(script_path)
-                print(f"Setup script {script_path} result: {result}")
+                log.debug(f"Setup script {script_path} result: {result}")

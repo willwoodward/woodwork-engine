@@ -1,24 +1,21 @@
 """
-Enhanced event system for Woodwork engine with typed payloads and component namespacing.
+Event system for Woodwork engine with typed payloads.
 
-This module provides:
-- Type-safe event payloads with runtime validation
-- Component context for event attribution
-- Backwards-compatible API
+The canonical event system is the UnifiedEventBus (woodwork.runtime.unified_event_bus).
+This module re-exports its public API.
 """
 
-# Core event system - keep existing API
-from .events import (
-    EventManager,
-    get_global_event_manager,
-    set_global_event_manager,
+from woodwork.runtime.unified_event_bus import (
+    get_global_event_bus,
+    set_global_event_bus,
     emit,
+    emit_sync,
     register_hook,
     register_pipe,
-    create_default_emitter,
+    register_component,
 )
 
-# New typed payload system - now imported from types
+# Typed payload system
 from woodwork.types.events import (
     BasePayload,
     GenericPayload,
@@ -37,13 +34,13 @@ from woodwork.types.event_source import EventSource, track_events_from
 
 __all__ = [
     # Core event system
-    "EventManager",
-    "get_global_event_manager",
-    "set_global_event_manager",
+    "get_global_event_bus",
+    "set_global_event_bus",
     "emit",
+    "emit_sync",
     "register_hook",
     "register_pipe",
-    "create_default_emitter",
+    "register_component",
     # Payload types
     "BasePayload",
     "GenericPayload",

@@ -7,9 +7,9 @@ tests (TDD) and implementation tests.
 """
 
 import pytest
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.core.message_bus.integration import (
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.message_bus.integration import (
     MessageBusIntegration,
     ComponentNotFoundError,
     ResponseTimeoutError,
@@ -262,8 +262,8 @@ class TestMessageAPIImplementation:
     @pytest.fixture
     async def api_setup(self):
         """Setup with real message API implementation."""
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         bus = InMemoryMessageBus()
         await bus.start()
@@ -396,8 +396,8 @@ class TestMessageAPIErrorHandling:
     @pytest.fixture
     async def error_test_setup(self):
         """Setup for error testing."""
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         bus = InMemoryMessageBus()
         await bus.start()
@@ -533,8 +533,8 @@ class TestMessageAPIEdgeCases:
     @pytest.fixture
     async def edge_case_setup(self):
         """Setup for edge case testing."""
-        from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         bus = InMemoryMessageBus()
         await bus.start()

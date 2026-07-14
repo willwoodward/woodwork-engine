@@ -3,9 +3,9 @@
 import pytest
 import asyncio
 from unittest.mock import Mock
-from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
-from woodwork.core.message_bus.integration import GlobalMessageBusManager
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.message_bus.integration import GlobalMessageBusManager
 from woodwork.types.events import GenericPayload
 
 
@@ -68,7 +68,7 @@ class TestRoutingToConsole:
         message_bus.register_component_handler("_console_output", console_handler)
 
         # Create envelope
-        from woodwork.core.message_bus.interface import MessageEnvelope
+        from woodwork.runtime.message_bus.interface import MessageEnvelope
         import uuid
 
         payload = GenericPayload(component_id="coding_ag", component_type="agent", data={"response": "Test response"})

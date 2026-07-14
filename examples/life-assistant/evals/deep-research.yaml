@@ -1,0 +1,23 @@
+config: ../main.ww
+
+cases:
+  - name: dublin_relocation_vague
+    input: "I'm moving to Dublin in August, I'll be working as a software engineer at a big tech company. Where should I look for a place to live?"
+    assert:
+      tool_called: search
+      response_contains: ["dublin"]
+
+  - name: dublin_relocation_detailed
+    input: >
+      I'm a 22-year-old grad software engineer moving to Dublin in August.
+      I'll be working at a big tech company in the Docklands area.
+      My budget for rent is around €1500-1800/month.
+      I'd like a commute under 30 minutes, ideally by bike or public transport.
+      I want somewhere with a good social scene — bars, restaurants, other young professionals.
+      Can you do a deep dive — best neighbourhoods, what rent looks like in each,
+      specific websites or listings I should check, and anything else I should know about
+      renting in Dublin as someone moving from the UK?
+    assert:
+      tool_called: search
+      response_contains: ["dublin", "rent"]
+      min_tool_calls: 5

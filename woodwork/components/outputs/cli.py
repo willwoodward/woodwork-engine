@@ -1,11 +1,11 @@
 import logging
-from woodwork.components.outputs.console import console
+from woodwork.components.outputs.console import Console
 from woodwork.utils import format_kwargs
 
 log = logging.getLogger(__name__)
 
 
-class cli(console):
+class CLI(Console):
     """CLI output component - alias for console output"""
 
     def __init__(self, **config):

@@ -3,14 +3,14 @@ import multiprocessing
 from langchain_anthropic import ChatAnthropic
 import time
 
-from woodwork.components.llms.llm import llm
+from woodwork.components.llms.llm import LLM
 from woodwork.interfaces import ParallelStartable, Startable
 from woodwork.utils import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
 
-class claude(llm, ParallelStartable, Startable):
+class ClaudeLLM(LLM, ParallelStartable, Startable):
     def __init__(self, api_key: str, model="claude-sonnet-4-20250514", **config):
         format_kwargs(config, api_key=api_key, model=model, type="claude")
         log.debug("Establishing connection with Claude model...")

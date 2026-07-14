@@ -25,7 +25,7 @@ async def main():
 
     try:
         # Import message bus
-        from woodwork.core.message_bus import get_global_message_bus
+        from woodwork.runtime.message_bus import get_global_message_bus
 
         # Get message bus - this should work with zero configuration
         message_bus = await get_global_message_bus()
@@ -36,7 +36,7 @@ async def main():
         log.info(f"✅ Message bus healthy: {healthy}")
 
         # Test basic component configuration parsing
-        from woodwork.core.message_bus.declarative_router import DeclarativeRouter
+        from woodwork.runtime.message_bus.declarative_router import DeclarativeRouter
 
         router = DeclarativeRouter(message_bus)
 

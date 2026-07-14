@@ -1,7 +1,7 @@
 """Tests for MessageBus interface and data structures."""
 
 import time
-from woodwork.core.message_bus.interface import MessageEnvelope, MessageDeliveryMode, MessagePattern
+from woodwork.runtime.message_bus.interface import MessageEnvelope, MessageDeliveryMode, MessagePattern
 
 
 class TestMessageEnvelope:

@@ -1,0 +1,14 @@
+config: ../main.ww
+
+cases:
+  - name: greeting_no_tools
+    input: "hey there!"
+    assert:
+      no_tools_called: true
+      response_contains: ["hello", "hi", "hey"]
+
+  - name: personalized_meal_plan
+    input: "Hi, I'm a 22 year old male, 5 foot 10. I want to put on more muscle and eat heart-healthy food. Can you design me a meal plan?"
+    assert:
+      tool_called: search
+      response_contains: ["breakfast", "lunch", "dinner"]

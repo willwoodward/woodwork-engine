@@ -3,14 +3,14 @@ import importlib.util
 import logging
 from typing import List, Optional, Any, Dict
 from woodwork.types.workflows import Hook, Pipe
-from woodwork.events import EventManager, get_global_event_manager
+from woodwork.runtime.unified_event_bus import get_global_event_bus
 from woodwork.components.streaming_mixin import StreamingMixin
-from woodwork.core.message_bus.integration import MessageBusIntegration, register_component_with_message_bus
+from woodwork.runtime.message_bus.integration import MessageBusIntegration, register_component_with_message_bus
 
 log = logging.getLogger(__name__)
 
 
-class component(StreamingMixin, MessageBusIntegration):
+class Component(StreamingMixin, MessageBusIntegration):
     def __init__(self, name, component, type, **config):
         log.debug(
             "[component] Initializing component '%s' (type: %s, component: %s) with config keys: %s",
@@ -36,7 +36,6 @@ class component(StreamingMixin, MessageBusIntegration):
             hasattr(self, "output_targets"),
         )
 
-        self._emitter: Optional[EventManager] = None
         self._hooks: List[Hook] = []
         self._pipes: List[Pipe] = []
 
@@ -176,12 +175,7 @@ class component(StreamingMixin, MessageBusIntegration):
         return pipes
 
     def _register_hooks_global(self):
-        """Register all configured hooks with both the old EventManager and unified event bus."""
-        global_manager = get_global_event_manager()
-
-        # Also register with unified event bus
-        from woodwork.core.unified_event_bus import get_global_event_bus
-
+        """Register all configured hooks with the unified event bus."""
         unified_bus = get_global_event_bus()
 
         log.debug(f"[Component {self.name}] Registering {len(self._hooks)} hooks globally...")
@@ -192,12 +186,9 @@ class component(StreamingMixin, MessageBusIntegration):
                 )
                 func = self._load_function(hook.script_path, hook.function_name)
                 if func:
-                    # Register with old event manager (for backward compatibility)
-                    global_manager.on_hook(hook.event, func)
-                    # Register with unified event bus (for new system)
                     unified_bus.register_hook(hook.event, func)
                     log.debug(
-                        f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name} (old + unified)"
+                        f"[Component {self.name}] Successfully registered hook for event '{hook.event}' from {hook.script_path}::{hook.function_name}"
                     )
                 else:
                     log.warning(
@@ -209,12 +200,7 @@ class component(StreamingMixin, MessageBusIntegration):
                 )
 
     def _register_pipes_global(self):
-        """Register all configured pipes with both the old EventManager and unified event bus."""
-        global_manager = get_global_event_manager()
-
-        # Also register with unified event bus
-        from woodwork.core.unified_event_bus import get_global_event_bus
-
+        """Register all configured pipes with the unified event bus."""
         unified_bus = get_global_event_bus()
 
         log.debug(f"[Component {self.name}] Registering {len(self._pipes)} pipes globally...")
@@ -225,12 +211,9 @@ class component(StreamingMixin, MessageBusIntegration):
                 )
                 func = self._load_function(pipe.script_path, pipe.function_name)
                 if func:
-                    # Register with old event manager (for backward compatibility)
-                    global_manager.on_pipe(pipe.event, func)
-                    # Register with unified event bus (for new system)
                     unified_bus.register_pipe(pipe.event, func)
                     log.debug(
-                        f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name} (old + unified)"
+                        f"[Component {self.name}] Successfully registered pipe for event '{pipe.event}' from {pipe.script_path}::{pipe.function_name}"
                     )
                 else:
                     log.warning(
@@ -302,7 +285,7 @@ class component(StreamingMixin, MessageBusIntegration):
             self.add_hook("tool.call", log_tool_calls, "Log all tool calls")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_hook(event_name, hook_function)
@@ -332,7 +315,7 @@ class component(StreamingMixin, MessageBusIntegration):
             self.add_pipe("input.received", add_component_context, "Add component context to input")
         """
         try:
-            from woodwork.core.unified_event_bus import get_global_event_bus
+            from woodwork.runtime.unified_event_bus import get_global_event_bus
 
             event_bus = get_global_event_bus()
             event_bus.register_pipe(event_name, pipe_function)
@@ -347,8 +330,3 @@ class component(StreamingMixin, MessageBusIntegration):
         # Base implementation for cleanup
         # Internal features cleanup is handled by specific component types
         pass
-
-    @property
-    def emitter(self) -> Optional[EventManager]:
-        """Get the EventManager instance for this component."""
-        return self._emitter

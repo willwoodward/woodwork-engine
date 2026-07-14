@@ -15,7 +15,8 @@ import logging
 from typing import Dict, List, Tuple, Callable, Any, TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from woodwork.components.component import component
+    from woodwork.components.component import Component
+from woodwork import defaults
 from woodwork.types.events import (
     AgentThoughtPayload,
     AgentActionPayload,
@@ -50,16 +51,16 @@ class KnowledgeGraphFeature(InternalFeature):
                 "component_type": "neo4j",
                 "component_id": "knowledge_graph_neo4j",
                 "config": {
-                    "uri": "bolt://localhost:7687",
-                    "user": "neo4j",
-                    "password": "testpassword",
+                    "uri": defaults.NEO4J_URI,
+                    "user": defaults.NEO4J_USER,
+                    "password": defaults.NEO4J_PASSWORD,
                     "name": "knowledge_graph_db",
                 },
                 "optional": False,
             }
         ]
 
-    def _setup_feature(self, component: "component", config: Dict, component_manager) -> None:
+    def _setup_feature(self, component: "Component", config: Dict, component_manager) -> None:
         """Initialize knowledge graph with auto-created Neo4j component."""
         log.debug(f"Setting up KnowledgeGraphFeature for component: {component.name}")
         self._component_ref = component
@@ -71,9 +72,9 @@ class KnowledgeGraphFeature(InternalFeature):
 
         # Get or create Neo4j component through component manager
         neo4j_config = {
-            "uri": config.get("knowledge_graph_uri", "bolt://localhost:7687"),
-            "user": config.get("knowledge_graph_user", "neo4j"),
-            "password": config.get("knowledge_graph_password", "testpassword"),
+            "uri": config.get("knowledge_graph_uri", defaults.NEO4J_URI),
+            "user": config.get("knowledge_graph_user", defaults.NEO4J_USER),
+            "password": config.get("knowledge_graph_password", defaults.NEO4J_PASSWORD),
             "name": f"{component.name}_knowledge_graph",
             "api_key": api_key,
         }
@@ -112,7 +113,7 @@ class KnowledgeGraphFeature(InternalFeature):
             except Exception as e:
                 log.debug(f"Schema query failed (may already exist): {e}")
 
-    def teardown(self, component: "component", component_manager) -> None:
+    def teardown(self, component: "Component", component_manager) -> None:
         """Clean up knowledge graph (component manager handles Neo4j cleanup)."""
         log.debug(f"Tearing down KnowledgeGraphFeature for component: {component.name}")
 

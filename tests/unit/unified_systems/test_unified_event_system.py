@@ -25,7 +25,7 @@ class TestUnifiedEventBus:
     @pytest.fixture
     def event_bus(self):
         """Create a UnifiedEventBus instance for testing"""
-        from woodwork.core.unified_event_bus import UnifiedEventBus
+        from woodwork.runtime.unified_event_bus import UnifiedEventBus
 
         return UnifiedEventBus()
 
@@ -220,7 +220,7 @@ class TestAsyncRuntime:
     @pytest.fixture
     def runtime(self):
         """Create an AsyncRuntime instance for testing"""
-        from woodwork.core.async_runtime import AsyncRuntime
+        from woodwork.runtime.async_runtime import AsyncRuntime
 
         return AsyncRuntime()
 
@@ -242,7 +242,7 @@ class TestAsyncRuntime:
     async def test_component_parsing_and_registration(self, runtime, sample_config):
         """Test that components are parsed and registered correctly"""
         # Start runtime with config
-        with patch("woodwork.core.async_runtime.parse_components") as mock_parse:
+        with patch("woodwork.runtime.async_runtime.parse_components") as mock_parse:
             mock_components = [Mock(name="input_comp"), Mock(name="agent_comp")]
             mock_parse.return_value = mock_components
 
@@ -312,9 +312,9 @@ class TestUnifiedAPIInput:
     @pytest.fixture
     def api_input_component(self):
         """Create API input component for testing"""
-        from woodwork.components.inputs.api_input import api_input
+        from woodwork.components.inputs.api_input import APIInput
 
-        return api_input()
+        return APIInput()
 
     async def test_direct_websocket_event_subscription(self, api_input_component):
         """Test that WebSocket subscribes directly to events without queues"""
@@ -387,7 +387,7 @@ class TestIntegrationScenarios:
     @pytest.fixture
     async def full_system(self):
         """Set up complete system with runtime and components"""
-        from woodwork.core.async_runtime import AsyncRuntime
+        from woodwork.runtime.async_runtime import AsyncRuntime
 
         runtime = AsyncRuntime()
 

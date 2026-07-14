@@ -10,7 +10,7 @@ import logging
 import uuid
 from typing import Dict, Any, Optional, List
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.interfaces.tool_interface import tool_interface
 from woodwork.utils import format_kwargs
 
@@ -22,7 +22,7 @@ from .messages import MCPMessage, MCPError
 log = logging.getLogger(__name__)
 
 
-class MCPServer(component, tool_interface):
+class MCPServer(Component, tool_interface):
     """Framework component for MCP servers with registry integration."""
 
     def __init__(
@@ -176,6 +176,9 @@ class MCPServer(component, tool_interface):
 
         log.info(f"[MCPServer] Starting {self.name} ({self.server_name}:{self.server_version})")
 
+        # Auto-inject credentials from identity store
+        await self._resolve_credentials()
+
         try:
             # Registry resolution
             log.debug(f"[MCPServer] Resolving {self.server_name}:{self.server_version} from registry")
@@ -204,6 +207,32 @@ class MCPServer(component, tool_interface):
             log.error(f"[MCPServer] Failed to start {self.name}: {e}")
             await self._cleanup()
             raise
+
+    async def _resolve_credentials(self) -> None:
+        """Resolve credentials from identity store.
+
+        If the identity store has Google credentials, inject a fresh access token
+        into any env var named GOOGLE_ACCESS_TOKEN (regardless of current value).
+        """
+        try:
+            from woodwork.identity.store import load_credentials
+            from woodwork.identity.oauth import refresh_access_token
+
+            for key in list(self.all_env_vars.keys()):
+                if "GOOGLE_ACCESS_TOKEN" in key:
+                    creds = load_credentials("google")
+                    if creds:
+                        creds = refresh_access_token(creds)
+                        self.all_env_vars[key] = creds["access_token"]
+                        log.info(f"[MCPServer] Injected fresh Google access token for {key}")
+                    else:
+                        log.warning(
+                            f"[MCPServer] No Google credentials in store for {key}. Run 'woodwork auth google'."
+                        )
+        except ImportError:
+            pass  # Identity module deps not installed, skip
+        except Exception as e:
+            log.warning(f"[MCPServer] Failed to resolve credentials: {e}")
 
     async def close(self) -> None:
         """Close MCP server and cleanup resources."""
@@ -740,8 +769,7 @@ class MCPServer(component, tool_interface):
                 capabilities["resources"] = resources_result.get("resources", [])
                 log.info(f"[MCPServer] Found {len(capabilities['resources'])} resources for {self.name}")
             except Exception as e:
-                log.error(f"[MCPServer] Failed to fetch resources from {self.name}: {e}")
-                log.debug(f"[MCPServer] Resource fetch error details: {type(e).__name__}: {str(e)}")
+                log.debug(f"[MCPServer] Failed to fetch resources from {self.name}: {e}")
                 capabilities["resources"] = []
 
             # Fetch prompts with detailed error handling
@@ -751,8 +779,7 @@ class MCPServer(component, tool_interface):
                 capabilities["prompts"] = prompts_result.get("prompts", [])
                 log.info(f"[MCPServer] Found {len(capabilities['prompts'])} prompts for {self.name}")
             except Exception as e:
-                log.error(f"[MCPServer] Failed to fetch prompts from {self.name}: {e}")
-                log.debug(f"[MCPServer] Prompt fetch error details: {type(e).__name__}: {str(e)}")
+                log.debug(f"[MCPServer] Failed to fetch prompts from {self.name}: {e}")
                 capabilities["prompts"] = []
 
             self._capabilities = capabilities

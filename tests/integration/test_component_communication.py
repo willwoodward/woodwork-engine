@@ -3,8 +3,8 @@
 import pytest
 import asyncio
 from unittest.mock import Mock, AsyncMock
-from woodwork.core.unified_event_bus import UnifiedEventBus
-from woodwork.core.message_bus.in_memory_bus import InMemoryMessageBus
+from woodwork.runtime.unified_event_bus import UnifiedEventBus
+from woodwork.runtime.message_bus.in_memory_bus import InMemoryMessageBus
 from tests.unit.fixtures.mock_components import MockAgent, MockTool, MockOutput
 
 

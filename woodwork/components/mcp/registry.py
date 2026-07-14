@@ -10,6 +10,7 @@ import logging
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
+from urllib.parse import quote
 import aiohttp
 
 log = logging.getLogger(__name__)
@@ -26,12 +27,14 @@ class TransportType(Enum):
 
 @dataclass
 class PackageInfo:
-    """Information about a local package (OCI container)."""
+    """Information about a local package (OCI container or command)."""
 
-    type: str
+    type: str  # "oci" for Docker, "command" for npx/local commands
     identifier: str
     version: str
-    registry_base_url: str
+    registry_base_url: str = ""
+    command: Optional[str] = None  # For command-type: the command to run
+    args: Optional[List[str]] = None  # For command-type: command arguments
 
 
 @dataclass
@@ -68,7 +71,7 @@ class ServerMetadata:
         # Prefer local packages for better performance/security
         if self.packages:
             for package in self.packages:
-                if package.type == "oci":
+                if package.type in ("oci", "command"):
                     return TransportType.STDIO
 
         # Fallback to remote endpoints
@@ -97,17 +100,59 @@ class ServerMetadata:
 
     @classmethod
     def from_registry(cls, server_data: Dict[str, Any]) -> "ServerMetadata":
-        """Create ServerMetadata from registry response."""
+        """Create ServerMetadata from v0.1 registry response.
+
+        Maps the v0.1 API fields to internal format:
+        - registryType "npm" → command="npx", args=["-y", identifier]
+        - registryType "pypi" → command="uvx", args=[identifier]
+        - runtimeHint overrides the default command
+        - environmentVariables are aggregated and deduped across packages
+        """
+        # Default command per registry type
+        _REGISTRY_COMMANDS: Dict[str, tuple[str, list[str]]] = {
+            "npm": ("npx", ["-y"]),
+            "pypi": ("uvx", []),
+        }
+
         packages = []
-        for package_data in server_data.get("packages", []):
+        seen_env_vars: Dict[str, EnvVar] = {}
+
+        for pkg in server_data.get("packages", []):
+            registry_type = pkg.get("registryType", "")
+            identifier = pkg.get("name", "")
+            version = pkg.get("version", "latest")
+            runtime_hint = pkg.get("runtimeHint", "")
+            registry_base_url = pkg.get("registryBaseUrl", "")
+
+            # Determine command and args from registry type
+            if registry_type in _REGISTRY_COMMANDS:
+                default_cmd, prefix_args = _REGISTRY_COMMANDS[registry_type]
+                command = runtime_hint or default_cmd
+                args = prefix_args + [identifier]
+            else:
+                command = runtime_hint or registry_type
+                args = [identifier]
+
             packages.append(
                 PackageInfo(
-                    type=package_data["type"],
-                    identifier=package_data["identifier"],
-                    version=package_data["version"],
-                    registry_base_url=package_data.get("registry_base_url", ""),
+                    type="command",
+                    identifier=identifier,
+                    version=version,
+                    registry_base_url=registry_base_url,
+                    command=command,
+                    args=args,
                 )
             )
+
+            # Collect env vars from each package (dedupe by name)
+            for env in pkg.get("environmentVariables", []):
+                name = env.get("name", "")
+                if name and name not in seen_env_vars:
+                    seen_env_vars[name] = EnvVar(
+                        name=name,
+                        required=env.get("isRequired", True),
+                        description=env.get("description", ""),
+                    )
 
         remotes = []
         for remote_data in server_data.get("remotes", []):
@@ -117,23 +162,23 @@ class ServerMetadata:
 
             remotes.append(RemoteInfo(type=remote_data["type"], url=remote_data["url"], headers=headers))
 
-        env_vars = []
-        for env_data in server_data.get("env_vars", []):
-            env_vars.append(
-                EnvVar(
-                    name=env_data["name"],
-                    required=env_data.get("required", True),
-                    description=env_data.get("description", ""),
-                )
-            )
+            # Collect env vars from remotes too
+            for env in remote_data.get("environmentVariables", []):
+                name = env.get("name", "")
+                if name and name not in seen_env_vars:
+                    seen_env_vars[name] = EnvVar(
+                        name=name,
+                        required=env.get("isRequired", True),
+                        description=env.get("description", ""),
+                    )
 
         return cls(
-            name=server_data["name"],
-            version=server_data["version"],
+            name=server_data.get("name", ""),
+            version=server_data.get("version_detail", {}).get("version", server_data.get("version", "")),
             description=server_data.get("description", ""),
             packages=packages,
             remotes=remotes,
-            env_vars=env_vars,
+            env_vars=list(seen_env_vars.values()),
         )
 
 
@@ -146,7 +191,7 @@ class UnsupportedTransportError(Exception):
 class MCPRegistry:
     """Client for MCP Registry API with caching."""
 
-    BASE_URL = "https://registry.modelcontextprotocol.io/v0"
+    BASE_URL = "https://registry.modelcontextprotocol.io/v0.1"
     CACHE_TTL = 3600  # 1 hour
 
     def __init__(self):
@@ -166,6 +211,9 @@ class MCPRegistry:
     ) -> ServerMetadata:
         """
         Fetch server metadata from registry with fallback for known servers.
+
+        Uses the v0.1 search endpoint for latest versions, or direct version
+        lookup for pinned versions.
 
         Args:
             name: Server name (e.g., "io.github.github/mcp-server")
@@ -194,20 +242,36 @@ class MCPRegistry:
             log.info(f"[MCPRegistry] Fetching metadata for {name}:{version}")
 
             http_client = await self._get_http_client()
-            # Use correct server endpoint format
-            server_id = name.replace("/", "-")  # Convert name to valid server ID
-            url = f"{self.BASE_URL}/server/{server_id}"
 
-            async with http_client.get(url) as response:
-                if response.status == 404:
-                    log.debug(f"[MCPRegistry] Server not found in registry: {name}, using fallback")
+            if version != "latest":
+                # Pinned version: direct lookup
+                url = f"{self.BASE_URL}/servers/{quote(name, safe='')}/versions/{quote(version, safe='')}"
+                async with http_client.get(url) as response:
+                    if response.status == 404:
+                        log.debug(f"[MCPRegistry] Server not found in registry: {name}@{version}, using fallback")
+                        return self._get_fallback_metadata(name, version, toolsets, readonly)
+                    response.raise_for_status()
+                    server_data = await response.json()
+            else:
+                # Latest: use search endpoint
+                url = f"{self.BASE_URL}/servers"
+                params = {"search": name, "limit": "5", "version": "latest"}
+                async with http_client.get(url, params=params) as response:
+                    if response.status == 404:
+                        log.debug(f"[MCPRegistry] Search returned 404 for {name}, using fallback")
+                        return self._get_fallback_metadata(name, version, toolsets, readonly)
+                    response.raise_for_status()
+                    data = await response.json()
+
+                servers = data.get("servers", [])
+                if not servers:
+                    log.debug(f"[MCPRegistry] No results for {name}, using fallback")
                     return self._get_fallback_metadata(name, version, toolsets, readonly)
 
-                response.raise_for_status()
-                data = await response.json()
+                # Use the first match; the nested "server" object holds metadata
+                server_data = servers[0].get("server", servers[0])
 
-            # Registry returns single server object, not array
-            metadata = ServerMetadata.from_registry(data)
+            metadata = ServerMetadata.from_registry(server_data)
 
             # Cache the result
             self._cache[cache_key] = {"metadata": metadata, "timestamp": time.time()}
@@ -286,6 +350,75 @@ class MCPRegistry:
                         description="GitHub Personal Access Token with appropriate scopes",
                     )
                 ],
+            )
+
+        # Google Calendar MCP Server (community, local STDIO via npx)
+        if name in ["google/calendar", "nspady/google-calendar-mcp"]:
+            return ServerMetadata(
+                name=name,
+                version=version,
+                description="Google Calendar MCP Server (nspady/google-calendar-mcp)",
+                packages=[
+                    PackageInfo(
+                        type="command",
+                        identifier="google-calendar-mcp",
+                        version=version,
+                        command="npx",
+                        args=["-y", "@cocal/google-calendar-mcp"],
+                    )
+                ],
+                env_vars=[
+                    EnvVar(
+                        name="GOOGLE_OAUTH_CREDENTIALS",
+                        required=True,
+                        description="Path to GCP OAuth client secrets JSON file",
+                    )
+                ],
+            )
+
+        # Google Gmail MCP Server (official, remote HTTP)
+        if name in ["google/gmail"]:
+            return ServerMetadata(
+                name=name,
+                version=version,
+                description="Google Gmail MCP Server (official)",
+                packages=[],
+                remotes=[
+                    RemoteInfo(
+                        type="streamable-http",
+                        url="https://gmailmcp.googleapis.com/mcp/v1",
+                        headers=[
+                            {"name": "Authorization", "value": "Bearer {GOOGLE_ACCESS_TOKEN}"},
+                            {"name": "Content-Type", "value": "application/json"},
+                        ],
+                    )
+                ],
+                env_vars=[
+                    EnvVar(
+                        name="GOOGLE_ACCESS_TOKEN",
+                        required=True,
+                        description="Google OAuth2 access token (use 'woodwork auth google' to obtain)",
+                    )
+                ],
+            )
+
+        # DuckDuckGo MCP Server (free web search, no API key needed)
+        if name in ["duckduckgo/mcp-server"]:
+            return ServerMetadata(
+                name=name,
+                version=version,
+                description="DuckDuckGo Web Search MCP Server",
+                packages=[
+                    PackageInfo(
+                        type="command",
+                        identifier="duckduckgo-mcp-server",
+                        version=version,
+                        command="uvx",
+                        args=["duckduckgo-mcp-server"],
+                    )
+                ],
+                remotes=[],
+                env_vars=[],
             )
 
         raise ValueError(f"Server '{name}' not found in registry and no fallback available")

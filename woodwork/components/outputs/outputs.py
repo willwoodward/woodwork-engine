@@ -2,11 +2,11 @@ from abc import abstractmethod
 import asyncio
 from typing import Any
 
-from woodwork.components.component import component
+from woodwork.components.component import Component
 from woodwork.utils import format_kwargs
 
 
-class outputs(component):
+class Output(Component):
     def __init__(self, **config):
         format_kwargs(config, component="output")
         super().__init__(**config)

@@ -6,14 +6,14 @@ from langchain_openai import OpenAIEmbeddings
 import hashlib
 
 from woodwork.components.knowledge_bases.vector_databases.vector_database import (
-    vector_database,
+    VectorDatabase,
 )
 from woodwork.utils import format_kwargs, get_optional
 
 log = logging.getLogger(__name__)
 
 
-class chroma(vector_database):
+class ChromaDB(VectorDatabase):
     def __init__(self, api_key: str, **config):
         format_kwargs(config, api_key=api_key, type="chroma")
         super().__init__(**config)
@@ -81,9 +81,9 @@ class chroma(vector_database):
 
         try:
             self._db.delete(ids=ids)
-            print(f"Deleted {len(ids)} vectors from Chroma.")
+            log.info(f"Deleted {len(ids)} vectors from Chroma.")
         except Exception as e:
-            print(f"Error deleting vectors from Chroma: {e}")
+            log.error(f"Error deleting vectors from Chroma: {e}")
 
     @property
     def retriever(self):

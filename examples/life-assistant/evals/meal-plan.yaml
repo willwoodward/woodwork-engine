@@ -1,0 +1,8 @@
+config: ../main.ww
+
+cases:
+  - name: personalized_meal_plan
+    input: "Hi, I'm a 22 year old male, 5 foot 10. I want to put on more muscle and eat heart-healthy food. Can you design me a meal plan?"
+    assert:
+      tool_called: search
+      response_contains: ["breakfast", "lunch", "dinner"]
