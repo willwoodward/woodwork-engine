@@ -8,8 +8,9 @@ All components share: name, config, lifecycle hooks, and hook/pipe registration.
 import logging
 import importlib.util
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+from woodwork.core.events import EventBus
 from woodwork.interfaces.stoppable import Stoppable
 from woodwork.types.workflows import Hook, Pipe
 
@@ -30,9 +31,24 @@ class Component(Stoppable):
         self.type = type
         self.config = config
 
-        # Hook / pipe configs parsed from the .ww file
-        self._hook_configs: List[Hook] = self._parse_hooks(config.get("hooks", []))
-        self._pipe_configs: List[Pipe] = self._parse_pipes(config.get("pipes", []))
+        # Per-component event bus (LLMAgent overrides with a bus that has a parent)
+        self.event_bus: EventBus = EventBus()
+
+        # Hook / pipe configs parsed from the .ww file (list-of-dicts path)
+        self._hook_configs: List[Hook] = self._parse_hooks(
+            config.get("hooks") if isinstance(config.get("hooks"), list) else []
+        )
+        self._pipe_configs: List[Pipe] = self._parse_pipes(
+            config.get("pipes") if isinstance(config.get("pipes"), list) else []
+        )
+
+        # Python API: hooks/pipes passed as {event: callable} dicts
+        if isinstance(config.get("hooks"), dict):
+            for event, fn in config["hooks"].items():
+                self.event_bus.register_hook(event if isinstance(event, str) else str(event), fn)
+        if isinstance(config.get("pipes"), dict):
+            for event, fn in config["pipes"].items():
+                self.event_bus.register_pipe(event if isinstance(event, str) else str(event), fn)
 
         log.debug("[Component] Initialized '%s' (component=%s type=%s)", name, component, type)
 
@@ -58,6 +74,42 @@ class Component(Stoppable):
 
     async def execute(self, action: str, inputs: Dict[str, Any]) -> Any:
         raise NotImplementedError(f"{self.__class__.__name__} does not implement execute()")
+
+    # ------------------------------------------------------------------ #
+    # Python API: hook / pipe decorators                                  #
+    # ------------------------------------------------------------------ #
+
+    def hook(self, event: Any) -> Callable:
+        """Decorator: register a read-only hook for *event* on this component's bus.
+
+        Usage::
+
+            @component.hook(Event.Agent.TOOL_CALL)
+            def on_tool_call(payload): ...
+        """
+        event_str = event if isinstance(event, str) else str(event)
+
+        def decorator(fn: Callable) -> Callable:
+            self.event_bus.register_hook(event_str, fn)
+            return fn
+
+        return decorator
+
+    def pipe(self, event: Any) -> Callable:
+        """Decorator: register a transforming pipe for *event* on this component's bus.
+
+        Usage::
+
+            @component.pipe(Event.Agent.ACTION)
+            def transform(payload): ...
+        """
+        event_str = event if isinstance(event, str) else str(event)
+
+        def decorator(fn: Callable) -> Callable:
+            self.event_bus.register_pipe(event_str, fn)
+            return fn
+
+        return decorator
 
     # ------------------------------------------------------------------ #
     # Hook / pipe wiring                                                  #

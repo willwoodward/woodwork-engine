@@ -18,7 +18,8 @@ from woodwork.components.agents.agent_loop import AgentLoop
 from woodwork.core.events import EventBus
 from woodwork.core.tools import ToolRegistry
 from woodwork.core.types import AgentContext
-from woodwork.types import Action, Prompt
+from woodwork.primitives import File
+from woodwork.types import Prompt
 from woodwork.utils import format_kwargs, get_optional, get_prompt
 from woodwork.components.internal_features import InternalFeatureRegistry, InternalComponentManager, InternalFeature
 
@@ -31,15 +32,33 @@ class LLMAgent(Agent):
         super().__init__(**config)
 
         self._model_component = model
+        self._input_component = get_optional(config, "input")
 
         self._is_planner = get_optional(config, "planning", False)
-        self._prompt_config = Prompt.from_dict(
-            config.get(
-                "prompt",
-                {"file": "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"},
-            )
-        )
-        self._prompt = get_prompt(self._prompt_config.file)
+
+        # Resolve the system prompt from multiple possible sources:
+        #   File("path/to/prompt.txt")  — Python API: appended onto the default ReAct prompt
+        #   "inline string"             — Python API: appended onto the default ReAct prompt
+        #   {"file": "path"}            — .ww config dict: used as the full prompt (no appending)
+        #   missing / None              — default ReAct prompt only
+        prompt_arg = config.get("prompt")
+        if isinstance(prompt_arg, dict):
+            # .ww path — the dict specifies the exact prompt file to use
+            self._prompt_config = Prompt.from_dict(prompt_arg)
+            self._prompt = get_prompt(self._prompt_config.file)
+        else:
+            # Python API paths — always start with the default ReAct format
+            default = self._load_default_prompt()
+            if isinstance(prompt_arg, File):
+                try:
+                    extra = prompt_arg.read()
+                except Exception:
+                    extra = ""
+                self._prompt = f"{default}\n\n{extra}".strip() if extra else default
+            elif isinstance(prompt_arg, str):
+                self._prompt = f"{default}\n\n{prompt_arg}".strip() if prompt_arg else default
+            else:
+                self._prompt = default
 
         # Per-agent event bus, optionally bubbling to the system bus
         self.event_bus = EventBus(parent=system_bus)
@@ -61,6 +80,7 @@ class LLMAgent(Agent):
 
             if queue:
                 from woodwork.types import Update
+
                 queue.put(Update(progress=10, component_name=self.name))
 
             self._internal_features = InternalFeatureRegistry.create_features(self._internal_features_config)
@@ -119,6 +139,13 @@ class LLMAgent(Agent):
 
         loop = AgentLoop(self._model_component, registry, self.event_bus)
         return await loop.run(ctx, system_prompt)
+
+    async def send(self, query: str, session_id: str = "default") -> str:
+        """Python API convenience method — send a query and return the response.
+
+        Equivalent to ``await agent.execute("run", {"query": query, "session_id": session_id})``.
+        """
+        return await self.execute("run", {"query": query, "session_id": session_id})
 
     # Legacy input() alias kept for existing event-bus delivery paths
     async def input(self, query: str, inputs: Optional[dict] = None):
@@ -180,6 +207,13 @@ class LLMAgent(Agent):
                 if not optional:
                     raise RuntimeError(f"Failed to create required component {cid}: {exc}") from exc
                 log.warning("[LLMAgent %s] Optional component %s unavailable: %s", self.name, cid, exc)
+
+    def _load_default_prompt(self) -> str:
+        path = "prompts/defaults/planning.txt" if self._is_planner else "prompts/defaults/agent.txt"
+        try:
+            return get_prompt(path)
+        except Exception:
+            return ""
 
     def get_internal_component(self, component_id: str):
         return self._internal_component_manager.get_component(component_id)

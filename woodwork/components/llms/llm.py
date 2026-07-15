@@ -23,7 +23,10 @@ class LLM(Component, StreamingMixin, tool_interface, knowledge_base_interface, A
         super().__init__(**config)
 
         self._prompt_config = Prompt.from_dict(config.get("prompt", {"file": "prompts/defaults/llm.txt"}))
-        self._prompt = get_prompt(self._prompt_config.file)
+        try:
+            self._prompt = get_prompt(self._prompt_config.file)
+        except Exception:
+            self._prompt = ""
         self._memory = config.get("memory")
         self._output = config.get("to")
 

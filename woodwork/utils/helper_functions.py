@@ -5,8 +5,30 @@ import logging
 import tomli
 import inspect
 import asyncio
+from enum import IntEnum
+from typing import Optional, Union
 
 from woodwork.utils.errors import WoodworkError
+
+
+class LogLevel(IntEnum):
+    """Log level constants for :func:`configure_logging`.
+
+    Mirrors Python's :mod:`logging` levels so users don't need a separate import.
+
+    Example::
+
+        from woodwork.utils import configure_logging, LogLevel
+
+        configure_logging(LogLevel.INFO)
+        configure_logging(LogLevel.DEBUG)
+    """
+
+    DEBUG = logging.DEBUG        # 10
+    INFO = logging.INFO          # 20
+    WARNING = logging.WARNING    # 30
+    ERROR = logging.ERROR        # 40
+    CRITICAL = logging.CRITICAL  # 50
 from woodwork.globals import global_config as config
 
 log = logging.getLogger(__name__)
@@ -126,3 +148,56 @@ async def maybe_async(func, *args, **kwargs):
         return await func(*args, **kwargs)
     else:
         return func(*args, **kwargs)
+
+
+def configure_logging(level: Union["LogLevel", int, str] = LogLevel.ERROR) -> None:
+    """Configure basic logging for a woodwork application.
+
+    Call this at the top of your script before constructing any components.
+    The default level is ``logging.ERROR`` so Python API users see only errors
+    by default.
+
+    Parameters
+    ----------
+    level:
+        A :class:`LogLevel` constant, a plain :mod:`logging` integer, or a
+        level name string.
+
+    Examples
+    --------
+    ::
+
+        from woodwork.utils import configure_logging, LogLevel
+
+        configure_logging()                  # ERROR only (default)
+        configure_logging(LogLevel.INFO)     # verbose
+        configure_logging(LogLevel.DEBUG)    # very verbose
+    """
+    if isinstance(level, str):
+        level = getattr(logging, level.upper(), logging.ERROR)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    )
+    # basicConfig is a no-op when handlers are already set; set the level directly too.
+    logging.root.setLevel(level)
+
+
+def load_envfile(path: Optional[str] = ".env") -> None:
+    """Load environment variables from a ``.env`` file.
+
+    Must be called **before** constructing :class:`~woodwork.primitives.Env`
+    instances (which read environment variables eagerly).
+
+    Parameters
+    ----------
+    path:
+        Path to the ``.env`` file (default: ``".env"`` in the current directory).
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError as exc:
+        raise ImportError(
+            "python-dotenv is required for load_envfile(). Install it with: pip install python-dotenv"
+        ) from exc
+    load_dotenv(path)

@@ -269,6 +269,7 @@ class MCPServer(Component, tool_interface):
 
         # Close manager and registry
         await self.manager.close()
+        await self.registry.close()
 
         self._started = False
         self._initialized = False

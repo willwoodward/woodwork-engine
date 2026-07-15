@@ -64,6 +64,22 @@ class AsyncRuntime:
         finally:
             await self._cleanup()
 
+    async def setup(self, components: List[Any], dep_map: Optional[Dict[str, List[str]]] = None) -> None:
+        """Initialise and start *components* without entering the main loop.
+
+        Used by :class:`woodwork.runtime.Runtime` as an async context manager
+        so callers can send queries programmatically.
+        """
+        dep_map = dep_map or {}
+        self._running = True
+
+        for comp in components:
+            self._components[comp.name] = comp
+
+        ordered = self._topo_sort(components, dep_map)
+        await self._initialize_all(ordered)
+        await self._start_all(ordered)
+
     async def stop(self) -> None:
         self._running = False
         if self._api_task and not self._api_task.done():
